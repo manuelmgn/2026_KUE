@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+data
+coverage
+playwright-report
+test-results
+kue-antigravity-kit
+kue-antigravity-kit-v2.zip
+prisma/*.db
+prisma/*.db-*

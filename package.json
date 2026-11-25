@@ -1,0 +1,45 @@
+{
+  "name": "kue",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack -p 5030",
+    "build": "next build",
+    "start": "next start -p 5030",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.10.1",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "better-sqlite3": "^12.0.0",
+    "next": "^16.4.6",
+    "pg": "^8.16.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.9",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "dotenv": "^17.0.0",
+    "prisma": "^7.10.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.8.3",
+    "vitest": "^5.1.2"
+  }
+}

@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-elevated: #121212;
+  --ink: #ffffff;
+  --ink-muted: #8a8a8a;
+  --line: #242424;
+  --line-strong: #3d3d3d;
+  --acid: #ccff00;
+  --acid-ink: #000000;
+}
+
+[data-theme="light"] {
+  --bg: #f4f4ef;
+  --surface: #ffffff;
+  --surface-elevated: #eaeae2;
+  --ink: #0a0a0a;
+  --ink-muted: #5f5f5a;
+  --line: #cecec6;
+  --line-strong: #181816;
+  --acid: #ccff00;
+  --acid-ink: #000000;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-acid: var(--acid);
+  --color-acid-ink: var(--acid-ink);
+
+  --font-display: var(--font-syne), sans-serif;
+  --font-serif: var(--font-instrument-serif), serif;
+  --font-mono: var(--font-ibm-plex-mono), monospace;
+  --font-sans: var(--font-archivo), sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  border-radius: 0px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

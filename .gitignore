@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js
+.next/
+out/
+build/
+
+# Prisma & Local DB
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+src/generated/prisma/
+
+# Media cache
+data/
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS / Misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Kit archive
+kue-antigravity-kit/
+kue-antigravity-kit-v2.zip

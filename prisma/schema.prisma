@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Local development uses SQLite. For production PostgreSQL, change provider to "postgresql"
+// and regenerate with `npm run db:generate`.
+datasource db {
+  provider = "sqlite"
+}
+
+enum ArtistStatus {
+  PENDING
+  LISTENING
+  RATED
+  DISCARDED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+}
+
+enum ReleaseType {
+  ALBUM
+  EP
+  LIVE
+  OTHER
+}
+
+model Artist {
+  id             String                @id @default(cuid())
+  name           String
+  normalizedName String                @unique
+  mbid           String?               @unique
+  deezerId       String?
+  country        String?
+  bio            String?
+  imagePath      String?
+  rating         Int?
+  status         ArtistStatus          @default(PENDING)
+  notes          String                @default("")
+  syncStatus     SyncStatus            @default(PENDING)
+  syncError      String?
+  syncedAt       DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  albums  Album[]
+  entries FestivalEntryArtist[]
+
+  @@index([status])
+  @@index([rating])
+  @@index([syncStatus])
+}
+
+model Album {
+  id          String      @id @default(cuid())
+  artistId    String
+  mbid        String?
+  title       String
+  releaseYear Int?
+  releaseType ReleaseType @default(ALBUM)
+  coverPath   String?
+  isPinned    Boolean     @default(false)
+  customUrl   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([artistId, mbid])
+  @@index([artistId, isPinned])
+}
+
+model Festival {
+  id        String          @id @default(cuid())
+  slug      String          @unique
+  name      String
+  year      Int
+  location  String?
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  entries FestivalEntry[]
+
+  @@index([year])
+}
+
+model FestivalEntry {
+  id          String                @id @default(cuid())
+  festivalId  String
+  billingName String
+  subtitle    String?
+  day         String?
+  stage       String?
+  setTime     String?
+  liveRating  Int?
+  liveNotes   String                @default("")
+  sortOrder   Int                   @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  festival Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  artists  FestivalEntryArtist[]
+
+  @@index([festivalId, day])
+  @@index([festivalId, sortOrder])
+}
+
+model FestivalEntryArtist {
+  entryId  String
+  artistId String
+  position Int    @default(0)
+
+  entry  FestivalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  artist Artist        @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, artistId])
+  @@index([artistId])
+}

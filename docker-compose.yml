@@ -1,0 +1,26 @@
+services:
+  kue:
+    build: .
+    container_name: kue
+    restart: unless-stopped
+    ports:
+      - "5030:5030"
+    environment:
+      NODE_ENV: production
+      PORT: 5030
+      HOSTNAME: "0.0.0.0"
+      DATABASE_URL: ${DATABASE_URL}
+      MEDIA_DIR: /app/data/media
+    volumes:
+      - kue_media:/app/data/media
+    networks:
+      - default
+      - postgres_net
+
+volumes:
+  kue_media:
+
+networks:
+  postgres_net:
+    external: true
+    name: ${POSTGRES_DOCKER_NETWORK:-postgres_net}
