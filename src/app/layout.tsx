@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, Instrument_Serif, Syne } from "next/font/google";
 import type { ReactNode } from "react";
+import { ServiceWorkerRegistrar } from "@/components/features/ServiceWorkerRegistrar";
 import "./globals.css";
 
 const syne = Syne({
@@ -31,6 +32,10 @@ const archivo = Archivo({
 export const metadata: Metadata = {
   title: "KUE",
   description: "Archivo personal y preparación editorial de festivales de música",
+  icons: {
+    icon: "/icons/icon.svg",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -56,7 +61,10 @@ export default function RootLayout({
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Inline theme bootstrap prevents FOUC before hydration */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerRegistrar />
+        {children}
+      </body>
     </html>
   );
 }
