@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --bg: #000000;
   --surface: #0a0a0a;
   --surface-elevated: #121212;
@@ -13,6 +14,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f4f4ef;
   --surface: #ffffff;
   --surface-elevated: #eaeae2;
@@ -46,6 +48,11 @@
   border-radius: 0px;
 }
 
+/* Sole allowed border-radius per DESIGN.md (6px on square album covers in the shelf) */
+.album-cover-radius {
+  border-radius: 6px;
+}
+
 html,
 body {
   margin: 0;
@@ -55,4 +62,56 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Native <dialog> modal scroll containment & backdrop */
+dialog:modal {
+  overscroll-behavior: contain;
+  color: var(--ink);
+  background-color: var(--bg);
+  border: 0;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+dialog.kue-drawer[open] {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  margin-left: auto;
+  width: min(680px, 94vw);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+}
+
+dialog.kue-modal[open] {
+  margin: auto;
+  width: min(560px, 92vw);
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+
+/* High-contrast B&W editorial image treatment that reveals clarity on hover */
+.kue-editorial-img {
+  filter: grayscale(100%) contrast(1.12);
+  transition:
+    filter 220ms ease,
+    transform 300ms ease;
+}
+
+.group:hover .kue-editorial-img {
+  filter: grayscale(0%) contrast(1.02);
+  transform: scale(1.03);
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, Instrument_Serif, Syne } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -33,6 +33,12 @@ export const metadata: Metadata = {
   description: "Archivo personal y preparación editorial de festivales de música",
 };
 
+export const viewport: Viewport = {
+  themeColor: "#000000",
+};
+
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("kue-theme");var v=t==="light"?"light":"dark";document.documentElement.dataset.theme=v;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,8 +48,14 @@ export default function RootLayout({
     <html
       lang="es"
       data-theme="dark"
+      suppressHydrationWarning
       className={`${syne.variable} ${instrumentSerif.variable} ${ibmPlexMono.variable} ${archivo.variable}`}
     >
+      <head>
+        <meta name="color-scheme" content="dark" />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Inline theme bootstrap prevents FOUC before hydration */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );
