@@ -1,6 +1,8 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+export { toMediaApiUrl } from "@/domain/media-url";
 
 export type MediaBucket = "artists" | "albums";
 
@@ -46,21 +48,32 @@ export function resolveSafeMediaPath(relativePath: string, overrideDir?: string)
   return resolved;
 }
 
-export function getMediaContentType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  return EXT_TO_MIME[ext] ?? "application/octet-stream";
+/** Returns the image MIME type for a known extension, or `null` for anything else. */
+export function getServableMediaType(filePath: string): string | null {
+  return EXT_TO_MIME[path.extname(filePath).toLowerCase()] ?? null;
 }
 
-export function toMediaApiUrl(relativePath: string | null): string | null {
-  if (!relativePath) {
-    return null;
-  }
-  const clean = relativePath.replace(/^\/+/, "");
-  return `/api/media/${clean}`;
+export function getMediaContentType(filePath: string): string {
+  return getServableMediaType(filePath) ?? "application/octet-stream";
 }
 
 function sanitizeBaseName(baseName: string): string {
   return baseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "media";
+}
+
+/** Best-effort removal of a previously cached media file. Never throws. */
+export async function deleteMediaFile(
+  relativePath: string | null | undefined,
+  mediaDir?: string,
+): Promise<void> {
+  if (!relativePath) {
+    return;
+  }
+  const target = resolveSafeMediaPath(relativePath, mediaDir);
+  if (!target) {
+    return;
+  }
+  await rm(target, { force: true }).catch(() => undefined);
 }
 
 export interface DownloadMediaOptions {
@@ -74,8 +87,12 @@ export interface DownloadMediaOptions {
 
 /**
  * Downloads an image from an external URL, validates MIME type and max size (5 MB),
- * and writes it atomically (`tmp -> rename`) into `<MEDIA_DIR>/<bucket>/<baseName>.<ext>`.
- * Returns the relative path (e.g. `artists/art_1.jpg`) or `null` if download/validation fails.
+ * and writes it atomically (`tmp -> rename`) into
+ * `<MEDIA_DIR>/<bucket>/<baseName>-<contentHash>.<ext>`.
+ *
+ * The content hash in the file name makes every distinct image a distinct URL, so the
+ * `immutable` HTTP cache of `/api/media` never serves a stale photo after a re-sync.
+ * Returns the relative path (e.g. `artists/art_1-3f9a0c1b2d.jpg`) or `null` on failure.
  */
 export async function downloadAndSaveMedia(options: DownloadMediaOptions): Promise<string | null> {
   const { url, bucket, baseName, mediaDir, timeoutMs = 10_000, fetchImpl = fetch } = options;
@@ -103,21 +120,18 @@ export async function downloadAndSaveMedia(options: DownloadMediaOptions): Promi
       return null;
     }
 
-    const contentLengthHeader = response.headers.get("content-length");
-    if (contentLengthHeader) {
-      const declaredSize = Number(contentLengthHeader);
-      if (Number.isFinite(declaredSize) && declaredSize > MAX_IMAGE_BYTES) {
-        return null;
-      }
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+    const declaredSize = Number(response.headers.get("content-length") ?? Number.NaN);
+    if (Number.isFinite(declaredSize) && declaredSize > MAX_IMAGE_BYTES) {
       return null;
     }
 
-    const safeFileName = `${sanitizeBaseName(baseName)}${ext}`;
-    const relativePath = `${bucket}/${safeFileName}`;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength === 0 || buffer.byteLength > MAX_IMAGE_BYTES) {
+      return null;
+    }
+
+    const contentHash = createHash("sha256").update(buffer).digest("hex").slice(0, 10);
+    const relativePath = `${bucket}/${sanitizeBaseName(baseName)}-${contentHash}${ext}`;
     const targetPath = resolveSafeMediaPath(relativePath, mediaDir);
     if (!targetPath) {
       return null;
@@ -127,7 +141,7 @@ export async function downloadAndSaveMedia(options: DownloadMediaOptions): Promi
     const tmpPath = `${targetPath}.${randomBytes(6).toString("hex")}.tmp`;
 
     try {
-      await writeFile(tmpPath, Buffer.from(arrayBuffer));
+      await writeFile(tmpPath, buffer);
       await rename(tmpPath, targetPath);
     } catch (writeErr) {
       await rm(tmpPath, { force: true }).catch(() => undefined);

@@ -11,6 +11,30 @@ export interface DeezerArtistPhotoResult {
   imageUrl: string | null;
 }
 
+/**
+ * GETs a Deezer search endpoint. Deezer is a best-effort enrichment source: network errors,
+ * timeouts, non-2xx responses and malformed bodies all resolve to `null` instead of throwing,
+ * so a flaky image lookup never fails the whole artist sync.
+ */
+async function getDeezerJson(
+  path: string,
+  params: URLSearchParams,
+  timeoutMs: number,
+): Promise<unknown> {
+  try {
+    const response = await fetch(`${DEEZER_BASE_URL}${path}?${params.toString()}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchDeezerArtistPhoto(
   artistName: string,
   timeoutMs = 10_000,
@@ -20,23 +44,13 @@ export async function searchDeezerArtistPhoto(
     return null;
   }
 
-  const params = new URLSearchParams({
-    q: trimmed,
-    limit: "3",
-  });
-
-  const response = await fetch(`${DEEZER_BASE_URL}/search/artist?${params.toString()}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const json: unknown = await response.json();
+  const json = await getDeezerJson(
+    "/search/artist",
+    new URLSearchParams({ q: trimmed, limit: "3" }),
+    timeoutMs,
+  );
   const parsed = deezerArtistSearchResponseSchema.safeParse(json);
-  if (!parsed.success || parsed.data.data.length === 0) {
+  if (!parsed.success) {
     return null;
   }
 
@@ -66,23 +80,13 @@ export async function searchDeezerAlbumCover(
     return null;
   }
 
-  const params = new URLSearchParams({
-    q: `artist:"${cleanArtist}" album:"${cleanAlbum}"`,
-    limit: "3",
-  });
-
-  const response = await fetch(`${DEEZER_BASE_URL}/search/album?${params.toString()}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const json: unknown = await response.json();
+  const json = await getDeezerJson(
+    "/search/album",
+    new URLSearchParams({ q: `artist:"${cleanArtist}" album:"${cleanAlbum}"`, limit: "3" }),
+    timeoutMs,
+  );
   const parsed = deezerAlbumSearchResponseSchema.safeParse(json);
-  if (!parsed.success || parsed.data.data.length === 0) {
+  if (!parsed.success) {
     return null;
   }
 

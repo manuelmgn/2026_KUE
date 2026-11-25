@@ -94,4 +94,28 @@ describe("server/sync/queue", () => {
     await idle;
     expect(seen).toEqual(["art-1", "art-2"]);
   });
+
+  it("supports rerunIfActive for mid-sync disambiguation and disabled mode", async () => {
+    const runs: string[] = [];
+    const queue = new SyncQueue({
+      minIntervalMs: 0,
+      processor: async (id) => {
+        runs.push(id);
+        if (runs.length === 1) {
+          // Simulate disambiguation arriving while artist is actively syncing
+          expect(queue.enqueue(id, { rerunIfActive: true })).toBe(true);
+        }
+      },
+    });
+
+    queue.enqueue("art-1");
+    const idle = queue.waitUntilIdle();
+    await vi.runAllTimersAsync();
+    await idle;
+    expect(runs).toEqual(["art-1", "art-1"]);
+
+    const disabledQueue = new SyncQueue({ disabled: true });
+    expect(disabledQueue.enqueue("art-2")).toBe(false);
+    expect(disabledQueue.getStatus().disabled).toBe(true);
+  });
 });

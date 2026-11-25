@@ -5,8 +5,10 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  deleteMediaFile,
   downloadAndSaveMedia,
   getMediaContentType,
+  getServableMediaType,
   resolveSafeMediaPath,
   toMediaApiUrl,
 } from "@/server/media-storage";
@@ -61,7 +63,7 @@ describe("server/media-storage", () => {
       mediaDir: tempDir,
     });
 
-    expect(savedRel).toBe("artists/art_123.jpg");
+    expect(savedRel).toMatch(/^artists\/art_123-[a-f0-9]{10}\.jpg$/);
     if (!savedRel) {
       throw new Error("Expected savedRel");
     }
@@ -71,6 +73,12 @@ describe("server/media-storage", () => {
     }
     const contents = await readFile(savedPath);
     expect(new Uint8Array(contents)).toEqual(fakeJpeg);
+
+    expect(getServableMediaType(savedPath)).toBe("image/jpeg");
+    expect(getServableMediaType("artists/art_123.tmp")).toBeNull();
+
+    await deleteMediaFile(savedRel, tempDir);
+    await expect(readFile(savedPath)).rejects.toThrow();
   });
 
   it("rejects non-image MIME types and oversized payloads", async () => {

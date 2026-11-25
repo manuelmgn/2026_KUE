@@ -16,6 +16,7 @@ describe("domain/rating", () => {
     expect(resolveStatusOnRating("RATED", 3)).toBe("RATED");
     expect(resolveStatusOnRating("DISCARDED", 2)).toBe("DISCARDED");
     expect(resolveStatusOnRating("PENDING", null)).toBe("PENDING");
+    expect(resolveStatusOnRating("RATED", null)).toBe("LISTENING");
   });
 
   it("computes effective rating and status for collaborations", () => {

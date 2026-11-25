@@ -25,13 +25,22 @@ export type RatingFilter = z.infer<typeof ratingFilterSchema>;
 export const viewModeSchema = z.enum(["grid", "index"]);
 export type ViewMode = z.infer<typeof viewModeSchema>;
 
-export const createFestivalSchema = z.object({
-  name: z.string().trim().min(1, "El nombre del festival es obligatorio").max(120),
-  year: z.coerce.number().int().min(1950).max(2100),
-  location: z.string().trim().max(120).optional(),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
-});
+export const createFestivalSchema = z
+  .object({
+    name: z.string().trim().min(1, "El nombre del festival es obligatorio").max(120),
+    year: z.coerce
+      .number({ error: "El año debe ser un número" })
+      .int("El año debe ser un número entero")
+      .min(1950, "El año debe estar entre 1950 y 2100")
+      .max(2100, "El año debe estar entre 1950 y 2100"),
+    location: z.string().trim().max(120).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+  })
+  .refine((value) => !value.startDate || !value.endDate || value.endDate >= value.startDate, {
+    error: "La fecha de fin no puede ser anterior a la de inicio",
+    path: ["endDate"],
+  });
 export type CreateFestivalInput = z.infer<typeof createFestivalSchema>;
 
 export const updateArtistRatingSchema = z.object({
@@ -54,7 +63,7 @@ export type UpdateArtistNotesInput = z.infer<typeof updateArtistNotesSchema>;
 
 export const disambiguateArtistSchema = z.object({
   artistId: z.string().min(1),
-  mbid: z.string().uuid("MBID inválido"),
+  mbid: z.guid({ error: "MBID inválido" }),
   country: z.string().trim().max(10).nullable().optional(),
 });
 export type DisambiguateArtistInput = z.infer<typeof disambiguateArtistSchema>;
@@ -100,9 +109,14 @@ export const importRowSchema = z.object({
 });
 export type ImportRowInput = z.infer<typeof importRowSchema>;
 
+export const MAX_IMPORT_ROWS = 2_000;
+
 export const importLineupSchema = z.object({
-  festivalId: z.string().min(1),
-  rows: z.array(importRowSchema).min(1),
+  festivalId: z.string().min(1, "Selecciona un festival"),
+  rows: z
+    .array(importRowSchema)
+    .min(1, "No hay filas para importar")
+    .max(MAX_IMPORT_ROWS, `Máximo ${MAX_IMPORT_ROWS} filas por importación`),
 });
 export type ImportLineupInput = z.infer<typeof importLineupSchema>;
 

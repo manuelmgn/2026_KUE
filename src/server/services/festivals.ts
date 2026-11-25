@@ -5,7 +5,7 @@ import { getDb } from "@/server/db";
 
 export async function listFestivals(db: PrismaClient = getDb()): Promise<Festival[]> {
   return db.festival.findMany({
-    orderBy: [{ year: "desc" }, { name: "asc" }],
+    orderBy: [{ year: "desc" }, { createdAt: "desc" }, { name: "asc" }],
   });
 }
 

@@ -7,12 +7,16 @@ import {
   fetchMusicBrainzReleaseGroups,
   MUSICBRAINZ_USER_AGENT,
   searchMusicBrainzArtists,
+  setMusicBrainzMinInterval,
 } from "@/server/clients/musicbrainz";
 import { fetchWikipediaBio } from "@/server/clients/wikipedia";
 
 const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => {
+  setMusicBrainzMinInterval(0);
+  server.listen({ onUnhandledRequest: "error" });
+});
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

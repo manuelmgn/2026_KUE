@@ -2,11 +2,15 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { LineupWorkspace } from "@/components/features/LineupWorkspace";
 import { TopBar } from "@/components/features/TopBar";
-import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ratingFilterSchema, statusFilterSchema, viewModeSchema } from "@/domain/schemas";
 import { listFestivalEntries } from "@/server/services/entries";
-import { getDefaultFestival, getFestivalBySlug, listFestivals } from "@/server/services/festivals";
+import { listFestivals } from "@/server/services/festivals";
+import {
+  resolveActiveFestival,
+  toFestivalSummary,
+  toLineupEntryDTO,
+} from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +26,8 @@ interface HomePageProps {
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
-  const festivals = await listFestivals();
-  const festivalSummaries: FestivalSummary[] = festivals.map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    name: f.name,
-    year: f.year,
-    location: f.location,
-  }));
-
-  const activeFestival = params.festival
-    ? ((await getFestivalBySlug(params.festival)) ?? (await getDefaultFestival()))
-    : await getDefaultFestival();
+  const festivalSummaries = (await listFestivals()).map(toFestivalSummary);
+  const activeFestival = resolveActiveFestival(festivalSummaries, params.festival);
 
   const initialQuery = params.q ?? "";
   const parsedStatus = statusFilterSchema.safeParse(params.status);
@@ -43,28 +37,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const parsedView = viewModeSchema.safeParse(params.view);
   const initialView = parsedView.success ? parsedView.data : "grid";
 
-  const rawEntries = activeFestival ? await listFestivalEntries(activeFestival.id) : [];
-  const entries: LineupEntryDTO[] = rawEntries.map((entry) => ({
-    id: entry.id,
-    festivalId: entry.festivalId,
-    billingName: entry.billingName,
-    subtitle: entry.subtitle,
-    day: entry.day,
-    stage: entry.stage,
-    setTime: entry.setTime,
-    liveRating: entry.liveRating,
-    liveNotes: entry.liveNotes,
-    artists: entry.artists.map((link) => ({
-      id: link.artist.id,
-      name: link.artist.name,
-      country: link.artist.country,
-      imagePath: link.artist.imagePath,
-      rating: link.artist.rating,
-      status: link.artist.status,
-      notes: link.artist.notes,
-      syncStatus: link.artist.syncStatus,
-    })),
-  }));
+  const entries = activeFestival
+    ? (await listFestivalEntries(activeFestival.id)).map(toLineupEntryDTO)
+    : [];
 
   return (
     <div className="min-h-screen bg-bg text-ink">
@@ -75,13 +50,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {activeFestival ? (
         <Suspense fallback={null}>
           <LineupWorkspace
-            festival={{
-              id: activeFestival.id,
-              slug: activeFestival.slug,
-              name: activeFestival.name,
-              year: activeFestival.year,
-              location: activeFestival.location,
-            }}
+            festival={activeFestival}
             initialEntries={entries}
             initialQuery={initialQuery}
             initialStatus={initialStatus}

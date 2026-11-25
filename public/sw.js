@@ -1,4 +1,4 @@
-const CACHE_NAME = "kue-shell-v1";
+const CACHE_NAME = "kue-shell-v2";
 const SHELL_URLS = ["/", "/festival-mode", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -39,15 +39,22 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
+          if (response.ok && response.type === "basic") {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return response;
         })
-        .catch(() =>
-          caches.match(request).then((cached) => cached || caches.match("/festival-mode")),
-        ),
+        .catch(async () => {
+          const cached = (await caches.match(request)) ?? (await caches.match("/festival-mode"));
+          return (
+            cached ??
+            new Response("KUE sin conexión. Abre la app con cobertura al menos una vez.", {
+              status: 503,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            })
+          );
+        }),
     );
     return;
   }
@@ -63,7 +70,7 @@ self.addEventListener("fetch", (event) => {
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            if (response.ok) {
+            if (response.ok && response.type === "basic") {
               const copy = response.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
             }

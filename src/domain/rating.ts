@@ -30,8 +30,10 @@ export interface ShelfAlbum {
 }
 
 /**
- * Convenience rule (SPEC 2.2): assigning a 1..5 rating to a PENDING or LISTENING artist
- * automatically promotes their status to RATED.
+ * Convenience rules (SPEC 2.2):
+ * - assigning a 1..5 rating to a PENDING or LISTENING artist promotes them to RATED;
+ * - clearing the rating of a RATED artist moves them back to LISTENING, so "Valorado"
+ *   never shows up without a rating. DISCARDED is always kept as-is.
  */
 export function resolveStatusOnRating(
   currentStatus: ArtistStatus,
@@ -39,6 +41,9 @@ export function resolveStatusOnRating(
 ): ArtistStatus {
   if (newRating !== null && (currentStatus === "PENDING" || currentStatus === "LISTENING")) {
     return "RATED";
+  }
+  if (newRating === null && currentStatus === "RATED") {
+    return "LISTENING";
   }
   return currentStatus;
 }

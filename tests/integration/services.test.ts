@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { DomainError } from "@/domain/errors";
 import { parseRawLineup } from "@/domain/lineup-parser";
 import { PrismaClient } from "@/generated/prisma/client";
 import {
@@ -219,5 +220,37 @@ describe("integration: services against real database", () => {
     const remainingAlbums = await db.album.findMany({ where: { artistId: helen.id } });
     expect(remainingAlbums).toHaveLength(1);
     expect(remainingAlbums[0]?.id).toBe(olderAlbum.id);
+
+    // Rejects assigning the same MBID to a different artist with a clean DomainError
+    const other = await db.artist.create({
+      data: { name: "Other Helen", normalizedName: "other helen" },
+    });
+    await expect(
+      disambiguateArtist(
+        { artistId: other.id, mbid: newMbid, country: "GB" },
+        { db, enqueueSync: false },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    // Rejects importing into a non-existent festival with DomainError
+    await expect(
+      importFestivalLineup(
+        {
+          festivalId: "non-existent-festival-id",
+          rows: [
+            {
+              billingName: "Test",
+              artistNames: ["Test"],
+              subtitle: null,
+              day: null,
+              stage: null,
+              setTime: null,
+              included: true,
+            },
+          ],
+        },
+        { db, enqueueSync: false },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
   });
 });

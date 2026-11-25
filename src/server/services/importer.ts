@@ -1,4 +1,5 @@
 import { normalizeArtistName } from "@/domain/artist-matching";
+import { DomainError } from "@/domain/errors";
 import { type ImportLineupInput, importLineupSchema } from "@/domain/schemas";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
@@ -19,6 +20,14 @@ export async function importFestivalLineup(
   const db = options.db ?? getDb();
   const shouldEnqueue = options.enqueueSync ?? true;
 
+  const festival = await db.festival.findUnique({
+    where: { id: input.festivalId },
+    select: { id: true },
+  });
+  if (!festival) {
+    throw new DomainError("Festival no encontrado");
+  }
+
   const includedRows = input.rows.filter((row) => row.included);
   if (includedRows.length === 0) {
     return {
@@ -29,14 +38,33 @@ export async function importFestivalLineup(
     };
   }
 
-  const txResult = await db.$transaction(async (tx) => {
-    const existingMax = await tx.festivalEntry.aggregate({
-      where: { festivalId: input.festivalId },
-      _max: { sortOrder: true },
-    });
-    let nextSortOrder = (existingMax._max.sortOrder ?? -1) + 1;
+  // Collect all unique normalized names up front so we can batch-fetch existing artists in one query.
+  const allNormalized = new Set<string>();
+  for (const row of includedRows) {
+    for (const rawName of row.artistNames) {
+      const normalized = normalizeArtistName(rawName);
+      if (normalized) {
+        allNormalized.add(normalized);
+      }
+    }
+  }
 
-    const artistCache = new Map<string, string>();
+  const txResult = await db.$transaction(async (tx) => {
+    const [existingMax, existingArtists] = await Promise.all([
+      tx.festivalEntry.aggregate({
+        where: { festivalId: input.festivalId },
+        _max: { sortOrder: true },
+      }),
+      tx.artist.findMany({
+        where: { normalizedName: { in: Array.from(allNormalized) } },
+        select: { id: true, normalizedName: true },
+      }),
+    ]);
+
+    let nextSortOrder = (existingMax._max.sortOrder ?? -1) + 1;
+    const artistCache = new Map<string, string>(
+      existingArtists.map((artist) => [artist.normalizedName, artist.id]),
+    );
     const newArtistIds: string[] = [];
     let linkedArtistsCount = 0;
     let createdEntriesCount = 0;
@@ -55,26 +83,16 @@ export async function importFestivalLineup(
 
         let artistId = artistCache.get(normalized);
         if (!artistId) {
-          const existingArtist = await tx.artist.findUnique({
-            where: { normalizedName: normalized },
-            select: { id: true, syncStatus: true },
+          const createdArtist = await tx.artist.create({
+            data: {
+              name: displayName,
+              normalizedName: normalized,
+              syncStatus: "PENDING",
+            },
+            select: { id: true },
           });
-
-          if (existingArtist) {
-            artistId = existingArtist.id;
-          } else {
-            const createdArtist = await tx.artist.create({
-              data: {
-                name: displayName,
-                normalizedName: normalized,
-                syncStatus: "PENDING",
-              },
-              select: { id: true },
-            });
-            artistId = createdArtist.id;
-            newArtistIds.push(artistId);
-          }
-
+          artistId = createdArtist.id;
+          newArtistIds.push(artistId);
           artistCache.set(normalized, artistId);
         }
 

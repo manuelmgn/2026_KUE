@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { setArtistRatingAction, setArtistStatusAction } from "@/actions/artist-actions";
 import { ArtistDrawer } from "@/components/features/ArtistDrawer";
@@ -23,7 +23,7 @@ interface LineupWorkspaceProps {
 }
 
 type OptimisticAction =
-  | { type: "rate"; artistId: string; rating: number }
+  | { type: "rate"; artistId: string; rating: number | null }
   | { type: "status"; artistId: string; status: ArtistStatus }
   | { type: "notes"; artistId: string; notes: string }
   | {
@@ -74,13 +74,13 @@ export function LineupWorkspace({
   initialRating,
   initialView,
 }: LineupWorkspaceProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [baseEntries, setBaseEntries] = useState<LineupEntryDTO[]>(initialEntries);
   const [optimisticEntries, addOptimistic] = useOptimistic(baseEntries, applyOptimistic);
   const [, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<StatusFilter>(initialStatus);
@@ -93,6 +93,8 @@ export function LineupWorkspace({
     setBaseEntries(initialEntries);
   }, [initialEntries]);
 
+  // Update URL search params via native History API (integrated with Next.js 16 router)
+  // so typing in the search bar or toggling filters never triggers a server RSC roundtrip.
   const syncUrlParams = (patch: {
     q?: string;
     status?: StatusFilter;
@@ -131,7 +133,7 @@ export function LineupWorkspace({
       params.delete("view");
     }
 
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    window.history.replaceState(null, "", `/?${params.toString()}`);
   };
 
   const visibleEntries = optimisticEntries.filter((entry) =>
@@ -148,25 +150,39 @@ export function LineupWorkspace({
   );
 
   const handleRateArtist = (artistId: string, value: number) => {
+    setActionError(null);
     startTransition(async () => {
       addOptimistic({ type: "rate", artistId, rating: value });
-      const updated = await setArtistRatingAction({ artistId, rating: value });
+      const res = await setArtistRatingAction({ artistId, rating: value });
+      if (!res.ok) {
+        setActionError(res.error);
+        return;
+      }
       setBaseEntries((prev) =>
         applyOptimistic(prev, {
           type: "rate",
-          artistId: updated.id,
-          rating: updated.rating ?? value,
+          artistId: res.data.id,
+          rating: res.data.rating,
         }),
       );
     });
   };
 
   const handleStatusArtist = (artistId: string, nextStatus: ArtistStatus) => {
+    setActionError(null);
     startTransition(async () => {
       addOptimistic({ type: "status", artistId, status: nextStatus });
-      const updated = await setArtistStatusAction({ artistId, status: nextStatus });
+      const res = await setArtistStatusAction({ artistId, status: nextStatus });
+      if (!res.ok) {
+        setActionError(res.error);
+        return;
+      }
       setBaseEntries((prev) =>
-        applyOptimistic(prev, { type: "status", artistId: updated.id, status: updated.status }),
+        applyOptimistic(prev, {
+          type: "status",
+          artistId: res.data.id,
+          status: res.data.status as ArtistStatus,
+        }),
       );
     });
   };
@@ -208,9 +224,7 @@ export function LineupWorkspace({
         target?.isContentEditable;
 
       if (event.key === "Escape") {
-        if (openEntryId) {
-          setOpenEntryId(null);
-        } else if (isTyping && target instanceof HTMLElement) {
+        if (!openEntryId && isTyping && target instanceof HTMLElement) {
           target.blur();
         }
         return;
@@ -297,6 +311,22 @@ export function LineupWorkspace({
           syncUrlParams({ view: next });
         }}
       />
+
+      {actionError ? (
+        <div
+          role="alert"
+          className="flex items-center justify-between border-b border-line bg-surface px-6 py-2.5 font-mono text-xs text-ink"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="cursor-pointer font-mono text-xs uppercase text-ink-muted hover:text-ink"
+          >
+            Cerrar
+          </button>
+        </div>
+      ) : null}
 
       {visibleEntries.length === 0 ? (
         <EmptyState

@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
+import { useDialog } from "@/components/ui/useDialog";
 
 interface DrawerProps {
   open: boolean;
@@ -10,72 +11,8 @@ interface DrawerProps {
   children: ReactNode;
 }
 
-function isPointerOutsideDialog(event: PointerEvent, dialog: HTMLDialogElement): boolean {
-  const rect = dialog.getBoundingClientRect();
-  return (
-    event.clientX < rect.left ||
-    event.clientX > rect.right ||
-    event.clientY < rect.top ||
-    event.clientY > rect.bottom
-  );
-}
-
 export function Drawer({ open, onClose, headerLabel, ariaLabel, children }: DrawerProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-
-    const handleClose = () => {
-      dialog.returnValue = "";
-      onClose();
-    };
-    dialog.addEventListener("close", handleClose);
-
-    // Light-dismiss fallback for browsers without native `closedby` (e.g. Safari)
-    const supportsClosedBy = "closedBy" in HTMLDialogElement.prototype;
-    let pressedOutside = false;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      pressedOutside = isPointerOutsideDialog(event, dialog);
-    };
-    const handlePointerUp = (event: PointerEvent) => {
-      if (pressedOutside && isPointerOutsideDialog(event, dialog)) {
-        dialog.close();
-      }
-      pressedOutside = false;
-    };
-
-    if (!supportsClosedBy) {
-      dialog.addEventListener("pointerdown", handlePointerDown);
-      dialog.addEventListener("pointerup", handlePointerUp);
-    }
-
-    return () => {
-      dialog.removeEventListener("close", handleClose);
-      if (!supportsClosedBy) {
-        dialog.removeEventListener("pointerdown", handlePointerDown);
-        dialog.removeEventListener("pointerup", handlePointerUp);
-      }
-    };
-  }, [onClose]);
-
+  const dialogRef = useDialog(open, onClose);
   const closedByProps = { closedby: "any" } as Record<string, string>;
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { LineupEntryDTO } from "@/components/features/types";
 import { RatingControl } from "@/components/ui/RatingControl";
 import { getEffectiveEntryRating, getEffectiveEntryStatus } from "@/domain/rating";
@@ -21,6 +22,13 @@ export function LineupIndex({
   onQuickRate,
   onQuickDiscard,
 }: LineupIndexProps) {
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    const row = rowRefs.current.get(focusedIndex);
+    row?.scrollIntoView({ block: "nearest" });
+  }, [focusedIndex]);
+
   return (
     <section aria-label="Cartel en índice de triaje" className="w-full">
       {entries.map((entry, idx) => {
@@ -37,6 +45,13 @@ export function LineupIndex({
         return (
           <div
             key={entry.id}
+            ref={(el) => {
+              if (el) {
+                rowRefs.current.set(idx, el);
+              } else {
+                rowRefs.current.delete(idx);
+              }
+            }}
             data-focused={isFocused ? "true" : "false"}
             className={`grid min-h-[58px] grid-cols-[54px_minmax(180px,2fr)_140px_minmax(140px,2fr)_216px] items-center border-b border-line border-l-4 transition-colors max-md:grid-cols-[44px_1fr_auto] ${
               isFocused

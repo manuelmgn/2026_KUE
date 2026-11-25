@@ -15,6 +15,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { RatingControl } from "@/components/ui/RatingControl";
 import { getAlbumExternalLinks, getArtistExternalLinks } from "@/domain/external-links";
+import { toMediaApiUrl } from "@/domain/media-url";
 import { sortAlbumsForShelf } from "@/domain/rating";
 import type { ArtistStatus } from "@/domain/schemas";
 
@@ -55,7 +56,9 @@ export function ArtistDrawer({
   const [detail, setDetail] = useState<ArtistDetailDTO | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
-  const [notesSaveState, setNotesSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [notesSaveState, setNotesSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [disambigOpen, setDisambigOpen] = useState(false);
   const [editingAlbumUrlId, setEditingAlbumUrlId] = useState<string | null>(null);
   const [albumUrlDraft, setAlbumUrlDraft] = useState("");
@@ -67,13 +70,16 @@ export function ArtistDrawer({
   const [timeDraft, setTimeDraft] = useState("");
   const [liveRatingDraft, setLiveRatingDraft] = useState<number | null>(null);
   const [liveNotesDraft, setLiveNotesDraft] = useState("");
-  const [liveSaved, setLiveSaved] = useState(false);
+  const [liveSaveState, setLiveSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [liveSaveError, setLiveSaveError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedNotesRef = useRef<string>("");
 
   const activeSummary = entry?.artists[activeArtistIdx] ?? entry?.artists[0] ?? null;
   const activeArtistId = activeSummary?.id ?? null;
-  const activeArtistNotes = activeSummary?.notes ?? "";
+  const initialArtistNotesRef = useRef<string>("");
+  initialArtistNotesRef.current = activeSummary?.notes ?? "";
 
   const entryId = entry?.id ?? null;
   const entryDay = entry?.day ?? "";
@@ -82,17 +88,26 @@ export function ArtistDrawer({
   const entryLiveRating = entry?.liveRating ?? null;
   const entryLiveNotes = entry?.liveNotes ?? "";
 
+  // Reset collaboration tab and modal state only when switching to a different lineup entry.
   useEffect(() => {
-    setActiveArtistIdx(0);
     setDisambigOpen(false);
     setEditingAlbumUrlId(null);
+    setAlbumUrlError(null);
+    if (entryId !== null) {
+      setActiveArtistIdx(0);
+    }
+  }, [entryId]);
+
+  // Keep schedule / live-rating draft fields synced with the entry prop.
+  useEffect(() => {
     if (entryId) {
       setDayDraft(entryDay);
       setStageDraft(entryStage);
       setTimeDraft(entrySetTime);
       setLiveRatingDraft(entryLiveRating);
       setLiveNotesDraft(entryLiveNotes);
-      setLiveSaved(false);
+      setLiveSaveState("idle");
+      setLiveSaveError(null);
     }
   }, [entryId, entryDay, entryStage, entrySetTime, entryLiveRating, entryLiveNotes]);
 
@@ -106,15 +121,25 @@ export function ArtistDrawer({
     }
   };
 
+  // Fetch full detail and seed notes draft only when the active artist changes (never on note saves).
   useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
     if (!activeArtistId) {
       setDetail(null);
       return;
     }
+
     let cancelled = false;
-    setNotesDraft(activeArtistNotes);
+    const initialNotes = initialArtistNotesRef.current;
+    setNotesDraft(initialNotes);
+    lastSavedNotesRef.current = initialNotes;
     setNotesSaveState("idle");
     setLoadingDetail(true);
+
     void getArtistDetailAction(activeArtistId)
       .then((data) => {
         if (!cancelled) {
@@ -129,18 +154,26 @@ export function ArtistDrawer({
 
     return () => {
       cancelled = true;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
-  }, [activeArtistId, activeArtistNotes]);
+  }, [activeArtistId]);
 
   const flushNotesSave = async (artistId: string, text: string) => {
-    setNotesSaveState("saving");
-    try {
-      await saveArtistNotesAction({ artistId, notes: text });
-      onNotesSaved(artistId, text);
-      setNotesSaveState("saved");
-    } catch {
-      setNotesSaveState("idle");
+    if (text === lastSavedNotesRef.current) {
+      return;
     }
+    setNotesSaveState("saving");
+    const res = await saveArtistNotesAction({ artistId, notes: text });
+    if (!res.ok) {
+      setNotesSaveState("error");
+      return;
+    }
+    lastSavedNotesRef.current = res.data.notes;
+    onNotesSaved(artistId, res.data.notes);
+    setNotesSaveState("saved");
   };
 
   const handleNotesChange = (value: string) => {
@@ -154,52 +187,61 @@ export function ArtistDrawer({
     }
     const targetId = activeSummary.id;
     debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
       void flushNotesSave(targetId, value);
     }, 600);
   };
 
   const handleTogglePin = async (albumId: string, currentlyPinned: boolean) => {
     const nextPinned = !currentlyPinned;
-    setDetail((prev) => {
-      if (!prev) {
-        return prev;
-      }
-      const nextAlbums = prev.albums.map((album) =>
-        album.id === albumId ? { ...album, isPinned: nextPinned } : album,
-      );
-      return { ...prev, albums: sortAlbumsForShelf(nextAlbums) };
-    });
-    await toggleAlbumPinAction({ albumId, isPinned: nextPinned });
+    const applyPin = (pinned: boolean) =>
+      setDetail((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const nextAlbums = prev.albums.map((album) =>
+          album.id === albumId ? { ...album, isPinned: pinned } : album,
+        );
+        return { ...prev, albums: sortAlbumsForShelf(nextAlbums) };
+      });
+
+    applyPin(nextPinned);
+    const res = await toggleAlbumPinAction({ albumId, isPinned: nextPinned });
+    if (!res.ok) {
+      applyPin(currentlyPinned);
+    }
   };
 
   const handleSaveCustomUrl = async (albumId: string) => {
     setAlbumUrlError(null);
-    try {
-      const result = await saveAlbumCustomUrlAction({
-        albumId,
-        customUrl: albumUrlDraft.trim() || null,
-      });
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              albums: prev.albums.map((album) =>
-                album.id === albumId ? { ...album, customUrl: result.customUrl } : album,
-              ),
-            }
-          : prev,
-      );
-      setEditingAlbumUrlId(null);
-    } catch (err: unknown) {
-      setAlbumUrlError(err instanceof Error ? err.message : "URL no válida");
+    const res = await saveAlbumCustomUrlAction({
+      albumId,
+      customUrl: albumUrlDraft.trim() || null,
+    });
+    if (!res.ok) {
+      setAlbumUrlError(res.error);
+      return;
     }
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            albums: prev.albums.map((album) =>
+              album.id === albumId ? { ...album, customUrl: res.data.customUrl } : album,
+            ),
+          }
+        : prev,
+    );
+    setEditingAlbumUrlId(null);
   };
 
   const handleSaveEntrySchedule = async () => {
     if (!entry) {
       return;
     }
-    const updated = await updateEntryScheduleAction({
+    setLiveSaveState("saving");
+    setLiveSaveError(null);
+    const res = await updateEntryScheduleAction({
       entryId: entry.id,
       day: dayDraft.trim() || null,
       stage: stageDraft.trim() || null,
@@ -207,14 +249,19 @@ export function ArtistDrawer({
       liveRating: liveRatingDraft,
       liveNotes: liveNotesDraft,
     });
+    if (!res.ok) {
+      setLiveSaveState("error");
+      setLiveSaveError(res.error);
+      return;
+    }
     onEntryUpdated(entry.id, {
-      day: updated.day,
-      stage: updated.stage,
-      setTime: updated.setTime,
-      liveRating: updated.liveRating,
-      liveNotes: updated.liveNotes,
+      day: res.data.day,
+      stage: res.data.stage,
+      setTime: res.data.setTime,
+      liveRating: res.data.liveRating,
+      liveNotes: res.data.liveNotes,
     });
-    setLiveSaved(true);
+    setLiveSaveState("saved");
     if (activeSummary) {
       void reloadArtistDetail(activeSummary.id);
     }
@@ -226,10 +273,7 @@ export function ArtistDrawer({
 
   const displayArtist = activeSummary;
   const externalLinks = displayArtist ? getArtistExternalLinks(displayArtist.name) : null;
-  const imageSrc =
-    (detail?.imagePath ?? displayArtist?.imagePath)
-      ? `/api/media/${detail?.imagePath ?? displayArtist?.imagePath}`
-      : null;
+  const imageSrc = toMediaApiUrl(detail?.imagePath ?? displayArtist?.imagePath);
 
   return (
     <>
@@ -279,9 +323,9 @@ export function ArtistDrawer({
               />
 
               <div>
-                <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
+                <h2 className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
                   {displayArtist.name}
-                </h1>
+                </h2>
                 <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
                   <span className="font-mono text-[0.75rem] uppercase text-ink-muted">
                     {[
@@ -299,6 +343,11 @@ export function ArtistDrawer({
                     ¿No es este artista? Cambiar
                   </button>
                 </div>
+                {detail?.syncStatus === "FAILED" && detail.syncError ? (
+                  <p className="mt-2 border border-line bg-surface px-2.5 py-1.5 font-mono text-[0.68rem] text-ink-muted">
+                    Error de sincronización: {detail.syncError}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-1 gap-3 border-y border-line py-4 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -359,7 +408,9 @@ export function ArtistDrawer({
                       ? "Guardando..."
                       : notesSaveState === "saved"
                         ? "Guardado"
-                        : ""}
+                        : notesSaveState === "error"
+                          ? "Error al guardar"
+                          : ""}
                   </span>
                 </div>
                 <textarea
@@ -368,6 +419,7 @@ export function ArtistDrawer({
                   onBlur={() => {
                     if (debounceRef.current) {
                       clearTimeout(debounceRef.current);
+                      debounceRef.current = null;
                     }
                     void flushNotesSave(displayArtist.id, notesDraft);
                   }}
@@ -397,7 +449,7 @@ export function ArtistDrawer({
                   <div className="flex gap-4 overflow-x-auto pb-2">
                     {detail.albums.map((album) => {
                       const albumLinks = getAlbumExternalLinks(displayArtist.name, album.title);
-                      const coverSrc = album.coverPath ? `/api/media/${album.coverPath}` : null;
+                      const coverSrc = toMediaApiUrl(album.coverPath);
                       return (
                         <div key={album.id} className="flex w-[150px] shrink-0 flex-col gap-2">
                           <div className="relative h-[150px] w-[150px]">
@@ -517,7 +569,7 @@ export function ArtistDrawer({
                       value={dayDraft}
                       onChange={(event) => {
                         setDayDraft(event.target.value);
-                        setLiveSaved(false);
+                        setLiveSaveState("idle");
                       }}
                       placeholder="Día (ej. Viernes 09)"
                       aria-label="Día del concierto"
@@ -528,7 +580,7 @@ export function ArtistDrawer({
                       value={stageDraft}
                       onChange={(event) => {
                         setStageDraft(event.target.value);
-                        setLiveSaved(false);
+                        setLiveSaveState("idle");
                       }}
                       placeholder="Escenario"
                       aria-label="Escenario"
@@ -539,7 +591,7 @@ export function ArtistDrawer({
                       value={timeDraft}
                       onChange={(event) => {
                         setTimeDraft(event.target.value);
-                        setLiveSaved(false);
+                        setLiveSaveState("idle");
                       }}
                       placeholder="Hora (22:30)"
                       aria-label="Hora del pase"
@@ -556,7 +608,7 @@ export function ArtistDrawer({
                       value={liveRatingDraft}
                       onRate={(value) => {
                         setLiveRatingDraft(value);
-                        setLiveSaved(false);
+                        setLiveSaveState("idle");
                       }}
                     />
                   </div>
@@ -566,18 +618,28 @@ export function ArtistDrawer({
                     value={liveNotesDraft}
                     onChange={(event) => {
                       setLiveNotesDraft(event.target.value);
-                      setLiveSaved(false);
+                      setLiveSaveState("idle");
                     }}
                     placeholder="¿Qué tal estuvo en directo?"
                     aria-label="Comentario de directo"
                     className="border border-line bg-bg px-3 py-2 font-serif text-base text-ink outline-none focus:border-acid"
                   />
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-[0.7rem] uppercase text-ink-muted">
-                      {liveSaved ? "Pase guardado" : ""}
+                      {liveSaveState === "saving"
+                        ? "Guardando..."
+                        : liveSaveState === "saved"
+                          ? "Pase guardado"
+                          : liveSaveState === "error"
+                            ? (liveSaveError ?? "Error al guardar")
+                            : ""}
                     </span>
-                    <HairlineButton variant="acid" onClick={() => void handleSaveEntrySchedule()}>
+                    <HairlineButton
+                      variant="acid"
+                      disabled={liveSaveState === "saving"}
+                      onClick={() => void handleSaveEntrySchedule()}
+                    >
                       Guardar pase
                     </HairlineButton>
                   </div>

@@ -6,6 +6,7 @@ export const DEFAULT_RATE_LIMIT_MS = 1100;
 
 export interface SyncQueueStatus {
   running: boolean;
+  disabled: boolean;
   currentArtistId: string | null;
   pendingCount: number;
   processedCount: number;
@@ -16,6 +17,16 @@ export interface SyncQueueStatus {
 export interface SyncQueueOptions {
   minIntervalMs?: number;
   processor?: (artistId: string) => Promise<void>;
+  /** When true, `enqueue` is a no-op (used by E2E runs to avoid hitting real external APIs). */
+  disabled?: boolean;
+}
+
+export interface EnqueueOptions {
+  /**
+   * Re-run the artist after the in-flight job finishes if it is currently being processed.
+   * Needed when the artist's identity changed mid-sync (e.g. manual disambiguation).
+   */
+  rerunIfActive?: boolean;
 }
 
 function delay(ms: number): Promise<void> {
@@ -30,6 +41,7 @@ function delay(ms: number): Promise<void> {
 export class SyncQueue {
   private readonly minIntervalMs: number;
   private readonly processor: (artistId: string) => Promise<void>;
+  private readonly disabled: boolean;
   private readonly queue: string[] = [];
   private readonly queuedSet = new Set<string>();
   private running = false;
@@ -42,15 +54,15 @@ export class SyncQueue {
 
   constructor(options: SyncQueueOptions = {}) {
     this.minIntervalMs = options.minIntervalMs ?? DEFAULT_RATE_LIMIT_MS;
-    this.processor =
-      options.processor ??
-      (async (artistId: string) => {
-        await syncArtist(artistId, { rateLimitMs: this.minIntervalMs });
-      });
+    this.disabled = options.disabled ?? false;
+    this.processor = options.processor ?? ((artistId: string) => syncArtist(artistId));
   }
 
-  enqueue(artistId: string): boolean {
-    if (!artistId || this.queuedSet.has(artistId) || this.currentArtistId === artistId) {
+  enqueue(artistId: string, options: EnqueueOptions = {}): boolean {
+    if (this.disabled || !artistId || this.queuedSet.has(artistId)) {
+      return false;
+    }
+    if (this.currentArtistId === artistId && !options.rerunIfActive) {
       return false;
     }
 
@@ -74,6 +86,7 @@ export class SyncQueue {
   getStatus(): SyncQueueStatus {
     return {
       running: this.running,
+      disabled: this.disabled,
       currentArtistId: this.currentArtistId,
       pendingCount: this.queue.length,
       processedCount: this.processedCount,
@@ -83,7 +96,7 @@ export class SyncQueue {
   }
 
   async waitUntilIdle(): Promise<void> {
-    if (this.drainPromise) {
+    while (this.drainPromise) {
       await this.drainPromise;
     }
   }
@@ -109,11 +122,7 @@ export class SyncQueue {
       this.queuedSet.delete(nextId);
 
       if (this.lastRunStartedAt !== null) {
-        const elapsed = Date.now() - this.lastRunStartedAt;
-        const remaining = this.minIntervalMs - elapsed;
-        if (remaining > 0) {
-          await delay(remaining);
-        }
+        await delay(this.minIntervalMs - (Date.now() - this.lastRunStartedAt));
       }
 
       this.currentArtistId = nextId;
@@ -122,8 +131,12 @@ export class SyncQueue {
       try {
         await this.processor(nextId);
         this.processedCount += 1;
-      } catch {
+      } catch (error: unknown) {
         this.failedCount += 1;
+        if (process.env.NODE_ENV !== "test") {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`[KUE] Sync failed for artist ${nextId}: ${message}`);
+        }
       } finally {
         this.currentArtistId = null;
       }
@@ -136,12 +149,13 @@ const globalForQueue = globalThis as typeof globalThis & {
 };
 
 export function getSyncQueue(): SyncQueue {
-  if (!globalForQueue.kueSyncQueue) {
-    globalForQueue.kueSyncQueue = new SyncQueue();
-  }
+  globalForQueue.kueSyncQueue ??= new SyncQueue({
+    disabled: process.env.KUE_SYNC_DISABLED === "1",
+  });
   return globalForQueue.kueSyncQueue;
 }
 
+/** Re-queues every artist left PENDING/SYNCING (e.g. after a restart). Returns how many. */
 export async function recoverPendingArtists(
   db: PrismaClient = getDb(),
   queue: SyncQueue = getSyncQueue(),
@@ -158,4 +172,16 @@ export async function recoverPendingArtists(
   });
 
   return queue.enqueueMany(pending.map((artist) => artist.id));
+}
+
+/** Moves FAILED artists back to PENDING and re-queues every pending artist. */
+export async function retryFailedArtists(
+  db: PrismaClient = getDb(),
+  queue: SyncQueue = getSyncQueue(),
+): Promise<number> {
+  await db.artist.updateMany({
+    where: { syncStatus: "FAILED" },
+    data: { syncStatus: "PENDING", syncError: null },
+  });
+  return recoverPendingArtists(db, queue);
 }

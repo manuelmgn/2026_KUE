@@ -49,16 +49,18 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
     setCreatingFestival(true);
     setError(null);
     try {
-      const created = await createFestivalAction({
+      const res = await createFestivalAction({
         name: newFestName,
         year: Number(newFestYear),
         location: newFestLocation || undefined,
       });
-      setFestivals((prev) => [created, ...prev]);
-      setSelectedFestivalId(created.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setFestivals((prev) => [res.data, ...prev]);
+      setSelectedFestivalId(res.data.id);
       setShowNewFestival(false);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el festival");
     } finally {
       setCreatingFestival(false);
     }
@@ -120,16 +122,18 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
         festivalId: selectedFestivalId,
         rows: includedRows,
       });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
       const targetFest = festivals.find((f) => f.id === selectedFestivalId);
       setResultSummary({
-        createdEntriesCount: res.createdEntriesCount,
-        newArtistsCount: res.newArtistsCount,
+        createdEntriesCount: res.data.createdEntriesCount,
+        newArtistsCount: res.data.newArtistsCount,
         festivalSlug: targetFest?.slug ?? "",
       });
       setRows([]);
       setRawText("");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error guardando el cartel");
     } finally {
       setSubmitting(false);
     }
@@ -177,7 +181,13 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       </div>
 
       {showNewFestival ? (
-        <section className="grid grid-cols-1 gap-3 border border-line bg-surface p-4 sm:grid-cols-[2fr_100px_2fr_auto]">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreateFestival();
+          }}
+          className="grid grid-cols-1 gap-3 border border-line bg-surface p-4 sm:grid-cols-[2fr_100px_2fr_auto]"
+        >
           <input
             type="text"
             value={newFestName}
@@ -202,15 +212,10 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             aria-label="Ubicación del festival"
             className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus:border-acid"
           />
-          <HairlineButton
-            variant="acid"
-            size="md"
-            disabled={creatingFestival}
-            onClick={() => void handleCreateFestival()}
-          >
+          <HairlineButton type="submit" variant="acid" size="md" disabled={creatingFestival}>
             {creatingFestival ? "Creando..." : "Crear"}
           </HairlineButton>
-        </section>
+        </form>
       ) : null}
 
       <section className="flex flex-col gap-3">
@@ -225,7 +230,12 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
         />
 
         <div className="flex flex-wrap items-center gap-3">
-          <HairlineButton variant="acid" size="md" onClick={handleParse}>
+          <HairlineButton
+            variant="acid"
+            size="md"
+            disabled={rawText.trim().length === 0}
+            onClick={handleParse}
+          >
             Analizar texto →
           </HairlineButton>
           {rows.length > 0 ? (

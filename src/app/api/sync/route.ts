@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/server/db";
-import { getSyncQueue } from "@/server/sync/queue";
+import { getSyncQueue, retryFailedArtists } from "@/server/sync/queue";
 
 export const dynamic = "force-dynamic";
 
@@ -8,41 +8,36 @@ export async function GET(): Promise<NextResponse> {
   const db = getDb();
   const queue = getSyncQueue();
 
-  const [pending, syncing, synced, failed] = await Promise.all([
-    db.artist.count({ where: { syncStatus: "PENDING" } }),
-    db.artist.count({ where: { syncStatus: "SYNCING" } }),
-    db.artist.count({ where: { syncStatus: "SYNCED" } }),
-    db.artist.count({ where: { syncStatus: "FAILED" } }),
-  ]);
-
-  return NextResponse.json({
-    queue: queue.getStatus(),
-    counts: {
-      pending,
-      syncing,
-      synced,
-      failed,
-      total: pending + syncing + synced + failed,
-    },
+  const grouped = await db.artist.groupBy({
+    by: ["syncStatus"],
+    _count: { _all: true },
   });
+  const countOf = (status: string) =>
+    grouped.find((group) => group.syncStatus === status)?._count._all ?? 0;
+
+  const pending = countOf("PENDING");
+  const syncing = countOf("SYNCING");
+  const synced = countOf("SYNCED");
+  const failed = countOf("FAILED");
+
+  return NextResponse.json(
+    {
+      queue: queue.getStatus(),
+      counts: {
+        pending,
+        syncing,
+        synced,
+        failed,
+        total: pending + syncing + synced + failed,
+      },
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(): Promise<NextResponse> {
-  const db = getDb();
   const queue = getSyncQueue();
-
-  await db.artist.updateMany({
-    where: { syncStatus: "FAILED" },
-    data: { syncStatus: "PENDING", syncError: null },
-  });
-
-  const toSync = await db.artist.findMany({
-    where: { syncStatus: "PENDING" },
-    select: { id: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const enqueued = queue.enqueueMany(toSync.map((a) => a.id));
+  const enqueued = await retryFailedArtists(getDb(), queue);
 
   return NextResponse.json({
     enqueued,

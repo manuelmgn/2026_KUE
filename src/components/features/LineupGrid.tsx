@@ -2,6 +2,7 @@
 
 import type { LineupEntryDTO } from "@/components/features/types";
 import { Artwork } from "@/components/ui/Artwork";
+import { toMediaApiUrl } from "@/domain/media-url";
 import { getEffectiveEntryRating, getEffectiveEntryStatus } from "@/domain/rating";
 
 interface LineupGridProps {
@@ -20,7 +21,7 @@ export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
         const rating = getEffectiveEntryRating(entry.artists);
         const status = getEffectiveEntryStatus(entry.artists);
         const isDiscarded = status === "DISCARDED";
-        const imageUrl = lead?.imagePath ? `/api/media/${lead.imagePath}` : null;
+        const imageUrl = toMediaApiUrl(lead?.imagePath);
         const noteText = entry.artists.find((a) => a.notes.trim().length > 0)?.notes ?? "";
 
         const ratingClass =

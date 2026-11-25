@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { disambiguateArtistAction } from "@/actions/artist-actions";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Modal } from "@/components/ui/Modal";
@@ -14,8 +14,11 @@ interface DisambiguateModalProps {
   onDisambiguated: () => void;
 }
 
-async function fetchCandidates(term: string): Promise<MusicBrainzArtistCandidate[]> {
-  const response = await fetch(`/api/disambiguate?q=${encodeURIComponent(term)}`);
+async function fetchCandidates(
+  term: string,
+  signal: AbortSignal,
+): Promise<MusicBrainzArtistCandidate[]> {
+  const response = await fetch(`/api/disambiguate?q=${encodeURIComponent(term)}`, { signal });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? "No se pudo consultar MusicBrainz");
@@ -36,53 +39,72 @@ export function DisambiguateModal({
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const runSearch = async (term: string) => {
     const trimmed = term.trim();
     if (!trimmed) {
       return;
     }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const results = await fetchCandidates(trimmed);
-      setCandidates(results);
+      const results = await fetchCandidates(trimmed, controller.signal);
+      if (!controller.signal.aborted) {
+        setCandidates(results);
+      }
     } catch (err: unknown) {
+      if (controller.signal.aborted) {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Error de conexión con MusicBrainz");
       setCandidates([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     if (!open) {
+      abortRef.current?.abort();
       return;
     }
-    let cancelled = false;
+
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+
     setQuery(artistName);
     setLoading(true);
     setError(null);
-    void fetchCandidates(artistName)
+
+    void fetchCandidates(artistName, controller.signal)
       .then((results) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setCandidates(results);
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setError(err instanceof Error ? err.message : "Error de conexión con MusicBrainz");
           setCandidates([]);
         }
       })
       .finally(() => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setLoading(false);
         }
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [open, artistName]);
 
@@ -90,15 +112,17 @@ export function DisambiguateModal({
     setSavingId(candidate.id);
     setError(null);
     try {
-      await disambiguateArtistAction({
+      const res = await disambiguateArtistAction({
         artistId,
         mbid: candidate.id,
         country: candidate.country ?? null,
       });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
       onDisambiguated();
       onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "No se pudo actualizar el artista");
     } finally {
       setSavingId(null);
     }

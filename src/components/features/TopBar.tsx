@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FestivalSummary } from "@/components/features/types";
 import { KueLogo } from "@/components/ui/KueLogo";
 
@@ -40,6 +40,9 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const searchParams = useSearchParams();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [syncInfo, setSyncInfo] = useState<SyncApiSnapshot["counts"] | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const wasSyncingRef = useRef(false);
+  const restartPollRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
@@ -73,21 +76,44 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
         setSyncInfo(data.counts);
         const activeCount = data.counts.pending + data.counts.syncing;
         if (activeCount > 0) {
+          wasSyncingRef.current = true;
           timerId = setTimeout(pollSync, 3500);
+        } else if (wasSyncingRef.current) {
+          wasSyncingRef.current = false;
+          router.refresh();
         }
       } catch {
         // Silent background check
       }
     };
 
+    restartPollRef.current = () => {
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = undefined;
+      }
+      void pollSync();
+    };
+
     void pollSync();
     return () => {
       cancelled = true;
+      restartPollRef.current = null;
       if (timerId) {
         clearTimeout(timerId);
       }
     };
-  }, []);
+  }, [router]);
+
+  const handleRetrySync = async () => {
+    setRetrying(true);
+    try {
+      await fetch("/api/sync", { method: "POST" });
+      restartPollRef.current?.();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const handleFestivalChange = (slug: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -107,6 +133,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
     : "";
 
   const isSyncing = syncInfo !== null && syncInfo.pending + syncInfo.syncing > 0;
+  const failedCount = syncInfo?.failed ?? 0;
   const doneCount = syncInfo ? syncInfo.synced + syncInfo.failed : 0;
 
   return (
@@ -161,6 +188,16 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
           >
             SYNC {doneCount}/{syncInfo.total}
           </div>
+        ) : failedCount > 0 ? (
+          <button
+            type="button"
+            disabled={retrying}
+            onClick={() => void handleRetrySync()}
+            title="Reintentar artistas con error de sincronización"
+            className="hidden cursor-pointer items-center border-l border-line px-4 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-acid hover:text-acid-ink disabled:opacity-40 md:flex"
+          >
+            {retrying ? "REINTENTANDO..." : `REINTENTAR (${failedCount})`}
+          </button>
         ) : null}
         <button
           type="button"

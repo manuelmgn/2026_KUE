@@ -2,10 +2,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { FestivalModeView } from "@/components/features/FestivalModeView";
 import { TopBar } from "@/components/features/TopBar";
-import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { listFestivalEntries } from "@/server/services/entries";
-import { getDefaultFestival, getFestivalBySlug, listFestivals } from "@/server/services/festivals";
+import { listFestivals } from "@/server/services/festivals";
+import {
+  resolveActiveFestival,
+  toFestivalSummary,
+  toLineupEntryDTO,
+} from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -15,41 +19,12 @@ interface FestivalModePageProps {
 
 export default async function FestivalModePage({ searchParams }: FestivalModePageProps) {
   const params = await searchParams;
-  const festivals = await listFestivals();
-  const summaries: FestivalSummary[] = festivals.map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    name: f.name,
-    year: f.year,
-    location: f.location,
-  }));
+  const summaries = (await listFestivals()).map(toFestivalSummary);
+  const activeFestival = resolveActiveFestival(summaries, params.festival);
 
-  const activeFestival = params.festival
-    ? ((await getFestivalBySlug(params.festival)) ?? (await getDefaultFestival()))
-    : await getDefaultFestival();
-
-  const rawEntries = activeFestival ? await listFestivalEntries(activeFestival.id) : [];
-  const entries: LineupEntryDTO[] = rawEntries.map((entry) => ({
-    id: entry.id,
-    festivalId: entry.festivalId,
-    billingName: entry.billingName,
-    subtitle: entry.subtitle,
-    day: entry.day,
-    stage: entry.stage,
-    setTime: entry.setTime,
-    liveRating: entry.liveRating,
-    liveNotes: entry.liveNotes,
-    artists: entry.artists.map((link) => ({
-      id: link.artist.id,
-      name: link.artist.name,
-      country: link.artist.country,
-      imagePath: link.artist.imagePath,
-      rating: link.artist.rating,
-      status: link.artist.status,
-      notes: link.artist.notes,
-      syncStatus: link.artist.syncStatus,
-    })),
-  }));
+  const entries = activeFestival
+    ? (await listFestivalEntries(activeFestival.id)).map(toLineupEntryDTO)
+    : [];
 
   return (
     <div className="min-h-screen bg-bg text-ink">
@@ -58,16 +33,7 @@ export default async function FestivalModePage({ searchParams }: FestivalModePag
       </Suspense>
 
       {activeFestival ? (
-        <FestivalModeView
-          festival={{
-            id: activeFestival.id,
-            slug: activeFestival.slug,
-            name: activeFestival.name,
-            year: activeFestival.year,
-            location: activeFestival.location,
-          }}
-          entries={entries}
-        />
+        <FestivalModeView festival={activeFestival} entries={entries} />
       ) : (
         <EmptyState
           title="Sin festival activo"
