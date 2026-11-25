@@ -21,7 +21,9 @@ const EXT_TO_MIME: Record<string, string> = {
 };
 
 export function getMediaRootDir(overrideDir?: string): string {
-  return path.resolve(overrideDir ?? process.env.MEDIA_DIR ?? "./data/media");
+  return path.resolve(
+    /* turbopackIgnore: true */ overrideDir ?? process.env.MEDIA_DIR ?? "./data/media",
+  );
 }
 
 /**
