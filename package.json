@@ -37,6 +37,7 @@
     "@types/react-dom": "^19.2.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "dotenv": "^17.0.0",
+    "msw": "^2.15.0",
     "prisma": "^7.10.1",
     "tailwindcss": "^4.3.5",
     "typescript": "^5.8.3",
