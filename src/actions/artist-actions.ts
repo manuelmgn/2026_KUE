@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { type ActionResult, runAction } from "@/actions/result";
 import type {
+  ArtistStatus,
   DisambiguateArtistInput,
+  SyncStatus,
   UpdateAlbumCustomUrlInput,
   UpdateAlbumPinInput,
   UpdateArtistNotesInput,
@@ -26,7 +28,7 @@ export async function getArtistDetailAction(artistId: string) {
 
 export async function setArtistRatingAction(
   input: UpdateArtistRatingInput,
-): Promise<ActionResult<{ id: string; rating: number | null; status: string }>> {
+): Promise<ActionResult<{ id: string; rating: number | null; status: ArtistStatus }>> {
   return runAction(async () => {
     const updated = await updateArtistRating(input);
     revalidatePath("/");
@@ -37,7 +39,7 @@ export async function setArtistRatingAction(
 
 export async function setArtistStatusAction(
   input: UpdateArtistStatusInput,
-): Promise<ActionResult<{ id: string; status: string }>> {
+): Promise<ActionResult<{ id: string; status: ArtistStatus }>> {
   return runAction(async () => {
     const updated = await updateArtistStatus(input);
     revalidatePath("/");
@@ -80,7 +82,7 @@ export async function saveAlbumCustomUrlAction(
 export async function disambiguateArtistAction(
   input: DisambiguateArtistInput,
 ): Promise<
-  ActionResult<{ id: string; mbid: string | null; country: string | null; syncStatus: string }>
+  ActionResult<{ id: string; mbid: string | null; country: string | null; syncStatus: SyncStatus }>
 > {
   return runAction(async () => {
     const updated = await disambiguateArtist(input);

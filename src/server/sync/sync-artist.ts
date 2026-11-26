@@ -170,8 +170,8 @@ export async function syncArtist(artistId: string, options: SyncArtistOptions = 
       await syncAlbums(ctx, artist, releaseGroups);
     }
 
-    await ctx.db.artist.update({
-      where: { id: artistId },
+    await ctx.db.artist.updateMany({
+      where: { id: artistId, mbid: identity.mbid },
       data: { syncStatus: "SYNCED", syncError: null, syncedAt: new Date() },
     });
   } catch (error: unknown) {

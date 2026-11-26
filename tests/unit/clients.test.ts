@@ -153,6 +153,13 @@ describe("server/clients (MSW)", () => {
       http.get("https://api.deezer.com/search/artist", () => HttpResponse.json({ data: [] })),
     );
     expect(await searchDeezerArtistPhoto("Unknown Artist")).toBeNull();
+
+    server.use(
+      http.get("https://api.deezer.com/search/artist", () => HttpResponse.error()),
+      http.get("https://api.deezer.com/search/album", () => HttpResponse.error()),
+    );
+    expect(await searchDeezerArtistPhoto("Tim Hecker")).toBeNull();
+    expect(await searchDeezerAlbumCover("Tim Hecker", "Virgins")).toBeNull();
   });
 
   it("fetches and trims Wikipedia summary, falling back to (musician) on disambiguation", async () => {

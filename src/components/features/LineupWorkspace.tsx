@@ -181,7 +181,7 @@ export function LineupWorkspace({
         applyOptimistic(prev, {
           type: "status",
           artistId: res.data.id,
-          status: res.data.status as ArtistStatus,
+          status: res.data.status,
         }),
       );
     });
