@@ -13,7 +13,12 @@ const MAX_EMBEDDED_SCRIPT_CHARS = 60_000;
 const LINEUP_FETCH_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-export type LineupExtractionMethod = "clashfinder" | "json-ld" | "plain-text" | "gemini";
+export type LineupExtractionMethod =
+  | "clashfinder"
+  | "json-ld"
+  | "embedded-json"
+  | "plain-text"
+  | "gemini";
 
 export interface FetchLineupSourceOptions {
   festivalName: string;
@@ -214,7 +219,7 @@ const IGNORED_EMBEDDED_KEYS = new Set([
 ]);
 
 function pruneEmbeddedJsonValue(value: unknown, depth = 0): unknown {
-  if (depth > 8 || value === null || value === undefined || typeof value === "boolean") {
+  if (depth > 14 || value === null || value === undefined || typeof value === "boolean") {
     return undefined;
   }
   if (typeof value === "number") {
@@ -385,7 +390,7 @@ function decodeJsStringLiteral(rawContent: string): string | null {
 }
 
 const JS_DATA_FIELD_REGEX =
-  /\b(title|name|artist|artists|performer|subtitle|header|header_sub|day|date|date_tag|startDate|startDateOnly|time|startTime|stage|venue|location|category)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][A-Za-z0-9_$]{0,3})\b)/g;
+  /\b(title|name|artist|artistName|artists|performer|subtitle|header|header_sub|day|date|date_tag|startDate|startDateOnly|time|startTime|stage|venue|location|category)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][A-Za-z0-9_$]{0,3})\b)/g;
 
 function extractKeyValuePairsFromJsScript(script: string): string {
   const paramMap = script.includes("window.__NUXT__")
@@ -681,6 +686,175 @@ export function extractLineupFromJsonLd(html: string): ParsedLineupEntry[] {
       visitNode(parsed, { day: null, stage: null, setTime: null });
     } catch {
       // Ignore malformed JSON-LD blocks
+    }
+  }
+
+  return deduplicateEntries(collected);
+}
+
+function pickLocalizedLabel(raw: unknown): string | null {
+  if (typeof raw === "string") {
+    const trimmed = raw.replace(/\s+/g, " ").trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const rec = raw as Record<string, unknown>;
+    for (const key of ["en", "es", "pt", "ca", "gl"]) {
+      const val = rec[key];
+      if (typeof val === "string" && val.trim().length > 0) {
+        return val.replace(/\s+/g, " ").trim();
+      }
+    }
+    for (const val of Object.values(rec)) {
+      if (typeof val === "string" && val.trim().length > 0) {
+        return val.replace(/\s+/g, " ").trim();
+      }
+    }
+  }
+  return null;
+}
+
+function splitBlockDayAndStage(label: string | null): { day: string | null; stage: string | null } {
+  if (!label) {
+    return { day: null, stage: null };
+  }
+  const parts = label
+    .split(/\s*[·|•]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      day: parts[0] ?? null,
+      stage: parts.slice(1).join(" · ") || null,
+    };
+  }
+  return { day: label, stage: null };
+}
+
+/**
+ * Deterministically extracts structured festival lineups from embedded page hydration JSON
+ * (e.g. Primavera Sound `window.__INITIAL_DATA__` `LineupList` blocks / `artistSets`)
+ * without executing JavaScript or calling an LLM.
+ */
+export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[] {
+  const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  const collected: ParsedLineupEntry[] = [];
+
+  const collectArtistObjects = (
+    items: unknown,
+    ctx: { day: string | null; stage: string | null },
+  ) => {
+    if (!Array.isArray(items)) {
+      return;
+    }
+    for (const item of items) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+      const rec = item as Record<string, unknown>;
+      const rawName =
+        typeof rec.artistName === "string"
+          ? rec.artistName
+          : typeof rec.artist_name === "string"
+            ? rec.artist_name
+            : null;
+      if (!rawName?.trim()) {
+        continue;
+      }
+      const itemDay = pickLocalizedLabel(rec.day ?? rec.date) ?? ctx.day;
+      const itemStage = pickLocalizedLabel(rec.stage ?? rec.venue) ?? ctx.stage;
+      const itemTime = typeof rec.time === "string" ? rec.time.trim() || null : null;
+      const normalized = normalizeExtractedEntry({
+        billingName: rawName,
+        day: itemDay,
+        stage: itemStage,
+        setTime: itemTime,
+      });
+      if (normalized) {
+        collected.push(normalized);
+      }
+    }
+  };
+
+  const visit = (node: unknown, depth = 0) => {
+    if (depth > 16 || !node || typeof node !== "object") {
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        visit(item, depth + 1);
+      }
+      return;
+    }
+    const rec = node as Record<string, unknown>;
+    const nodeType = typeof rec.type === "string" ? rec.type : "";
+    if (nodeType === "LineupList" || Array.isArray(rec.artistSets)) {
+      if (Array.isArray(rec.artistSets)) {
+        collectArtistObjects(rec.artistSets, { day: null, stage: null });
+      }
+      if (Array.isArray(rec.blocks)) {
+        for (const block of rec.blocks) {
+          if (!block || typeof block !== "object" || Array.isArray(block)) {
+            continue;
+          }
+          const blockRec = block as Record<string, unknown>;
+          const blockLabel = pickLocalizedLabel(blockRec.title ?? blockRec.name ?? blockRec.day);
+          const ctx = splitBlockDayAndStage(blockLabel);
+          collectArtistObjects(blockRec.artists ?? blockRec.artistSets, ctx);
+        }
+      }
+    }
+
+    for (const val of Object.values(rec)) {
+      if (val && typeof val === "object") {
+        visit(val, depth + 1);
+      }
+    }
+  };
+
+  for (const match of html.matchAll(scriptRegex)) {
+    const attrs = match[1] ?? "";
+    const content = match[2]?.trim() ?? "";
+    if (!content || /\bsrc\s*=/i.test(attrs)) {
+      continue;
+    }
+    if (/type\s*=\s*["']application\/ld\+json["']/i.test(attrs)) {
+      continue;
+    }
+
+    let parsed: unknown = null;
+    const isJsonScript =
+      /type\s*=\s*["']application\/json["']/i.test(attrs) ||
+      /\bid\s*=\s*["'](?:__NEXT_DATA__|__NUXT_DATA__)["']/i.test(attrs);
+
+    if (isJsonScript) {
+      try {
+        parsed = JSON.parse(content) as unknown;
+      } catch {
+        parsed = null;
+      }
+    } else if (
+      /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*[{[]/.test(content) &&
+      !content.includes("window.__NUXT__")
+    ) {
+      const assignMatch = content.match(
+        /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*([{[])/,
+      );
+      if (assignMatch && assignMatch.index !== undefined) {
+        const openIdx = content.indexOf(assignMatch[1] ?? "{", assignMatch.index);
+        const jsonSlice = openIdx >= 0 ? extractBalancedJsonSlice(content, openIdx) : null;
+        if (jsonSlice) {
+          try {
+            parsed = JSON.parse(jsonSlice) as unknown;
+          } catch {
+            parsed = null;
+          }
+        }
+      }
+    }
+
+    if (parsed) {
+      visit(parsed);
     }
   }
 
@@ -1069,6 +1243,17 @@ export async function fetchAndExtractFestivalLineup(
   const jsonLdEntries = extractLineupFromJsonLd(body);
   if (jsonLdEntries.length > 0) {
     return { unchanged: false, contentHash, method: "json-ld", entries: jsonLdEntries };
+  }
+
+  // Layer 1c: Structured hydration JSON payloads (e.g. Primavera Sound LineupList blocks) (free)
+  const embeddedJsonEntries = extractLineupFromEmbeddedJson(body);
+  if (embeddedJsonEntries.length > 0) {
+    return {
+      unchanged: false,
+      contentHash,
+      method: "embedded-json",
+      entries: embeddedJsonEntries,
+    };
   }
 
   // Layer 2: Universal structured extraction via Gemini API (optional, requires GEMINI_API_KEY)

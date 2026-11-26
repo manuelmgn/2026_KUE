@@ -600,7 +600,7 @@ export async function runScheduledLineupSyncs(
   return { checked, failed };
 }
 
-const ONE_TIME_EMPTY_RECHECK_MARKER = ".recheck-empty-lineups-v1.done";
+const ONE_TIME_EMPTY_RECHECK_MARKER = ".recheck-empty-lineups-v2.done";
 
 function resolveOneTimeRecheckMarkerPath(overridePath?: string): string {
   if (overridePath) {

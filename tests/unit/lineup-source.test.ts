@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   extractEmbeddedScriptDataText,
   extractLineupFromClashfinderJson,
+  extractLineupFromEmbeddedJson,
   extractLineupFromJsonLd,
   fetchAndExtractFestivalLineup,
   getClashfinderJsonUrl,
@@ -310,5 +311,79 @@ describe("lineup-source", () => {
         fetchImpl: brokenFetch,
       }),
     ).rejects.toThrow("UND_ERR_CONNECT_TIMEOUT");
+  });
+
+  it("extracts Primavera Sound deeply nested window.__INITIAL_DATA__ LineupList deterministically", async () => {
+    const primaveraHtml = `
+      <html>
+        <body><div id="root"></div></body>
+        <script type="abc123-text/javascript">
+          window.__INITIAL_DATA__ = {
+            "components": [
+              { "type": "HeaderRedesignHeader", "name": "header" },
+              {
+                "type": "Body",
+                "components": [
+                  {
+                    "type": "LineupList",
+                    "artistSets": [],
+                    "blocks": [
+                      {
+                        "id": "blk_1",
+                        "title": { "en": "10 JUN", "pt": "10 JUN" },
+                        "artists": [
+                          { "artistName": "Fontaines D.C.", "level": "headliner" },
+                          { "artistName": "Bonnie \\"Prince\\" Billy", "level": "semi" }
+                        ]
+                      },
+                      {
+                        "id": "blk_2",
+                        "title": { "en": "13 JUN · PRIMAVERA BITS" },
+                        "artists": [
+                          { "artistName": "Josh Baker", "level": "normal" }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          };
+        </script>
+      </html>
+    `;
+
+    // Embedded script text pruning must preserve deep artistName values (depth > 8)
+    const embeddedText = extractEmbeddedScriptDataText(primaveraHtml);
+    expect(embeddedText).toContain("Fontaines D.C.");
+    expect(embeddedText).toContain("Josh Baker");
+
+    const extracted = extractLineupFromEmbeddedJson(primaveraHtml);
+    expect(extracted).toHaveLength(3);
+    expect(extracted[0]).toMatchObject({
+      billingName: "Fontaines D.C.",
+      day: "10 JUN",
+      stage: null,
+    });
+    expect(extracted[2]).toMatchObject({
+      billingName: "Josh Baker",
+      day: "13 JUN",
+      stage: "PRIMAVERA BITS",
+    });
+
+    const result = await fetchAndExtractFestivalLineup(
+      "https://www.primaverasound.com/en/porto/lineup-porto",
+      {
+        festivalName: "Primavera Sound Porto",
+        festivalYear: 2027,
+        fetchImpl: async () =>
+          new Response(primaveraHtml, {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          }),
+      },
+    );
+    expect(result.method).toBe("embedded-json");
+    expect(result.entries).toHaveLength(3);
   });
 });
