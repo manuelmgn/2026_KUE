@@ -229,7 +229,7 @@ export interface Dictionary {
 const DICTIONARIES: Record<Locale, Dictionary> = {
   gl,
   "pt-PT": ptPT,
-  es,
+  "es-ES": es,
 };
 
 export function getDictionary(locale: Locale): Dictionary {

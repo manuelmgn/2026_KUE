@@ -108,7 +108,7 @@ export function SettingsView() {
       meta: dict.settings.languagePtMeta,
     },
     {
-      value: "es",
+      value: "es-ES",
       label: dict.settings.languageEsLabel,
       meta: dict.settings.languageEsMeta,
     },

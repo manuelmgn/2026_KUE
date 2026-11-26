@@ -146,7 +146,7 @@ export const ptPT: Dictionary = {
     selectFestivalError: "Seleciona ou cria um festival antes de importar.",
     noValidRowsError: "Não há linhas válidas selecionadas para importar.",
     importedSummary: (entries: number, newArtists: number) =>
-      `Importadas ${entries} entradas (${newArtists} artistas novos em fila de enriquecimento).`,
+      `Importadas ${entries} entradas (${newArtists} artistas novos na fila de enriquecimento).`,
     viewLineup: "Ver cartaz →",
     scheduleToggle: "Adicionar dias e palcos agora (opcional)",
     colInclude: "Inc.",
@@ -194,13 +194,14 @@ export const ptPT: Dictionary = {
     title: "Definições",
     subtitle: "Personaliza o idioma e a aparência da aplicação.",
     languageSectionTitle: "Idioma",
-    languageDescription: "Escolhe o idioma principal da interface. Galego é o idioma predefinido.",
+    languageDescription:
+      "Escolhe o idioma principal da interface. O galego é o idioma predefinido.",
     languageGlLabel: "Galego",
     languageGlMeta: "GL · Idioma principal",
     languagePtLabel: "Português (Portugal)",
     languagePtMeta: "PT-PT · Português europeu",
-    languageEsLabel: "Español",
-    languageEsMeta: "ES · Castellano",
+    languageEsLabel: "Castellano",
+    languageEsMeta: "ES-ES · Espanha",
     activeBadge: "ATIVO",
     themeSectionTitle: "Aparência",
     themeDescription:
@@ -209,7 +210,7 @@ export const ptPT: Dictionary = {
     themeSystemMeta: (resolved: "dark" | "light") =>
       `Automático · Atualmente ${resolved === "dark" ? "escuro" : "claro"}`,
     themeDarkLabel: "Escuro",
-    themeDarkMeta: "Contraste alto sobre preto",
+    themeDarkMeta: "Alto contraste sobre preto",
     themeLightLabel: "Claro",
     themeLightMeta: "Papel quente de alto contraste",
     savedNotice: "Preferência guardada.",

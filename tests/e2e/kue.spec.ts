@@ -56,7 +56,7 @@ test.describe("KUE E2E flows", () => {
       "BIG|BRAVE | Sábado 10 | PAARD | 23:00",
     ].join("\n");
 
-    await page.getByLabel("Texto do cartel en bruto").fill(rawLineup);
+    await page.getByLabel("Texto do cartaz en bruto").fill(rawLineup);
     await page.getByRole("button", { name: /Analizar texto/i }).click();
 
     // Verify preview shows only artists initially (no Día / Escenario columns until toggled)
@@ -116,7 +116,7 @@ test.describe("KUE E2E flows", () => {
     }
 
     // 2. Navigate to lineup, switch to ÍNDICE, and perform keyboard triage (↓, 5, Enter)
-    await page.getByRole("link", { name: /Ver cartel/i }).click();
+    await page.getByRole("link", { name: /Ver cartaz/i }).click();
     await expect(page.getByRole("heading", { name: /REWIRE 2027/i })).toBeVisible();
 
     await page.getByRole("button", { name: "ÍNDICE" }).click();
@@ -156,7 +156,7 @@ test.describe("KUE E2E flows", () => {
     await page.goto("/festival-mode?festival=rewire-2027");
 
     // Must-see is active by default: Mabe Fratti & Bill Orcutt (5/5) + William Basinski (4/5), NOT BIG|BRAVE (unrated)
-    const listItems = page.locator("ul[aria-label='Lista de pases en Modo Festival'] li");
+    const listItems = page.locator("ul[aria-label='Lista de actuacións en Modo Festival'] li");
     await expect(listItems).toHaveCount(2);
     await expect(page.getByText("Mabe Fratti & Bill Orcutt")).toBeVisible();
     await expect(page.getByText("William Basinski 'Passing the Cup of Sorrows'")).toBeVisible();
@@ -173,14 +173,14 @@ test.describe("KUE E2E flows", () => {
     await expect(page.getByText("BIG|BRAVE")).toBeVisible();
   });
 
-  test("defaults to gl and allows switching between gl, pt-PT, and es in Settings with persistence", async ({
+  test("defaults to gl and allows switching between gl, pt-PT, and es-ES in Settings with persistence", async ({
     page,
   }) => {
     await page.goto("/settings");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "gl");
     await expect(page.getByRole("heading", { name: "Axustes" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cartel" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Cartaz" })).toBeVisible();
 
     // Switch to Portuguese (Portugal)
     await page.getByRole("button", { name: /Português \(Portugal\)/i }).click();
@@ -193,10 +193,11 @@ test.describe("KUE E2E flows", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT");
     await expect(page.getByRole("heading", { name: "Definições" })).toBeVisible();
 
-    // Switch to Spanish
-    await page.getByRole("button", { name: /Español/i }).click();
+    // Switch to Castellano (es-ES)
+    await page.getByRole("button", { name: /Castellano/i }).click();
     await expect(page.getByRole("heading", { name: "Ajustes" })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByRole("link", { name: "Cartel" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es-ES");
 
     // Switch back to Galego
     await page.getByRole("button", { name: /Galego/i }).click();
