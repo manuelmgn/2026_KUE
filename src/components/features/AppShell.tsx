@@ -127,6 +127,23 @@ function SettingsIcon() {
   );
 }
 
+function AdminIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 18 18"
+      className="h-[18px] w-[18px] shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="miter"
+    >
+      <path d="M9 2L15 4.25V8.75C15 12.25 12.5 14.75 9 16C5.5 14.75 3 12.25 3 8.75V4.25L9 2Z" />
+      <path d="M6.5 9L8.25 10.75L11.75 7.25" />
+    </svg>
+  );
+}
+
 export function AppShell({
   currentUser,
   upcomingFestivals,
@@ -355,13 +372,19 @@ export function AppShell({
                 title={dict.nav.admin}
                 aria-label={dict.nav.admin}
                 aria-current={isAdmin ? "page" : undefined}
-                className={`relative flex min-h-10 items-center justify-center border-b border-line px-1 py-2 font-mono text-[0.58rem] uppercase tracking-[0.06em] transition-colors ${
+                className={`relative flex min-h-11 flex-col items-center justify-center gap-1 border-b border-line px-1 py-2.5 transition-colors ${
                   isAdmin
-                    ? "bg-acid font-semibold text-acid-ink"
+                    ? "bg-surface font-semibold text-ink"
                     : "text-ink-muted hover:bg-surface hover:text-ink"
                 }`}
               >
-                {dict.nav.admin}
+                {isAdmin ? (
+                  <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-acid" />
+                ) : null}
+                <AdminIcon />
+                <span className="kue-shell-rail-label max-w-full truncate font-mono text-[0.55rem] uppercase leading-none tracking-[0.04em]">
+                  {dict.nav.admin}
+                </span>
               </Link>
             ) : null}
 
@@ -523,6 +546,7 @@ export function AppShell({
                 {isAdmin ? (
                   <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-acid" />
                 ) : null}
+                <AdminIcon />
                 <span>{dict.nav.admin}</span>
               </Link>
             ) : null}
