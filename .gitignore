@@ -25,8 +25,8 @@ test-results/
 
 # Env
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # OS / Misc
 .DS_Store
@@ -36,3 +36,4 @@ next-env.d.ts
 # Kit archive
 kue-antigravity-kit/
 kue-antigravity-kit-v2.zip
+.env.prod

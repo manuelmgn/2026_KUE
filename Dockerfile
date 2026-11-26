@@ -12,7 +12,8 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV DATABASE_URL="file:./prisma/dev.db"
+# Generate PostgreSQL Prisma client for production container automatically
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/kue?schema=public"
 RUN npx prisma generate
 RUN npm run build
 
