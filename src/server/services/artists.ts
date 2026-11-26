@@ -101,7 +101,7 @@ export async function getArtistDetail(
         where: {
           artistId: artist.id,
           userId: { in: friendIds },
-          OR: [{ rating: { not: null } }, { notes: { not: "" } }],
+          rating: { not: null },
         },
       }),
       entryIds.length > 0
@@ -145,14 +145,14 @@ export async function getArtistDetail(
       const canSeeNotes = friend.notesVisibility === "FRIENDS";
 
       const rating = canSeeRatings ? (aState?.rating ?? null) : null;
-      const rawNotes = aState?.notes.trim() ?? "";
-      const notes = canSeeNotes && rawNotes.length > 0 ? rawNotes : null;
+      // Personal artist notes are always strictly private and never exposed to friends.
+      const notes = null;
 
       const liveRating = canSeeRatings ? (lState?.liveRating ?? null) : null;
       const rawLiveNotes = lState?.liveNotes.trim() ?? "";
       const liveNotes = canSeeNotes && rawLiveNotes.length > 0 ? rawLiveNotes : null;
 
-      if (rating === null && notes === null && liveRating === null && liveNotes === null) {
+      if (rating === null && liveRating === null && liveNotes === null) {
         continue;
       }
 

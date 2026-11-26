@@ -232,8 +232,14 @@ async function collectPostsForAuthors(
   const { viewerId, limit, db } = options;
   const authorById = new Map(authors.map((a) => [a.id, a]));
 
-  // Determine which authors allow at least ratings or notes
-  const reviewAuthorIds = authors
+  // Personal artist notes are ALWAYS strictly private (self-only).
+  // Friends only see artist states when the author shares ratings and has a numeric rating.
+  const artistReviewAuthorIds = authors
+    .filter((a) => a.id === viewerId || a.ratingsVisibility === "FRIENDS")
+    .map((a) => a.id);
+
+  // Live concert reviews can include liveRating (ratingsVisibility) or liveNotes (notesVisibility).
+  const liveReviewAuthorIds = authors
     .filter(
       (a) =>
         a.id === viewerId || a.ratingsVisibility === "FRIENDS" || a.notesVisibility === "FRIENDS",
@@ -246,11 +252,11 @@ async function collectPostsForAuthors(
     .map((a) => a.id);
 
   const [artistStates, entryStates, editionFollows, authorMemberships] = await Promise.all([
-    reviewAuthorIds.length > 0
+    artistReviewAuthorIds.length > 0
       ? db.userArtistState.findMany({
           where: {
-            userId: { in: reviewAuthorIds },
-            OR: [{ rating: { not: null } }, { notes: { not: "" } }],
+            userId: { in: artistReviewAuthorIds },
+            OR: [{ rating: { not: null } }, { userId: viewerId, notes: { not: "" } }],
           },
           orderBy: [{ ratedAt: "desc" }, { updatedAt: "desc" }],
           take: limit * 2,
@@ -279,10 +285,10 @@ async function collectPostsForAuthors(
           },
         })
       : Promise.resolve([]),
-    reviewAuthorIds.length > 0
+    liveReviewAuthorIds.length > 0
       ? db.userEntryState.findMany({
           where: {
-            userId: { in: reviewAuthorIds },
+            userId: { in: liveReviewAuthorIds },
             OR: [{ liveRating: { not: null } }, { liveNotes: { not: "" } }],
           },
           orderBy: [{ updatedAt: "desc" }],
@@ -358,11 +364,11 @@ async function collectPostsForAuthors(
     if (!author) continue;
     const isSelf = author.id === viewerId;
     const canSeeRatings = isSelf || author.ratingsVisibility === "FRIENDS";
-    const canSeeNotes = isSelf || author.notesVisibility === "FRIENDS";
 
     const visibleRating = canSeeRatings ? state.rating : null;
     const trimmedNotes = state.notes.trim();
-    const visibleNotes = canSeeNotes && trimmedNotes.length > 0 ? trimmedNotes : null;
+    // Personal artist notes are strictly private and never shared with other users.
+    const visibleNotes = isSelf && trimmedNotes.length > 0 ? trimmedNotes : null;
 
     if (visibleRating === null && visibleNotes === null) {
       continue;

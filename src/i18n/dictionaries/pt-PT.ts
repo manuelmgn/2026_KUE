@@ -407,8 +407,9 @@ export const ptPT: Dictionary = {
     festivalsHint: "Próximos festivais, arquivo de edições passadas e coincidências.",
     ratingsLabel: "Pontuações (1–5)",
     ratingsHint: "Notas numéricas de estúdio e ao vivo no teu perfil, feed e fichas de artista.",
-    notesLabel: "Notas e críticas escritas",
-    notesHint: "Texto escrito nos teus apontamentos pessoais de artistas e crónicas pós-concerto.",
+    notesLabel: "Comentários ao vivo",
+    notesHint:
+      "Crónicas escritas após um concerto. As tuas notas pessoais de artista são sempre privadas.",
   },
   profile: {
     editProfileButton: "Editar perfil",

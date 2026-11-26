@@ -406,8 +406,9 @@ export const gl: Dictionary = {
     festivalsHint: "Próximos festivais, arquivo de edicións pasadas e coincidencias.",
     ratingsLabel: "Puntuacións (1–5)",
     ratingsHint: "Notas numéricas de estudio e directo no teu perfil, feed e fichas de artista.",
-    notesLabel: "Notas e recensións escritas",
-    notesHint: "Texto escrito nos teus apuntamentos persoais de artistas e crónicas post-concerto.",
+    notesLabel: "Comentarios de directo",
+    notesHint:
+      "Crónicas escritas tras un concerto. As túas notas persoais de artista son sempre privadas.",
   },
   profile: {
     editProfileButton: "Editar perfil",

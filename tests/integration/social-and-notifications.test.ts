@@ -286,34 +286,42 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
       db,
     );
 
-    // 1. Default (all FRIENDS): Bob sees festivals, shared festivals, scores, and notes
+    // 1. Default (all FRIENDS): Bob sees festivals, shared festivals, scores, and live reviews,
+    //    but personal artist notes are ALWAYS strictly private and never exposed to friends.
     const viewAllOpen = await getUserProfileByUsername(bob.id, "alice", db);
     expect(viewAllOpen?.sharedFestivals).toHaveLength(1);
     expect(viewAllOpen?.festivals).toHaveLength(1);
-    expect(viewAllOpen?.posts.length).toBeGreaterThanOrEqual(4);
+    expect(viewAllOpen?.posts).toHaveLength(3);
+    expect(viewAllOpen?.posts.some((p) => p.artist?.id === timArtistId)).toBe(false);
     const aliceArtistPost = viewAllOpen?.posts.find(
       (p) => p.kind === "ARTIST_REVIEW" && p.artist?.id === kaliArtistId,
     );
     expect(aliceArtistPost?.festival?.name).toBe("Primavera Sound");
+    expect(aliceArtistPost?.rating).toBe(5);
+    expect(aliceArtistPost?.notes).toBeNull();
 
     const kaliDetailOpen = await getArtistDetail(bob.id, kaliArtistId, db);
     expect(kaliDetailOpen?.friendReviews).toHaveLength(1);
     expect(kaliDetailOpen?.friendReviews[0]?.rating).toBe(5);
-    expect(kaliDetailOpen?.friendReviews[0]?.notes).toBe("Órgano hipnótico imprescindible");
+    expect(kaliDetailOpen?.friendReviews[0]?.notes).toBeNull();
     expect(kaliDetailOpen?.friendReviews[0]?.liveRating).toBe(4);
     expect(kaliDetailOpen?.friendReviews[0]?.liveNotes).toBe("Sonido brutal en el Auditori");
 
     // 2. Alice sets notesVisibility = PRIVATE (keeps ratingsVisibility = FRIENDS)
+    //    Live review comments are now hidden too, while numeric ratings remain visible.
     await updateOwnPrivacy(alice.id, { notesVisibility: "PRIVATE" }, db);
 
     const feedNoNotes = await listFriendsActivityFeed(bob.id, { db });
-    // Note-only Tim Hecker review must NOT appear at all; Kali reviews keep numeric rating but null notes!
     expect(feedNoNotes.some((p) => p.artist?.id === timArtistId)).toBe(false);
     const kaliFeedPost = feedNoNotes.find(
       (p) => p.kind === "ARTIST_REVIEW" && p.artist?.id === kaliArtistId,
     );
     expect(kaliFeedPost?.rating).toBe(5);
     expect(kaliFeedPost?.notes).toBeNull();
+
+    const kaliLivePostNoNotes = feedNoNotes.find((p) => p.kind === "LIVE_REVIEW");
+    expect(kaliLivePostNoNotes?.rating).toBe(4);
+    expect(kaliLivePostNoNotes?.notes).toBeNull();
 
     const kaliDetailNoNotes = await getArtistDetail(bob.id, kaliArtistId, db);
     expect(kaliDetailNoNotes?.friendReviews[0]?.rating).toBe(5);
