@@ -7,8 +7,12 @@ export async function register(): Promise<void> {
   }
 
   try {
-    const { recoverPendingArtists } = await import("@/server/sync/queue");
+    const [{ recoverPendingArtists }, { startLineupSyncScheduler }] = await Promise.all([
+      import("@/server/sync/queue"),
+      import("@/server/sync/lineup-scheduler"),
+    ]);
     await recoverPendingArtists();
+    startLineupSyncScheduler();
   } catch {
     // Database might not be initialized yet during initial container setup
   }

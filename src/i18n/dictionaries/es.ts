@@ -57,6 +57,8 @@ export const es: Dictionary = {
     tabDetails: "Datos",
     tabArtists: (count: number) => `Artistas (${count})`,
     tabImport: "Importar",
+    tabAutoSync: (pendingCount: number) =>
+      pendingCount > 0 ? `Auto-sync (${pendingCount})` : "Auto-sync",
     detailsTitle: "Datos del festival",
     detailsDescription: "Corrige el nombre, la ubicación o las fechas de este festival.",
     saveDetails: "Guardar cambios",
@@ -75,6 +77,48 @@ export const es: Dictionary = {
     noFestivalTitle: "Sin festival activo",
     noFestivalDescription: "Crea o selecciona un festival para editarlo.",
     goToFestivals: "Ir a Festivales →",
+    autoSync: {
+      title: "Actualización automática del cartel",
+      description:
+        "Conecta la web oficial del festival (o Clashfinder) para detectar nuevas tandas y horarios sin tocar tus valoraciones ni notas.",
+      sourceUrlLabel: "URL del cartel",
+      sourceUrlPlaceholder: "https://www.rewirefestival.nl/lineup",
+      enabledLabel: "Activar comprobación periódica en segundo plano",
+      enabledHint:
+        "Solo analiza la página cuando cambia su contenido; se detiene al terminar el festival.",
+      modeLabel: "Modo de aplicación",
+      modeReview: "Revisión previa (recomendado)",
+      modeAuto: "Aplicar novedades automáticamente",
+      intervalLabel: "Frecuencia",
+      intervalHours: (hours: number) => `Cada ${hours} h`,
+      intervalDays: (days: number) => (days === 1 ? "Cada día" : `Cada ${days} días`),
+      saveConfig: "Guardar configuración",
+      configSaved: "Configuración guardada.",
+      checkNow: "Comprobar ahora",
+      checking: "Comprobando...",
+      forceCheck: "Forzar análisis",
+      lastCheckLabel: "Última comprobación:",
+      neverChecked: "Nunca",
+      geminiActive: "IA Gemini activa (cualquier web)",
+      geminiMissing: "Sin GEMINI_API_KEY (solo JSON-LD, Clashfinder o texto)",
+      statusUnchanged: "Sin cambios en la web desde la última comprobación.",
+      statusUpToDate: "Cartel al día: no se detectaron novedades.",
+      statusApplied: (added: number, updated: number, newArtists: number) =>
+        `Aplicado: +${added} entradas, ~${updated} horarios actualizados (${newArtists} artistas nuevos en cola).`,
+      statusPendingReview: (added: number, updated: number, missing: number) =>
+        `Novedades detectadas: +${added} nuevas, ~${updated} horarios, ${missing} ausentes.`,
+      pendingTitle: "Novedades pendientes de revisión",
+      pendingAddedTitle: (count: number) => `Nuevas entradas (${count})`,
+      pendingUpdatedTitle: (count: number) => `Horarios / subtítulos completados (${count})`,
+      pendingMissingTitle: (count: number) => `Ausentes en la última comprobación (${count})`,
+      pendingMissingHint:
+        "KUE nunca borra artistas automáticamente. Si alguno canceló, puedes quitarlo manualmente en la pestaña Artistas.",
+      applySelected: (count: number) => `Aplicar ${count} cambios`,
+      applying: "Aplicando...",
+      dismissPending: "Descartar aviso",
+      appliedSummary: (added: number, updated: number, newArtists: number) =>
+        `Cambios aplicados: +${added} entradas, ~${updated} actualizadas (${newArtists} artistas nuevos en cola).`,
+    },
   },
   home: {
     emptyTitle: "Empieza tu archivo",

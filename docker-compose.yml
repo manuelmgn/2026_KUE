@@ -11,6 +11,8 @@ services:
       HOSTNAME: "0.0.0.0"
       DATABASE_URL: ${DATABASE_URL}
       MEDIA_DIR: /app/data/media
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
     volumes:
       - kue_media:/app/data/media
     networks:

@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import { deleteEntryAction } from "@/actions/entry-actions";
 import { updateFestivalAction } from "@/actions/festival-actions";
 import { importLineupAction } from "@/actions/import-actions";
+import { FestivalAutoSyncPanel } from "@/components/features/FestivalAutoSyncPanel";
 import { PlaceAutocomplete } from "@/components/features/PlaceAutocomplete";
 import type { FestivalEditDTO, LineupEntryDTO } from "@/components/features/types";
 import { HairlineButton } from "@/components/ui/HairlineButton";
@@ -16,9 +17,10 @@ import { useI18n } from "@/i18n/context";
 interface FestivalManageViewProps {
   festival: FestivalEditDTO;
   initialEntries: LineupEntryDTO[];
+  hasGeminiApiKey: boolean;
 }
 
-type ManageTab = "details" | "artists" | "import";
+type ManageTab = "details" | "artists" | "import" | "autosync";
 
 interface EditableImportRow {
   key: string;
@@ -47,7 +49,11 @@ function buildInitialPlace(festival: FestivalEditDTO): PlaceCandidate | null {
   };
 }
 
-export function FestivalManageView({ festival, initialEntries }: FestivalManageViewProps) {
+export function FestivalManageView({
+  festival,
+  initialEntries,
+  hasGeminiApiKey,
+}: FestivalManageViewProps) {
   const { dict } = useI18n();
   const router = useRouter();
   const formId = useId();
@@ -249,6 +255,9 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
     : entries;
 
   const includedCount = rows.filter((row) => row.included).length;
+  const pendingDiffCount =
+    (festival.pendingLineupDiff?.added.length ?? 0) +
+    (festival.pendingLineupDiff?.updated.length ?? 0);
 
   return (
     <main className="mx-auto w-full max-w-[880px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
@@ -274,13 +283,14 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
         </Link>
       </div>
 
-      {/* 3-section hairline tab bar */}
-      <div role="tablist" className="grid grid-cols-3 border-b border-line bg-bg">
+      {/* 4-section hairline tab bar */}
+      <div role="tablist" className="grid grid-cols-2 border-b border-line bg-bg sm:grid-cols-4">
         {(
           [
             { id: "details", label: dict.manage.tabDetails },
             { id: "artists", label: dict.manage.tabArtists(entries.length) },
             { id: "import", label: dict.manage.tabImport },
+            { id: "autosync", label: dict.manage.tabAutoSync(pendingDiffCount) },
           ] as const
         ).map((tab, idx) => {
           const isActive = activeTab === tab.id;
@@ -292,7 +302,9 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
               aria-selected={isActive}
               onClick={() => setActiveTab(tab.id)}
               className={`cursor-pointer px-3 py-3 font-mono text-[0.74rem] uppercase tracking-[0.08em] transition-colors ${
-                idx < 2 ? "border-r border-line" : ""
+                idx < 3 ? "sm:border-r sm:border-line" : ""
+              } ${idx % 2 === 0 ? "border-r border-line sm:border-r" : ""} ${
+                idx < 2 ? "border-b border-line sm:border-b-0" : ""
               } ${
                 isActive
                   ? "bg-acid font-semibold text-acid-ink"
@@ -742,6 +754,11 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
             </div>
           ) : null}
         </section>
+      ) : null}
+
+      {/* TAB 4: Auto-sync lineup source */}
+      {activeTab === "autosync" ? (
+        <FestivalAutoSyncPanel festival={festival} hasGeminiApiKey={hasGeminiApiKey} />
       ) : null}
     </main>
   );

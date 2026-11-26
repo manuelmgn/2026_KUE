@@ -1,4 +1,5 @@
-import type { ArtistStatus, ReleaseType, SyncStatus } from "@/domain/schemas";
+import type { PendingLineupDiff } from "@/domain/lineup-diff";
+import type { ArtistStatus, LineupSyncMode, ReleaseType, SyncStatus } from "@/domain/schemas";
 
 export interface FestivalSummary {
   id: string;
@@ -24,6 +25,13 @@ export interface FestivalEditDTO extends FestivalSummary {
   locationPlaceId: string | null;
   startDate: string | null;
   endDate: string | null;
+  lineupSourceUrl: string | null;
+  autoSyncEnabled: boolean;
+  autoSyncMode: LineupSyncMode;
+  syncIntervalHours: number;
+  lastLineupSyncAt: string | null;
+  lastLineupSyncError: string | null;
+  pendingLineupDiff: PendingLineupDiff | null;
 }
 
 export interface HomeArtistItemDTO {

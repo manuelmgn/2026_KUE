@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ARTIST_STATUSES = ["PENDING", "LISTENING", "RATED", "DISCARDED"] as const;
 export const SYNC_STATUSES = ["PENDING", "SYNCING", "SYNCED", "FAILED"] as const;
 export const RELEASE_TYPES = ["ALBUM", "EP", "LIVE", "OTHER"] as const;
+export const LINEUP_SYNC_MODES = ["REVIEW", "AUTO"] as const;
 
 export const artistStatusSchema = z.enum(ARTIST_STATUSES);
 export type ArtistStatus = z.infer<typeof artistStatusSchema>;
@@ -12,6 +13,9 @@ export type SyncStatus = z.infer<typeof syncStatusSchema>;
 
 export const releaseTypeSchema = z.enum(RELEASE_TYPES);
 export type ReleaseType = z.infer<typeof releaseTypeSchema>;
+
+export const lineupSyncModeSchema = z.enum(LINEUP_SYNC_MODES);
+export type LineupSyncMode = z.infer<typeof lineupSyncModeSchema>;
 
 export const ratingSchema = z.number().int().min(1).max(5);
 export const nullableRatingSchema = ratingSchema.nullable();
@@ -75,6 +79,31 @@ export const updateFestivalSchema = z
     path: ["endDate"],
   });
 export type UpdateFestivalInput = z.infer<typeof updateFestivalSchema>;
+
+export const updateFestivalSyncConfigSchema = z.object({
+  festivalId: z.string().min(1),
+  lineupSourceUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .nullable()
+    .optional()
+    .refine(
+      (value) => !value || (URL.canParse(value) && /^https?:\/\//i.test(value)),
+      "Debe ser una URL válida (http:// o https://)",
+    ),
+  autoSyncEnabled: z.boolean().default(false),
+  autoSyncMode: lineupSyncModeSchema.default("REVIEW"),
+  syncIntervalHours: z.coerce.number().int().min(1).max(168).default(24),
+});
+export type UpdateFestivalSyncConfigInput = z.infer<typeof updateFestivalSyncConfigSchema>;
+
+export const applyLineupDiffSchema = z.object({
+  festivalId: z.string().min(1),
+  addedIndexes: z.array(z.number().int().min(0)).optional(),
+  updatedEntryIds: z.array(z.string().min(1)).optional(),
+});
+export type ApplyLineupDiffInput = z.infer<typeof applyLineupDiffSchema>;
 
 export const deleteEntrySchema = z.object({
   entryId: z.string().min(1),

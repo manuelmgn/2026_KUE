@@ -9,6 +9,7 @@ import { getServerDictionary } from "@/i18n/server";
 import { getLocalizedPlaceName } from "@/server/clients/places";
 import { listFestivalEntries } from "@/server/services/entries";
 import { listFestivals } from "@/server/services/festivals";
+import { parsePendingLineupDiff } from "@/server/services/lineup-sync";
 import {
   resolveActiveFestival,
   toFestivalSummary,
@@ -55,9 +56,20 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
       locationPlaceId: activeRaw.locationPlaceId,
       startDate: activeRaw.startDate ? activeRaw.startDate.toISOString().slice(0, 10) : null,
       endDate: activeRaw.endDate ? activeRaw.endDate.toISOString().slice(0, 10) : null,
+      lineupSourceUrl: activeRaw.lineupSourceUrl,
+      autoSyncEnabled: activeRaw.autoSyncEnabled,
+      autoSyncMode: activeRaw.autoSyncMode,
+      syncIntervalHours: activeRaw.syncIntervalHours,
+      lastLineupSyncAt: activeRaw.lastLineupSyncAt
+        ? activeRaw.lastLineupSyncAt.toISOString()
+        : null,
+      lastLineupSyncError: activeRaw.lastLineupSyncError,
+      pendingLineupDiff: parsePendingLineupDiff(activeRaw.pendingLineupDiff),
     };
     entries = rawEntries.map(toLineupEntryDTO);
   }
+
+  const hasGeminiApiKey = Boolean(process.env.GEMINI_API_KEY?.trim());
 
   return (
     <div className="min-h-screen bg-bg text-ink">
@@ -66,7 +78,12 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
       </Suspense>
 
       {activeEdit ? (
-        <FestivalManageView key={activeEdit.id} festival={activeEdit} initialEntries={entries} />
+        <FestivalManageView
+          key={activeEdit.id}
+          festival={activeEdit}
+          initialEntries={entries}
+          hasGeminiApiKey={hasGeminiApiKey}
+        />
       ) : (
         <EmptyState
           title={dict.manage.noFestivalTitle}

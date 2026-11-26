@@ -5,6 +5,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(5030),
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
   MEDIA_DIR: z.string().min(1).default("./data/media"),
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.5-flash-lite"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -21,6 +23,8 @@ export function getEnv(): Env {
     PORT: process.env.PORT,
     DATABASE_URL: process.env.DATABASE_URL,
     MEDIA_DIR: process.env.MEDIA_DIR,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || undefined,
+    GEMINI_MODEL: process.env.GEMINI_MODEL || undefined,
   });
 
   if (!parsed.success) {
