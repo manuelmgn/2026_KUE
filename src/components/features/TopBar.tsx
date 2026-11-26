@@ -141,12 +141,12 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
 
         <nav
           aria-label={dict.nav.mainAria}
-          className="flex min-w-0 flex-1 items-stretch md:flex-none"
+          className="hidden min-w-0 items-stretch md:flex md:flex-none"
         >
           <Link
             href={`/${festivalSuffix}`}
             aria-current={pathname === "/" ? "page" : undefined}
-            className={`flex flex-1 items-center justify-center whitespace-nowrap border-r border-line px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-r-0 md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
+            className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
               pathname === "/"
                 ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
                 : "text-ink hover:bg-surface-elevated"
@@ -158,7 +158,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
           <Link
             href={`/festival-mode${festivalSuffix}`}
             aria-current={pathname === "/festival-mode" ? "page" : undefined}
-            className={`flex flex-1 items-center justify-center whitespace-nowrap border-r border-line px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-r-0 md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
+            className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
               pathname === "/festival-mode"
                 ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
                 : "text-ink hover:bg-surface-elevated"
@@ -170,7 +170,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
           <Link
             href={`/manage${festivalSuffix}`}
             aria-current={pathname === "/manage" || pathname === "/import" ? "page" : undefined}
-            className={`flex flex-1 items-center justify-center whitespace-nowrap px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-line md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
+            className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
               pathname === "/manage" || pathname === "/import"
                 ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
                 : "text-ink hover:bg-surface-elevated"

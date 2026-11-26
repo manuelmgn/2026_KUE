@@ -5,6 +5,8 @@ import { BottomNav } from "@/components/features/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/features/ServiceWorkerRegistrar";
 import { I18nProvider } from "@/i18n/context";
 import { getServerDictionary } from "@/i18n/server";
+import { listFestivals } from "@/server/services/festivals";
+import { toFestivalSummary } from "@/server/services/mappers";
 import "./globals.css";
 
 const syne = Syne({
@@ -73,7 +75,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  const { locale } = await getServerDictionary();
+  const [{ locale }, festivalSummaries] = await Promise.all([
+    getServerDictionary(),
+    listFestivals()
+      .then((rows) => rows.map(toFestivalSummary))
+      .catch(() => []),
+  ]);
 
   return (
     <html
@@ -91,7 +98,7 @@ export default async function RootLayout({
           <ServiceWorkerRegistrar />
           {children}
           <Suspense fallback={null}>
-            <BottomNav />
+            <BottomNav festivals={festivalSummaries} />
           </Suspense>
         </I18nProvider>
       </body>

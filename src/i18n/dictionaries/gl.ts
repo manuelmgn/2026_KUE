@@ -25,6 +25,8 @@ export const gl: Dictionary = {
     selectFestivalAria: "Seleccionar festival",
     home: "Inicio",
     festivals: "Festivais",
+    festivalFallback: "Festival",
+    festivalMenuAria: "Opcións do festival activo",
     search: "Buscar",
     searchPendingTitle: "Buscar artistas (próximamente)",
     lineup: "Cartaz",

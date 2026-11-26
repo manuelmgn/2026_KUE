@@ -25,6 +25,8 @@ export const es: Dictionary = {
     selectFestivalAria: "Seleccionar festival",
     home: "Inicio",
     festivals: "Festivales",
+    festivalFallback: "Festival",
+    festivalMenuAria: "Opciones del festival activo",
     search: "Buscar",
     searchPendingTitle: "Buscar artistas (próximamente)",
     lineup: "Cartel",

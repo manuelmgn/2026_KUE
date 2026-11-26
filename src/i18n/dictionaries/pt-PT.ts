@@ -25,6 +25,8 @@ export const ptPT: Dictionary = {
     selectFestivalAria: "Selecionar festival",
     home: "Início",
     festivals: "Festivais",
+    festivalFallback: "Festival",
+    festivalMenuAria: "Opções do festival ativo",
     search: "Buscar",
     searchPendingTitle: "Pesquisar artistas (em breve)",
     lineup: "Cartaz",

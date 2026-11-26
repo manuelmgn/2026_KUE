@@ -28,6 +28,8 @@ export interface Dictionary {
     selectFestivalAria: string;
     home: string;
     festivals: string;
+    festivalFallback: string;
+    festivalMenuAria: string;
     search: string;
     searchPendingTitle: string;
     lineup: string;
