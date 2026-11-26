@@ -9,6 +9,17 @@ export async function listFestivals(db: PrismaClient = getDb()): Promise<Festiva
   });
 }
 
+export async function listFestivalsWithCounts(db: PrismaClient = getDb()) {
+  return db.festival.findMany({
+    orderBy: [{ year: "desc" }, { createdAt: "desc" }, { name: "asc" }],
+    include: {
+      _count: {
+        select: { entries: true },
+      },
+    },
+  });
+}
+
 export async function getFestivalBySlug(
   slug: string,
   db: PrismaClient = getDb(),

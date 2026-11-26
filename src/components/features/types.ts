@@ -8,6 +8,12 @@ export interface FestivalSummary {
   location: string | null;
 }
 
+export interface FestivalArchiveItemDTO extends FestivalSummary {
+  startDate: string | null;
+  endDate: string | null;
+  entriesCount: number;
+}
+
 export interface LineupArtistSummary {
   id: string;
   name: string;

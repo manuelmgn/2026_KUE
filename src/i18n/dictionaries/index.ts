@@ -24,10 +24,12 @@ export interface Dictionary {
   nav: {
     logoAria: string;
     mainAria: string;
+    bottomAria: string;
     selectFestivalAria: string;
-    menu: string;
-    menuOpenAria: string;
-    menuCloseAria: string;
+    home: string;
+    festivals: string;
+    search: string;
+    searchPendingTitle: string;
     lineup: string;
     festivalMode: string;
     import: string;
@@ -36,6 +38,20 @@ export interface Dictionary {
     retrySyncTitle: string;
     retryingSync: string;
     retrySync: (count: number) => string;
+  };
+  festivals: {
+    title: string;
+    subtitle: string;
+    newFestival: string;
+    closeForm: string;
+    upcomingTitle: string;
+    pastTitle: string;
+    openAction: string;
+    emptyUpcoming: string;
+    emptyPast: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    createSubmit: string;
   };
   home: {
     emptyTitle: string;

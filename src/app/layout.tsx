@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, Instrument_Serif, Syne } from "next/font/google";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
+import { BottomNav } from "@/components/features/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/features/ServiceWorkerRegistrar";
 import { I18nProvider } from "@/i18n/context";
 import { getServerDictionary } from "@/i18n/server";
@@ -74,6 +75,9 @@ export default async function RootLayout({
         <I18nProvider initialLocale={locale}>
           <ServiceWorkerRegistrar />
           {children}
+          <Suspense fallback={null}>
+            <BottomNav />
+          </Suspense>
         </I18nProvider>
       </body>
     </html>

@@ -15,6 +15,7 @@ export async function createFestivalAction(
   return runAction(async () => {
     const created = await createFestival(input);
     revalidatePath("/");
+    revalidatePath("/festivals");
     revalidatePath("/import");
     revalidatePath("/festival-mode");
     return toFestivalSummary(created);
