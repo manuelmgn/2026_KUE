@@ -44,10 +44,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f4ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("kue-theme");var v=t==="light"?"light":"dark";document.documentElement.dataset.theme=v;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("kue-theme");var v=t==="light"||t==="dark"?t:"light dark";var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
@@ -59,12 +62,11 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      data-theme="dark"
       suppressHydrationWarning
       className={`${syne.variable} ${instrumentSerif.variable} ${ibmPlexMono.variable} ${archivo.variable}`}
     >
       <head>
-        <meta name="color-scheme" content="dark" />
+        <meta name="color-scheme" content="light dark" />
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Inline theme bootstrap prevents FOUC before hydration */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

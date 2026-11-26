@@ -1,5 +1,6 @@
 import type { Locale } from "@/i18n/config";
 import { es } from "@/i18n/dictionaries/es";
+import { gl } from "@/i18n/dictionaries/gl";
 import { ptPT } from "@/i18n/dictionaries/pt-PT";
 
 export interface Dictionary {
@@ -24,6 +25,9 @@ export interface Dictionary {
     logoAria: string;
     mainAria: string;
     selectFestivalAria: string;
+    menu: string;
+    menuOpenAria: string;
+    menuCloseAria: string;
     lineup: string;
     festivalMode: string;
     import: string;
@@ -32,8 +36,6 @@ export interface Dictionary {
     retrySyncTitle: string;
     retryingSync: string;
     retrySync: (count: number) => string;
-    themeLight: string;
-    themeDark: string;
   };
   home: {
     emptyTitle: string;
@@ -190,6 +192,8 @@ export interface Dictionary {
     subtitle: string;
     languageSectionTitle: string;
     languageDescription: string;
+    languageGlLabel: string;
+    languageGlMeta: string;
     languagePtLabel: string;
     languagePtMeta: string;
     languageEsLabel: string;
@@ -197,6 +201,8 @@ export interface Dictionary {
     activeBadge: string;
     themeSectionTitle: string;
     themeDescription: string;
+    themeSystemLabel: string;
+    themeSystemMeta: (resolved: "dark" | "light") => string;
     themeDarkLabel: string;
     themeDarkMeta: string;
     themeLightLabel: string;
@@ -221,6 +227,7 @@ export interface Dictionary {
 }
 
 const DICTIONARIES: Record<Locale, Dictionary> = {
+  gl,
   "pt-PT": ptPT,
   es,
 };
@@ -228,4 +235,3 @@ const DICTIONARIES: Record<Locale, Dictionary> = {
 export function getDictionary(locale: Locale): Dictionary {
   return DICTIONARIES[locale];
 }
-

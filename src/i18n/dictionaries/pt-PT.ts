@@ -22,6 +22,9 @@ export const ptPT: Dictionary = {
     logoAria: "KUE — Início",
     mainAria: "Navegação principal",
     selectFestivalAria: "Selecionar festival",
+    menu: "Menu",
+    menuOpenAria: "Abrir menu de navegação",
+    menuCloseAria: "Fechar menu de navegação",
     lineup: "Cartaz",
     festivalMode: "Modo Festival",
     import: "Importar",
@@ -30,8 +33,6 @@ export const ptPT: Dictionary = {
     retrySyncTitle: "Tentar novamente artistas com erro de sincronização",
     retryingSync: "A TENTAR NOVAMENTE...",
     retrySync: (count: number) => `TENTAR NOVAMENTE (${count})`,
-    themeLight: "Claro",
-    themeDark: "Escuro",
   },
   home: {
     emptyTitle: "Começa o teu arquivo",
@@ -194,14 +195,20 @@ export const ptPT: Dictionary = {
     subtitle: "Personaliza o idioma e a aparência da aplicação.",
     languageSectionTitle: "Idioma",
     languageDescription:
-      "Escolhe o idioma principal da interface. Português (Portugal) é o idioma predefinido.",
+      "Escolhe o idioma principal da interface. Galego é o idioma predefinido.",
+    languageGlLabel: "Galego",
+    languageGlMeta: "GL · Idioma principal",
     languagePtLabel: "Português (Portugal)",
-    languagePtMeta: "PT-PT · Idioma principal",
+    languagePtMeta: "PT-PT · Português europeu",
     languageEsLabel: "Español",
     languageEsMeta: "ES · Castellano",
     activeBadge: "ATIVO",
     themeSectionTitle: "Aparência",
-    themeDescription: "Alterna entre o tema escuro editorial e o tema claro de papel.",
+    themeDescription:
+      "Segue o tema do sistema por predefinição ou fixa o modo escuro editorial ou o modo claro de papel.",
+    themeSystemLabel: "Sistema",
+    themeSystemMeta: (resolved: "dark" | "light") =>
+      `Automático · Atualmente ${resolved === "dark" ? "escuro" : "claro"}`,
     themeDarkLabel: "Escuro",
     themeDarkMeta: "Contraste alto sobre preto",
     themeLightLabel: "Claro",
@@ -224,4 +231,3 @@ export const ptPT: Dictionary = {
     musicBrainzServiceError: "Erro ao consultar o MusicBrainz",
   },
 };
-

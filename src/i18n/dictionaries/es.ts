@@ -22,6 +22,9 @@ export const es: Dictionary = {
     logoAria: "KUE — Inicio",
     mainAria: "Navegación principal",
     selectFestivalAria: "Seleccionar festival",
+    menu: "Menú",
+    menuOpenAria: "Abrir menú de navegación",
+    menuCloseAria: "Cerrar menú de navegación",
     lineup: "Cartel",
     festivalMode: "Modo Festival",
     import: "Importar",
@@ -30,8 +33,6 @@ export const es: Dictionary = {
     retrySyncTitle: "Reintentar artistas con error de sincronización",
     retryingSync: "REINTENTANDO...",
     retrySync: (count: number) => `REINTENTAR (${count})`,
-    themeLight: "Claro",
-    themeDark: "Oscuro",
   },
   home: {
     emptyTitle: "Empieza tu archivo",
@@ -183,8 +184,7 @@ export const es: Dictionary = {
     filterByDayAria: "Filtrar por día",
     allDays: "TODOS",
     emptyTitle: "Sin pases en esta vista",
-    emptyMustSeeDescription:
-      "Todavía no tienes artistas puntuados con 4★ o 5★ para este filtro.",
+    emptyMustSeeDescription: "Todavía no tienes artistas puntuados con 4★ o 5★ para este filtro.",
     emptyDayDescription: "No hay entradas cargadas para este día.",
     showAllSets: "Ver todos los pases",
     backToLineup: "Volver al cartel",
@@ -195,14 +195,20 @@ export const es: Dictionary = {
     subtitle: "Personaliza el idioma y la apariencia de la aplicación.",
     languageSectionTitle: "Idioma",
     languageDescription:
-      "Elige el idioma principal de la interfaz. Portugués (Portugal) es el idioma predeterminado.",
+      "Elige el idioma principal de la interfaz. Gallego es el idioma predeterminado.",
+    languageGlLabel: "Galego",
+    languageGlMeta: "GL · Idioma principal",
     languagePtLabel: "Português (Portugal)",
-    languagePtMeta: "PT-PT · Idioma principal",
+    languagePtMeta: "PT-PT · Portugués europeo",
     languageEsLabel: "Español",
     languageEsMeta: "ES · Castellano",
     activeBadge: "ACTIVO",
     themeSectionTitle: "Apariencia",
-    themeDescription: "Alterna entre el tema oscuro editorial y el tema claro de papel.",
+    themeDescription:
+      "Sigue el tema del sistema por defecto o fija el modo oscuro editorial o el modo claro de papel.",
+    themeSystemLabel: "Sistema",
+    themeSystemMeta: (resolved: "dark" | "light") =>
+      `Automático · Actualmente ${resolved === "dark" ? "oscuro" : "claro"}`,
     themeDarkLabel: "Oscuro",
     themeDarkMeta: "Alto contraste sobre negro",
     themeLightLabel: "Claro",
@@ -225,4 +231,3 @@ export const es: Dictionary = {
     musicBrainzServiceError: "Error consultando MusicBrainz",
   },
 };
-

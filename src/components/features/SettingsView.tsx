@@ -4,14 +4,32 @@ import { useEffect, useState } from "react";
 import type { Locale } from "@/i18n/config";
 import { useI18n } from "@/i18n/context";
 
-function applyTheme(next: "dark" | "light") {
-  document.documentElement.dataset.theme = next;
+type ThemePreference = "system" | "dark" | "light";
+
+function readStoredTheme(): ThemePreference {
+  try {
+    const stored = localStorage.getItem("kue-theme");
+    if (stored === "dark" || stored === "light") {
+      return stored;
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+  return "system";
+}
+
+function applyThemePreference(next: ThemePreference) {
+  const metaContent = next === "system" ? "light dark" : next;
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) {
-    meta.setAttribute("content", next);
+    meta.setAttribute("content", metaContent);
   }
   try {
-    localStorage.setItem("kue-theme", next);
+    if (next === "system") {
+      localStorage.removeItem("kue-theme");
+    } else {
+      localStorage.setItem("kue-theme", next);
+    }
     window.dispatchEvent(new Event("kue-theme-change"));
   } catch {
     // Ignore storage errors in restricted contexts
@@ -20,20 +38,41 @@ function applyTheme(next: "dark" | "light") {
 
 export function SettingsView() {
   const { locale, dict, setLocale } = useI18n();
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<ThemePreference>("system");
+  const [systemScheme, setSystemScheme] = useState<"dark" | "light">("dark");
   const [savingLocale, setSavingLocale] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
     const syncTheme = () => {
-      setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+      const pref = readStoredTheme();
+      setTheme(pref);
+      const meta = document.querySelector('meta[name="color-scheme"]');
+      if (meta) {
+        meta.setAttribute("content", pref === "system" ? "light dark" : pref);
+      }
     };
     syncTheme();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemScheme = () => {
+      setSystemScheme(mediaQuery.matches ? "dark" : "light");
+    };
+    syncSystemScheme();
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "kue-theme" || event.key === null) {
+        syncTheme();
+      }
+    };
+
+    mediaQuery.addEventListener("change", syncSystemScheme);
     window.addEventListener("kue-theme-change", syncTheme);
-    window.addEventListener("storage", syncTheme);
+    window.addEventListener("storage", onStorage);
     return () => {
+      mediaQuery.removeEventListener("change", syncSystemScheme);
       window.removeEventListener("kue-theme-change", syncTheme);
-      window.removeEventListener("storage", syncTheme);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -51,13 +90,18 @@ export function SettingsView() {
     }
   };
 
-  const handleThemeSelect = (next: "dark" | "light") => {
+  const handleThemeSelect = (next: ThemePreference) => {
     setTheme(next);
-    applyTheme(next);
+    applyThemePreference(next);
     setSavedNotice(true);
   };
 
   const languageOptions: Array<{ value: Locale; label: string; meta: string }> = [
+    {
+      value: "gl",
+      label: dict.settings.languageGlLabel,
+      meta: dict.settings.languageGlMeta,
+    },
     {
       value: "pt-PT",
       label: dict.settings.languagePtLabel,
@@ -70,7 +114,12 @@ export function SettingsView() {
     },
   ];
 
-  const themeOptions: Array<{ value: "dark" | "light"; label: string; meta: string }> = [
+  const themeOptions: Array<{ value: ThemePreference; label: string; meta: string }> = [
+    {
+      value: "system",
+      label: dict.settings.themeSystemLabel,
+      meta: dict.settings.themeSystemMeta(systemScheme),
+    },
     {
       value: "dark",
       label: dict.settings.themeDarkLabel,
@@ -107,7 +156,7 @@ export function SettingsView() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {languageOptions.map((option) => {
             const isActive = locale === option.value;
             return (
@@ -162,7 +211,7 @@ export function SettingsView() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {themeOptions.map((option) => {
             const isActive = theme === option.value;
             return (
@@ -171,7 +220,7 @@ export function SettingsView() {
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => handleThemeSelect(option.value)}
-                className={`flex cursor-pointer items-center justify-between gap-4 border p-4 text-left transition-colors ${
+                className={`flex cursor-pointer items-center justify-between gap-3 border p-4 text-left transition-colors ${
                   isActive
                     ? "border-acid bg-acid text-acid-ink"
                     : "border-line bg-surface text-ink hover:border-ink"
@@ -211,4 +260,3 @@ export function SettingsView() {
     </main>
   );
 }
-
