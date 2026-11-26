@@ -1,11 +1,16 @@
-import { runScheduledLineupSyncs } from "@/server/services/lineup-sync";
+import {
+  runOneTimeEmptyLineupRecheck,
+  runScheduledLineupSyncs,
+} from "@/server/services/lineup-sync";
 
 const SCHEDULER_POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const INITIAL_DELAY_MS = 60 * 1000; // 1 minute after startup
+const ONE_TIME_RECHECK_DELAY_MS = 5 * 1000; // 5 seconds after startup
 
 const globalForLineupScheduler = globalThis as typeof globalThis & {
   kueLineupSchedulerStarted?: boolean;
   kueLineupSchedulerRunning?: boolean;
+  kueOneTimeRecheckScheduled?: boolean;
 };
 
 async function tick(): Promise<void> {
@@ -35,6 +40,20 @@ export function startLineupSyncScheduler(): void {
   }
 
   globalForLineupScheduler.kueLineupSchedulerStarted = true;
+
+  if (
+    process.env.KUE_RECHECK_EMPTY_LINEUPS_ONCE === "1" &&
+    !globalForLineupScheduler.kueOneTimeRecheckScheduled
+  ) {
+    globalForLineupScheduler.kueOneTimeRecheckScheduled = true;
+    const recheckTimer = setTimeout(() => {
+      void runOneTimeEmptyLineupRecheck().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[KUE] One-time empty lineup recheck error: ${message}`);
+      });
+    }, ONE_TIME_RECHECK_DELAY_MS);
+    recheckTimer.unref();
+  }
 
   const initialTimer = setTimeout(() => {
     void tick();

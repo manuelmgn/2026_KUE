@@ -1,3 +1,5 @@
+import { access, mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { DomainError } from "@/domain/errors";
 import {
   computeLineupDiff,
@@ -562,4 +564,131 @@ export async function runScheduledLineupSyncs(
   }
 
   return { checked, failed };
+}
+
+const ONE_TIME_EMPTY_RECHECK_MARKER = ".recheck-empty-lineups-v1.done";
+
+function resolveOneTimeRecheckMarkerPath(overridePath?: string): string {
+  if (overridePath) {
+    return overridePath;
+  }
+  const mediaDir = path.resolve(
+    /* turbopackIgnore: true */ process.env.MEDIA_DIR?.trim() || "./data/media",
+  );
+  return path.join(mediaDir, ONE_TIME_EMPTY_RECHECK_MARKER);
+}
+
+export interface OneTimeEmptyLineupRecheckResult {
+  skipped: boolean;
+  checked: number;
+  imported: number;
+  failed: number;
+}
+
+/**
+ * Runs a one-time forced lineup re-import for all festival editions that have a `lineupSourceUrl`
+ * but currently have 0 entries. Persists a marker file in `MEDIA_DIR` so subsequent restarts
+ * and `docker compose up` runs skip it automatically.
+ */
+export async function runOneTimeEmptyLineupRecheck(
+  options: {
+    db?: PrismaClient;
+    markerPath?: string;
+    queue?: SyncQueue;
+    enqueueSync?: boolean;
+    fetchImpl?: FetchLineupSourceOptions["fetchImpl"];
+    llmExtractor?: FetchLineupSourceOptions["llmExtractor"];
+    geminiApiKey?: string;
+    geminiModel?: string;
+  } = {},
+): Promise<OneTimeEmptyLineupRecheckResult> {
+  const markerPath = resolveOneTimeRecheckMarkerPath(options.markerPath);
+
+  try {
+    await access(markerPath);
+    return { skipped: true, checked: 0, imported: 0, failed: 0 };
+  } catch {
+    // Marker does not exist yet -> run once
+  }
+
+  const db = options.db ?? getDb();
+  const candidates = await db.festivalEdition.findMany({
+    where: {
+      lineupSourceUrl: { not: null },
+      entries: { none: {} },
+    },
+    select: {
+      id: true,
+      year: true,
+      lineupSourceUrl: true,
+      festival: { select: { name: true } },
+    },
+    orderBy: [{ createdAt: "asc" }],
+  });
+
+  let checked = 0;
+  let imported = 0;
+  let failed = 0;
+
+  if (process.env.NODE_ENV !== "test") {
+    console.info(
+      `[KUE] One-time forced lineup recheck started (${candidates.length} empty editions with source URL).`,
+    );
+  }
+
+  for (const edition of candidates) {
+    if (!edition.lineupSourceUrl?.trim()) {
+      continue;
+    }
+
+    try {
+      const result = await checkFestivalLineupSync(edition.id, {
+        force: true,
+        applyDirectly: true,
+        db,
+        ...(options.queue !== undefined ? { queue: options.queue } : {}),
+        ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
+        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        ...(options.llmExtractor !== undefined ? { llmExtractor: options.llmExtractor } : {}),
+        ...(options.geminiApiKey !== undefined ? { geminiApiKey: options.geminiApiKey } : {}),
+        ...(options.geminiModel !== undefined ? { geminiModel: options.geminiModel } : {}),
+      });
+      checked += 1;
+      imported += result.addedCount;
+      if (process.env.NODE_ENV !== "test") {
+        console.info(
+          `[KUE] One-time lineup recheck OK: ${edition.festival.name} ${edition.year} (+${result.addedCount} entries)`,
+        );
+      }
+    } catch (error: unknown) {
+      failed += 1;
+      if (process.env.NODE_ENV !== "test") {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[KUE] One-time lineup recheck failed for ${edition.festival.name} ${edition.year}: ${message}`,
+        );
+      }
+    }
+  }
+
+  try {
+    await mkdir(path.dirname(markerPath), { recursive: true });
+    await writeFile(
+      markerPath,
+      JSON.stringify({
+        completedAt: new Date().toISOString(),
+        checked,
+        imported,
+        failed,
+      }),
+      "utf8",
+    );
+  } catch (error: unknown) {
+    if (process.env.NODE_ENV !== "test") {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[KUE] Could not write one-time recheck marker (${markerPath}): ${message}`);
+    }
+  }
+
+  return { skipped: false, checked, imported, failed };
 }

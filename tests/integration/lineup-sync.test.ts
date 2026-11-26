@@ -13,6 +13,7 @@ import {
   applyPendingLineupDiff,
   checkFestivalLineupSync,
   dismissPendingLineupDiff,
+  runOneTimeEmptyLineupRecheck,
   runScheduledLineupSyncs,
   updateFestivalSyncConfig,
 } from "@/server/services/lineup-sync";
@@ -272,5 +273,87 @@ describe("integration: festival lineup auto-sync", () => {
 
     const entries = await listFestivalEntries(testUserId, festival.id, {}, db);
     expect(entries).toHaveLength(2);
+  });
+
+  it("force-rechecks only empty editions with lineupSourceUrl once and persists marker", async () => {
+    const emptyWithUrl = await createFestival(
+      {
+        name: "Semibreve",
+        year: 2026,
+        lineupSourceUrl: "https://example.com/semibreve.txt",
+        autoSyncEnabled: false,
+      },
+      testUserId,
+      db,
+    );
+    const alreadyPopulated = await createFestival(
+      {
+        name: "WOS",
+        year: 2026,
+        lineupSourceUrl: "https://example.com/wos.txt",
+        autoSyncEnabled: false,
+      },
+      testUserId,
+      db,
+    );
+    await createFestival(
+      {
+        name: "No Link Fest",
+        year: 2026,
+      },
+      testUserId,
+      db,
+    );
+
+    await importFestivalLineup(
+      {
+        festivalId: alreadyPopulated.id,
+        rows: [
+          {
+            billingName: "Existing Artist",
+            artistNames: ["Existing Artist"],
+            subtitle: null,
+            day: null,
+            stage: null,
+            setTime: null,
+            included: true,
+          },
+        ],
+      },
+      { db, enqueueSync: false },
+    );
+
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request) =>
+        new Response("Suzan Peeters\nNoémi Büchi", {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        }),
+    );
+
+    const markerPath = path.join(tempDir, ".one-time-recheck.done");
+    const first = await runOneTimeEmptyLineupRecheck({
+      db,
+      markerPath,
+      enqueueSync: false,
+      fetchImpl: fetchMock,
+    });
+
+    expect(first).toEqual({ skipped: false, checked: 1, imported: 2, failed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://example.com/semibreve.txt");
+
+    const importedEntries = await listFestivalEntries(testUserId, emptyWithUrl.id, {}, db);
+    expect(importedEntries).toHaveLength(2);
+
+    // Subsequent startup/compose up must skip because marker file exists
+    const second = await runOneTimeEmptyLineupRecheck({
+      db,
+      markerPath,
+      enqueueSync: false,
+      fetchImpl: fetchMock,
+    });
+    expect(second).toEqual({ skipped: true, checked: 0, imported: 0, failed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
