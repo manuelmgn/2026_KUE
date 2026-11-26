@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { deleteEntryAction } from "@/actions/entry-actions";
 import { updateFestivalAction } from "@/actions/festival-actions";
 import { importLineupAction } from "@/actions/import-actions";
@@ -73,6 +73,10 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
   const [artistQuery, setArtistQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEntries(initialEntries);
+  }, [initialEntries]);
 
   // 3. Import new artists state
   const [rawText, setRawText] = useState("");

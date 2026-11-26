@@ -69,8 +69,7 @@ export const es: Dictionary = {
     noArtists: "Este festival todavía no tiene artistas.",
     noFilterMatches: "Sin coincidencias para este filtro.",
     importTitle: "Importar nuevos artistas",
-    importDescription:
-      "Pega una lista de artistas para añadirlos al cartel de este festival.",
+    importDescription: "Pega una lista de artistas para añadirlos al cartel de este festival.",
     noFestivalTitle: "Sin festival activo",
     noFestivalDescription: "Crea o selecciona un festival para editarlo.",
     goToFestivals: "Ir a Festivales →",
