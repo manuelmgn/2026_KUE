@@ -568,6 +568,7 @@ export function SocialHubView({
                         ) : (
                           <button
                             type="button"
+                            aria-label={dict.social.removeFriendAction}
                             onClick={() => setConfirmRemoveId(friend.id)}
                             className="cursor-pointer border border-line px-2 py-1 font-mono text-[0.64rem] uppercase tracking-[0.06em] text-ink-muted transition-colors hover:border-ink hover:text-ink"
                           >

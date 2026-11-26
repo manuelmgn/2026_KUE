@@ -321,12 +321,19 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     expect(kaliDetailNoNotes?.friendReviews[0]?.liveRating).toBe(4);
     expect(kaliDetailNoNotes?.friendReviews[0]?.liveNotes).toBeNull();
 
-    // 3. Alice sets ratingsVisibility = PRIVATE and festivalsVisibility = PRIVATE (100% private)
-    await updateOwnPrivacy(
-      alice.id,
-      { ratingsVisibility: "PRIVATE", festivalsVisibility: "PRIVATE" },
-      db,
-    );
+    // 2b. Alice sets festivalsVisibility = PRIVATE (keeping ratingsVisibility = FRIENDS)
+    // Live review still shows rating, but MUST NOT leak festival name/slug/day/stage!
+    await updateOwnPrivacy(alice.id, { festivalsVisibility: "PRIVATE" }, db);
+    const feedNoFestivals = await listFriendsActivityFeed(bob.id, { db });
+    expect(feedNoFestivals.some((p) => p.kind === "FESTIVAL_ADDED")).toBe(false);
+    const kaliLiveNoFest = feedNoFestivals.find((p) => p.kind === "LIVE_REVIEW");
+    expect(kaliLiveNoFest?.rating).toBe(4);
+    expect(kaliLiveNoFest?.festival).toBeNull();
+    expect(kaliLiveNoFest?.entry?.day).toBeNull();
+    expect(kaliLiveNoFest?.entry?.stage).toBeNull();
+
+    // 3. Alice sets ratingsVisibility = PRIVATE as well (100% private)
+    await updateOwnPrivacy(alice.id, { ratingsVisibility: "PRIVATE" }, db);
 
     const viewLocked = await getUserProfileByUsername(bob.id, "alice", db);
     expect(viewLocked?.canViewFestivals).toBe(false);

@@ -231,7 +231,6 @@ async function collectPostsForAuthors(
 
   const { viewerId, limit, db } = options;
   const authorById = new Map(authors.map((a) => [a.id, a]));
-  const authorIds = authors.map((a) => a.id);
 
   // Determine which authors allow at least ratings or notes
   const reviewAuthorIds = authors
@@ -352,7 +351,6 @@ async function collectPostsForAuthors(
     set.add(m.editionId);
   }
 
-  void authorIds;
   const posts: SocialPostItemDTO[] = [];
 
   for (const state of artistStates) {
@@ -422,6 +420,7 @@ async function collectPostsForAuthors(
       continue;
     }
 
+    const canSeeFestivals = isSelf || author.festivalsVisibility === "FRIENDS";
     const firstArtist = state.entry.artists[0]?.artist ?? null;
     const ed = state.entry.edition;
 
@@ -442,18 +441,20 @@ async function collectPostsForAuthors(
             imagePath: firstArtist.imagePath,
           }
         : null,
-      festival: {
-        id: ed.id,
-        slug: ed.slug,
-        name: ed.festival.name,
-        year: ed.year,
-        location: ed.location,
-      },
+      festival: canSeeFestivals
+        ? {
+            id: ed.id,
+            slug: ed.slug,
+            name: ed.festival.name,
+            year: ed.year,
+            location: ed.location,
+          }
+        : null,
       entry: {
         id: state.entry.id,
         billingName: state.entry.billingName,
-        day: state.entry.day,
-        stage: state.entry.stage,
+        day: canSeeFestivals ? state.entry.day : null,
+        stage: canSeeFestivals ? state.entry.stage : null,
       },
       rating: visibleRating,
       notes: visibleNotes,

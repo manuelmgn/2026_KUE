@@ -390,6 +390,9 @@ export async function searchUsersForFriends(
   }
 
   const normalized = normalizeUsername(cleaned);
+  const lowered = cleaned.toLowerCase();
+  const capitalized = lowered.charAt(0).toUpperCase() + lowered.slice(1);
+  const displayVariants = Array.from(new Set([cleaned, lowered, capitalized]));
 
   const candidates = await db.user.findMany({
     where: {
@@ -397,7 +400,7 @@ export async function searchUsersForFriends(
       isActive: true,
       OR: [
         { normalizedUsername: { contains: normalized } },
-        { displayName: { contains: cleaned } },
+        ...displayVariants.map((variant) => ({ displayName: { contains: variant } })),
       ],
     },
     orderBy: [{ normalizedUsername: "asc" }],
