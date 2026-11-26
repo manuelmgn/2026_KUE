@@ -222,16 +222,15 @@ describe("integration: festival lineup auto-sync", () => {
       db,
     );
 
-    await updateFestivalSyncConfig(
-      {
-        festivalId: pastFestival.id,
+    await db.festivalEdition.update({
+      where: { id: pastFestival.id },
+      data: {
         lineupSourceUrl: "https://example.com/past.txt",
         autoSyncEnabled: true,
         autoSyncMode: "REVIEW",
         syncIntervalHours: 24,
       },
-      db,
-    );
+    });
 
     const scheduled = await runScheduledLineupSyncs({
       db,
@@ -239,6 +238,12 @@ describe("integration: festival lineup auto-sync", () => {
       enqueueSync: false,
     });
     expect(scheduled).toEqual({ checked: 0, failed: 0 });
+
+    const persisted = await db.festivalEdition.findUnique({
+      where: { id: pastFestival.id },
+      select: { autoSyncEnabled: true },
+    });
+    expect(persisted?.autoSyncEnabled).toBe(false);
   });
 
   it("supports creating a festival with lineupSourceUrl for one-time import (applyDirectly)", async () => {
@@ -355,5 +360,52 @@ describe("integration: festival lineup auto-sync", () => {
     });
     expect(second).toEqual({ skipped: true, checked: 0, imported: 0, failed: 0 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("permanently disables auto-sync after 6 months (180 days) and blocks re-enabling", async () => {
+    const edition = await createFestival(
+      {
+        name: "Endless Fest",
+        year: 2027,
+        lineupSourceUrl: "https://example.com/endless.txt",
+        autoSyncEnabled: true,
+        syncIntervalHours: 24,
+      },
+      testUserId,
+      db,
+    );
+
+    // Move createdAt 181 days into the past (past the 6-month hard cap)
+    const oldCreatedAt = new Date(Date.now() - 181 * 24 * 60 * 60 * 1000);
+    await db.festivalEdition.update({
+      where: { id: edition.id },
+      data: { createdAt: oldCreatedAt },
+    });
+
+    const scheduled = await runScheduledLineupSyncs({
+      db,
+      now: new Date(),
+      enqueueSync: false,
+    });
+    expect(scheduled).toEqual({ checked: 0, failed: 0 });
+
+    const updated = await db.festivalEdition.findUnique({
+      where: { id: edition.id },
+      select: { autoSyncEnabled: true },
+    });
+    expect(updated?.autoSyncEnabled).toBe(false);
+
+    await expect(
+      updateFestivalSyncConfig(
+        {
+          festivalId: edition.id,
+          lineupSourceUrl: "https://example.com/endless.txt",
+          autoSyncEnabled: true,
+          autoSyncMode: "REVIEW",
+          syncIntervalHours: 24,
+        },
+        db,
+      ),
+    ).rejects.toThrow("límite máximo de 6 meses");
   });
 });

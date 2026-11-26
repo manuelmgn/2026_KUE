@@ -26,6 +26,21 @@ import { getSyncQueue, type SyncQueue } from "@/server/sync/queue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
+export const MAX_AUTO_SYNC_DAYS = 180; // Hard 6-month lifetime cap for automatic updates
+const MAX_AUTO_SYNC_DURATION_MS = MAX_AUTO_SYNC_DAYS * DAY_MS;
+
+export function isEditionAutoSyncExpired(
+  edition: { createdAt: Date; endDate: Date | null },
+  now: Date = new Date(),
+): boolean {
+  if (edition.createdAt.getTime() + MAX_AUTO_SYNC_DURATION_MS <= now.getTime()) {
+    return true;
+  }
+  if (edition.endDate && edition.endDate.getTime() + DAY_MS < now.getTime()) {
+    return true;
+  }
+  return false;
+}
 
 const globalForLineupSync = globalThis as typeof globalThis & {
   kueInFlightLineupSyncs?: Map<string, Promise<CheckFestivalLineupResult>>;
@@ -90,10 +105,24 @@ export async function updateFestivalSyncConfig(
 
   const current = await db.festivalEdition.findUnique({
     where: { id: input.festivalId },
-    select: { id: true, lineupSourceUrl: true },
+    select: { id: true, lineupSourceUrl: true, createdAt: true, endDate: true },
   });
   if (!current) {
     throw new DomainError("Edición de festival no encontrada");
+  }
+
+  if (input.autoSyncEnabled) {
+    const now = new Date();
+    if (current.createdAt.getTime() + MAX_AUTO_SYNC_DURATION_MS <= now.getTime()) {
+      throw new DomainError(
+        "La actualización automática tiene un límite máximo de 6 meses desde la creación del festival y ya ha expirado",
+      );
+    }
+    if (current.endDate && current.endDate.getTime() + DAY_MS < now.getTime()) {
+      throw new DomainError(
+        "No se puede activar la actualización automática en un festival ya finalizado",
+      );
+    }
   }
 
   const urlChanged = current.lineupSourceUrl !== cleanedUrl;
@@ -524,6 +553,7 @@ export async function runScheduledLineupSyncs(
     },
     select: {
       id: true,
+      createdAt: true,
       endDate: true,
       syncIntervalHours: true,
       lastLineupSyncAt: true,
@@ -535,7 +565,11 @@ export async function runScheduledLineupSyncs(
   let failed = 0;
 
   for (const edition of candidates) {
-    if (edition.endDate && edition.endDate.getTime() + DAY_MS < now.getTime()) {
+    if (isEditionAutoSyncExpired(edition, now)) {
+      await db.festivalEdition.update({
+        where: { id: edition.id },
+        data: { autoSyncEnabled: false },
+      });
       continue;
     }
 
