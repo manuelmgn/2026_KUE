@@ -234,13 +234,12 @@ export function BottomNav({ festivals }: BottomNavProps) {
           </span>
         </button>
 
-        {/* 4. Buscar — classic magnifying glass (pending / disabled) */}
+        {/* 4. Buscar — classic magnifying glass (pending, normal appearance) */}
         <button
           type="button"
-          disabled
           aria-disabled="true"
           title={dict.nav.searchPendingTitle}
-          className="relative flex min-h-14 min-w-0 cursor-not-allowed flex-col items-center justify-center gap-1 border-r border-line px-1 py-2 text-ink-muted opacity-45"
+          className="relative flex min-h-14 min-w-0 cursor-pointer flex-col items-center justify-center gap-1 border-r border-line px-1 py-2 text-ink-muted transition-colors hover:bg-surface hover:text-ink"
         >
           <svg
             aria-hidden="true"
