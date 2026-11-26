@@ -144,6 +144,16 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
         const keys = await caches.keys().catch(() => []);
         await Promise.all(keys.map((key) => caches.delete(key).catch(() => false)));
       }
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+          const key = localStorage.key(i);
+          if (key?.startsWith("kue-festival-mode:")) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch {
+        // Ignore storage errors in restricted contexts
+      }
       await logoutAction();
       router.push("/login");
       router.refresh();

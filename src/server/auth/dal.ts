@@ -5,6 +5,7 @@ import { ForbiddenError, UnauthorizedError } from "@/domain/errors";
 import {
   type AuthSessionUser,
   SESSION_COOKIE_NAME,
+  setSessionCookie,
   validateSessionToken,
 } from "@/server/auth/session";
 
@@ -19,6 +20,15 @@ export const getCurrentUser = cache(async (): Promise<AuthSessionUser | null> =>
   if (!result) {
     return null;
   }
+
+  if (result.renewedExpiresAt) {
+    try {
+      await setSessionCookie(rawToken, result.renewedExpiresAt);
+    } catch {
+      // Cookie mutation is only allowed in Server Actions & Route Handlers; skip during RSC render
+    }
+  }
+
   return result.user;
 });
 

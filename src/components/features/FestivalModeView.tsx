@@ -8,20 +8,21 @@ import { getEffectiveEntryRating } from "@/domain/rating";
 import { useI18n } from "@/i18n/context";
 
 interface FestivalModeViewProps {
+  userId: string;
   festival: FestivalSummary;
   entries: LineupEntryDTO[];
 }
 
 const ALL_DAYS_KEY = "__ALL__";
 
-export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
+export function FestivalModeView({ userId, festival, entries }: FestivalModeViewProps) {
   const { dict } = useI18n();
   const [selectedDay, setSelectedDay] = useState<string>(ALL_DAYS_KEY);
   const [onlyMustSee, setOnlyMustSee] = useState<boolean>(true);
   const [offlineEntries, setOfflineEntries] = useState<LineupEntryDTO[]>(entries);
 
   useEffect(() => {
-    const cacheKey = `kue-festival-mode:${festival.slug}`;
+    const cacheKey = `kue-festival-mode:${userId}:${festival.slug}`;
     if (entries.length > 0) {
       setOfflineEntries(entries);
       try {
@@ -40,7 +41,7 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
     } catch {
       // Ignore malformed cache
     }
-  }, [festival.slug, entries]);
+  }, [userId, festival.slug, entries]);
 
   const activeEntries = offlineEntries.filter((entry) =>
     entry.artists.some((artist) => artist.status !== "DISCARDED"),

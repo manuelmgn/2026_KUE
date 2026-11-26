@@ -44,6 +44,9 @@ export default async function LineupPage({ searchParams }: LineupPageProps) {
   const activeFestival = activeFestivalRaw
     ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
     : null;
+  const isInMyFestivals = activeFestival
+    ? myEditions.some((ed) => ed.id === activeFestival.id)
+    : false;
 
   const initialQuery = params.q ?? "";
   const parsedStatus = statusFilterSchema.safeParse(params.status);
@@ -71,6 +74,7 @@ export default async function LineupPage({ searchParams }: LineupPageProps) {
         <Suspense fallback={null}>
           <LineupWorkspace
             festival={activeFestival}
+            isInMyFestivals={isInMyFestivals}
             initialEntries={entries}
             initialQuery={initialQuery}
             initialStatus={initialStatus}

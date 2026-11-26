@@ -275,6 +275,12 @@ export function FestivalManageView({
           >
             {name || festival.name} {year || festival.year}
           </h1>
+          {festival.existingYears.length > 1 ? (
+            <p className="mt-1.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
+              {dict.catalog.editionCount(festival.existingYears.length)} ·{" "}
+              {festival.existingYears.join(" / ")}
+            </p>
+          ) : null}
         </div>
 
         <Link

@@ -53,7 +53,7 @@ export default async function FestivalModePage({ searchParams }: FestivalModePag
       </Suspense>
 
       {activeFestival ? (
-        <FestivalModeView festival={activeFestival} entries={entries} />
+        <FestivalModeView userId={user.id} festival={activeFestival} entries={entries} />
       ) : (
         <EmptyState
           title={dict.festivalMode.noFestivalTitle}

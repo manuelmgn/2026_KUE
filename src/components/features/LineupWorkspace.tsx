@@ -1,21 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { setArtistRatingAction, setArtistStatusAction } from "@/actions/artist-actions";
+import { addEditionToMyFestivalsAction } from "@/actions/festival-actions";
 import { ArtistDrawer } from "@/components/features/ArtistDrawer";
 import { FilterBar } from "@/components/features/FilterBar";
 import { LineupGrid } from "@/components/features/LineupGrid";
 import { LineupIndex } from "@/components/features/LineupIndex";
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HairlineButton } from "@/components/ui/HairlineButton";
 import { matchesEntryFilters, resolveStatusOnRating } from "@/domain/rating";
 import type { ArtistStatus, RatingFilter, StatusFilter, ViewMode } from "@/domain/schemas";
 import { useI18n } from "@/i18n/context";
 
 interface LineupWorkspaceProps {
   festival: FestivalSummary;
+  isInMyFestivals?: boolean;
   initialEntries: LineupEntryDTO[];
   initialQuery: string;
   initialStatus: StatusFilter;
@@ -69,6 +72,7 @@ function applyOptimistic(entries: LineupEntryDTO[], action: OptimisticAction): L
 
 export function LineupWorkspace({
   festival,
+  isInMyFestivals = true,
   initialEntries,
   initialQuery,
   initialStatus,
@@ -76,8 +80,31 @@ export function LineupWorkspace({
   initialView,
 }: LineupWorkspaceProps) {
   const { dict } = useI18n();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [inMyFestivals, setInMyFestivals] = useState(isInMyFestivals);
+  const [addingToMine, setAddingToMine] = useState(false);
+
+  useEffect(() => {
+    setInMyFestivals(isInMyFestivals);
+  }, [isInMyFestivals]);
+
+  const handleAddCurrentEdition = async () => {
+    setActionError(null);
+    setAddingToMine(true);
+    try {
+      const res = await addEditionToMyFestivalsAction(festival.id);
+      if (!res.ok) {
+        setActionError(res.error);
+        return;
+      }
+      setInMyFestivals(true);
+      router.refresh();
+    } finally {
+      setAddingToMine(false);
+    }
+  };
 
   const [baseEntries, setBaseEntries] = useState<LineupEntryDTO[]>(initialEntries);
   const [optimisticEntries, addOptimistic] = useOptimistic(baseEntries, applyOptimistic);
@@ -283,11 +310,23 @@ export function LineupWorkspace({
         >
           {festival.name} {festival.year}
         </h1>
-        {festival.location ? (
-          <p className="font-serif text-[clamp(1.35rem,2.4vw,1.9rem)] italic leading-[1.1] text-ink-muted">
-            {festival.location}
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {festival.location ? (
+            <p className="font-serif text-[clamp(1.35rem,2.4vw,1.9rem)] italic leading-[1.1] text-ink-muted">
+              {festival.location}
+            </p>
+          ) : null}
+          {!inMyFestivals ? (
+            <HairlineButton
+              variant="acid"
+              size="sm"
+              disabled={addingToMine}
+              onClick={() => void handleAddCurrentEdition()}
+            >
+              {dict.catalog.addEditionAction}
+            </HairlineButton>
+          ) : null}
+        </div>
       </section>
 
       <FilterBar
