@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { FestivalSummary } from "@/components/features/types";
 import { useI18n } from "@/i18n/context";
 
@@ -15,6 +15,8 @@ export function BottomNav({ festivals }: BottomNavProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const menuId = useId();
+  const sheetRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [festivalMenuOpen, setFestivalMenuOpen] = useState(false);
 
   const requestedSlug = searchParams.get("festival");
@@ -42,8 +44,22 @@ export function BottomNav({ festivals }: BottomNavProps) {
         setFestivalMenuOpen(false);
       }
     };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (sheetRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+        return;
+      }
+      setFestivalMenuOpen(false);
+    };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
   }, [festivalMenuOpen]);
 
   const isHome = pathname === "/";
@@ -83,6 +99,7 @@ export function BottomNav({ festivals }: BottomNavProps) {
             className="fixed inset-0 z-40 bg-black/60"
           />
           <section
+            ref={sheetRef}
             id={menuId}
             aria-label={dict.nav.festivalMenuAria}
             className="kue-bottom-sheet fixed z-50 border-t border-line-strong bg-bg"
@@ -205,6 +222,7 @@ export function BottomNav({ festivals }: BottomNavProps) {
 
         {/* 3. Active festival menu trigger — Lightning bolt */}
         <button
+          ref={triggerRef}
           type="button"
           aria-expanded={festivalMenuOpen}
           aria-controls={menuId}
