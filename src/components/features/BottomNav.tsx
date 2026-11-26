@@ -82,7 +82,7 @@ export function BottomNav({ festivals }: BottomNavProps) {
           <section
             id={menuId}
             aria-label={dict.nav.festivalMenuAria}
-            className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-50 border-t border-line-strong bg-bg"
+            className="kue-bottom-sheet fixed z-50 border border-line-strong bg-bg"
           >
             <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5">
               <div className="min-w-0">
@@ -140,7 +140,7 @@ export function BottomNav({ festivals }: BottomNavProps) {
 
       <nav
         aria-label={dict.nav.bottomAria}
-        className="kue-bottom-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-line-strong bg-bg md:hidden"
+        className="kue-bottom-nav fixed z-50 grid grid-cols-5 border border-line-strong bg-bg md:hidden"
       >
         {/* 1. Início — Set C (audio pulse) */}
         <Link
