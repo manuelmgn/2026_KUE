@@ -36,22 +36,37 @@ export async function generateMetadata(): Promise<Metadata> {
   const { dict } = await getServerDictionary();
   return {
     title: "KUE",
+    applicationName: "KUE",
     description: dict.meta.description,
+    appleWebApp: {
+      capable: true,
+      title: "KUE",
+      statusBarStyle: "default",
+    },
+    formatDetection: {
+      telephone: false,
+    },
     icons: {
-      icon: "/icons/icon.svg",
-      apple: "/icons/apple-touch-icon.png",
+      icon: [
+        { url: "/icons/icon.svg", type: "image/svg+xml" },
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      ],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     },
   };
 }
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f4ef" },
     { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("kue-theme");var v=t==="light"||t==="dark"?t:"light dark";var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("kue-theme");var v=t==="light"||t==="dark"?t:"light dark";var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;if(t==="light"||t==="dark"){var c=t==="light"?"#f4f4ef":"#000000";document.querySelectorAll('meta[name="theme-color"]').forEach(function(el){el.setAttribute("content",c);});}}catch(e){}})();`;
 
 export default async function RootLayout({
   children,

@@ -5,11 +5,14 @@ import { getDictionary } from "@/i18n/dictionaries";
 export default function manifest(): MetadataRoute.Manifest {
   const dict = getDictionary(DEFAULT_LOCALE);
   return {
+    id: "/",
     name: "KUE",
     short_name: "KUE",
     description: dict.meta.description,
-    start_url: "/festival-mode",
+    start_url: "/",
+    scope: "/",
     display: "standalone",
+    orientation: "portrait-primary",
     background_color: "#000000",
     theme_color: "#000000",
     lang: DEFAULT_LOCALE,

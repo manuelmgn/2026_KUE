@@ -18,12 +18,32 @@ function readStoredTheme(): ThemePreference {
   return "system";
 }
 
+function syncThemeColorMetas(pref: ThemePreference) {
+  const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+  if (metas.length === 0) {
+    return;
+  }
+  for (const meta of metas) {
+    const media = meta.getAttribute("media") ?? "";
+    if (pref === "dark") {
+      meta.setAttribute("content", "#000000");
+    } else if (pref === "light") {
+      meta.setAttribute("content", "#f4f4ef");
+    } else if (media.includes("light")) {
+      meta.setAttribute("content", "#f4f4ef");
+    } else {
+      meta.setAttribute("content", "#000000");
+    }
+  }
+}
+
 function applyThemePreference(next: ThemePreference) {
   const metaContent = next === "system" ? "light dark" : next;
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) {
     meta.setAttribute("content", metaContent);
   }
+  syncThemeColorMetas(next);
   try {
     if (next === "system") {
       localStorage.removeItem("kue-theme");

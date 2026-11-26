@@ -32,7 +32,7 @@ export function FilterBar({
   return (
     <section
       aria-label={dict.filters.sectionAria}
-      className="sticky top-14 z-30 flex h-[50px] items-stretch overflow-x-auto border-y border-line bg-bg"
+      className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-30 flex h-[50px] items-stretch overflow-x-auto border-y border-line bg-bg"
     >
       <div className="flex min-w-[180px] flex-1 items-center gap-3 border-r border-line px-[18px]">
         <input

@@ -1,5 +1,14 @@
-const CACHE_NAME = "kue-shell-v2";
-const SHELL_URLS = ["/", "/festival-mode", "/manifest.webmanifest", "/icons/icon.svg"];
+const CACHE_NAME = "kue-shell-v3";
+const SHELL_URLS = [
+  "/",
+  "/festival-mode",
+  "/festivals",
+  "/manage",
+  "/settings",
+  "/manifest.webmanifest",
+  "/icons/icon.svg",
+  "/icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -33,7 +42,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for navigation & /festival-mode so fresh data loads when online,
+  // Network-first for document navigations so fresh data loads when online,
   // falling back to the last cached response when offline inside a venue.
   if (request.mode === "navigate" || url.pathname.startsWith("/festival-mode")) {
     event.respondWith(
@@ -46,7 +55,10 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(async () => {
-          const cached = (await caches.match(request)) ?? (await caches.match("/festival-mode"));
+          const cached =
+            (await caches.match(request)) ??
+            (await caches.match("/")) ??
+            (await caches.match("/festival-mode"));
           return (
             cached ??
             new Response("KUE sin conexión. Abre la app con cobertura al menos una vez.", {
