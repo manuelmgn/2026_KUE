@@ -19,6 +19,12 @@ interface FestivalAutoSyncPanelProps {
   hasGeminiApiKey: boolean;
 }
 
+function normalizeIntervalOption(hours: number): "12" | "24" | "168" {
+  if (hours <= 12) return "12";
+  if (hours <= 24) return "24";
+  return "168";
+}
+
 export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAutoSyncPanelProps) {
   const { dict, locale } = useI18n();
   const router = useRouter();
@@ -270,7 +276,7 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
             </label>
             <select
               id={`${formId}-interval`}
-              value={autoSyncEnabled ? String(syncIntervalHours) : "once"}
+              value={autoSyncEnabled ? normalizeIntervalOption(syncIntervalHours) : "once"}
               disabled={sourceUrl.trim().length === 0}
               onChange={(event) => {
                 const value = event.target.value;
