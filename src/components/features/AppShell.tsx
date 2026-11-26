@@ -202,8 +202,8 @@ export function AppShell({
   const hasIncomingRequests = incomingRequestsCount > 0;
 
   return (
-    <div className="min-h-dvh w-full bg-bg text-ink wide:mx-auto wide:max-w-[1800px] wide:border-x wide:border-line">
-      <div className="flex min-h-dvh w-full flex-col sm:flex-row">
+    <div className="min-h-dvh w-full overflow-x-clip bg-bg text-ink wide:mx-auto wide:max-w-[1800px] wide:border-x wide:border-line">
+      <div className="kue-shell-frame flex min-h-dvh w-full flex-col sm:flex-row">
         {/* TIER 1 (Phone V): Minimal TopBar with unified scroll title + Notifications bell */}
         <header
           ref={mobileHeaderRef}

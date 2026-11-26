@@ -65,26 +65,28 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
   const registrationBlocked = mode === "register" && !registrationOpen && !isFirstUser;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg text-ink">
-      <header className="flex h-14 items-stretch justify-between border-b border-line bg-bg">
-        <KueLogo href="/login" />
-        <div className="flex items-stretch">
-          {mode === "login" && (registrationOpen || isFirstUser) ? (
-            <Link
-              href="/register"
-              className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
-            >
-              {dict.auth.goToRegister}
-            </Link>
-          ) : null}
-          {mode === "register" ? (
-            <Link
-              href="/login"
-              className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
-            >
-              {dict.auth.goToLogin}
-            </Link>
-          ) : null}
+    <div className="flex min-h-dvh w-full flex-col overflow-x-clip bg-bg text-ink">
+      <header className="kue-top-bar border-b border-line bg-bg">
+        <div className="flex h-14 items-stretch justify-between">
+          <KueLogo href="/login" />
+          <div className="flex items-stretch">
+            {mode === "login" && (registrationOpen || isFirstUser) ? (
+              <Link
+                href="/register"
+                className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
+              >
+                {dict.auth.goToRegister}
+              </Link>
+            ) : null}
+            {mode === "register" ? (
+              <Link
+                href="/login"
+                className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
+              >
+                {dict.auth.goToLogin}
+              </Link>
+            ) : null}
+          </div>
         </div>
       </header>
 

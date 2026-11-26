@@ -765,8 +765,8 @@ export function FestivalsView({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:col-span-2">
-              <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
+              <div className="flex min-w-0 flex-col gap-1">
                 <label
                   htmlFor={`${formId}-start`}
                   className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
@@ -778,11 +778,11 @@ export function FestivalsView({
                   type="date"
                   value={startDate}
                   onChange={(event) => handleStartDateChange(event.target.value)}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 <label
                   htmlFor={`${formId}-end`}
                   className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
@@ -795,11 +795,11 @@ export function FestivalsView({
                   min={startDate || undefined}
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 <label
                   htmlFor={`${formId}-year`}
                   className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
@@ -813,7 +813,7 @@ export function FestivalsView({
                   max={2100}
                   value={year}
                   onChange={(event) => setYear(event.target.value)}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none"
                 />
               </div>
             </div>

@@ -619,15 +619,15 @@ export function SocialHubView({
               type="button"
               aria-expanded={compactPanel === "shared"}
               onClick={() => setCompactPanel((prev) => (prev === "shared" ? null : "shared"))}
-              className="flex cursor-pointer flex-col justify-between gap-2.5 border-r border-line-strong bg-acid p-3.5 text-left text-acid-ink transition-opacity hover:opacity-95"
+              className="flex min-w-0 cursor-pointer flex-col justify-between gap-2.5 border-r border-line-strong bg-acid p-3.5 text-left text-acid-ink transition-opacity hover:opacity-95"
             >
-              <div className="flex w-full items-center justify-between font-mono text-[0.6rem] font-semibold uppercase tracking-[0.06em]">
-                <span>{dict.social.sharedFestivalsShort}</span>
-                <span className="border border-acid-ink/40 px-1.5 py-0.5">
+              <div className="flex w-full items-center justify-between gap-1 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.06em]">
+                <span className="truncate">{dict.social.sharedFestivalsShort}</span>
+                <span className="shrink-0 border border-acid-ink/40 px-1.5 py-0.5">
                   {sharedFestivals.length} {compactPanel === "shared" ? "▴" : "▾"}
                 </span>
               </div>
-              <div className="font-display text-[1.1rem] font-extrabold uppercase leading-[0.96] tracking-[-0.03em]">
+              <div className="font-display text-[1.05rem] font-extrabold uppercase leading-[0.96] tracking-[-0.03em] sm:text-[1.1rem]">
                 {dict.social.sharedFestivalsTitle}
               </div>
             </button>
@@ -636,15 +636,15 @@ export function SocialHubView({
               type="button"
               aria-expanded={compactPanel === "radar"}
               onClick={() => setCompactPanel((prev) => (prev === "radar" ? null : "radar"))}
-              className="flex cursor-pointer flex-col justify-between gap-2.5 bg-ink p-3.5 text-left text-bg transition-opacity hover:opacity-95"
+              className="flex min-w-0 cursor-pointer flex-col justify-between gap-2.5 bg-ink p-3.5 text-left text-bg transition-opacity hover:opacity-95"
             >
-              <div className="flex w-full items-center justify-between font-mono text-[0.6rem] font-semibold uppercase tracking-[0.06em]">
-                <span>{dict.social.radarShort}</span>
-                <span className="bg-acid px-1.5 py-0.5 font-semibold text-acid-ink">
+              <div className="flex w-full items-center justify-between gap-1 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.06em]">
+                <span className="truncate">{dict.social.radarShort}</span>
+                <span className="shrink-0 bg-acid px-1.5 py-0.5 font-semibold text-acid-ink">
                   {radarPicks.length} {compactPanel === "radar" ? "▴" : "▾"}
                 </span>
               </div>
-              <div className="font-display text-[1.1rem] font-extrabold uppercase leading-[0.96] tracking-[-0.03em]">
+              <div className="font-display text-[1.05rem] font-extrabold uppercase leading-[0.96] tracking-[-0.03em] sm:text-[1.1rem]">
                 {dict.social.radarTitle}
               </div>
             </button>

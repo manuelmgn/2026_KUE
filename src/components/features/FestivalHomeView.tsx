@@ -141,12 +141,12 @@ export function FestivalHomeView({
           </div>
 
           {/* Official Website & Social Links (prepared for automatic population) */}
-          <div className="grid grid-cols-3 border border-line bg-surface font-mono text-[0.68rem] uppercase tracking-[0.06em] sm:inline-flex">
+          <div className="grid w-full grid-cols-3 border border-line bg-surface font-mono text-[0.66rem] uppercase tracking-[0.04em] sm:inline-flex sm:w-auto sm:text-[0.68rem] sm:tracking-[0.06em]">
             <a
               href={externalLinks.officialWeb}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center border-r border-line px-3 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+              className="flex min-w-0 items-center justify-center truncate border-r border-line px-2 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:px-3"
             >
               {dict.festivalHome.officialWeb}
             </a>
@@ -154,7 +154,7 @@ export function FestivalHomeView({
               href={externalLinks.instagram}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center border-r border-line px-3 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+              className="flex min-w-0 items-center justify-center truncate border-r border-line px-2 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:px-3"
             >
               {dict.festivalHome.instagram}
             </a>
@@ -162,7 +162,7 @@ export function FestivalHomeView({
               href={externalLinks.youtube}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center px-3 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+              className="flex min-w-0 items-center justify-center truncate px-2 py-2 text-ink transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:px-3"
             >
               {dict.festivalHome.youtube}
             </a>

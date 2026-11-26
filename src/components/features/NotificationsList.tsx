@@ -256,7 +256,7 @@ export function NotificationsList({
               key={tab.id}
               type="button"
               onClick={() => setFilter(tab.id)}
-              className={`flex cursor-pointer items-center justify-center truncate px-1 font-mono text-[0.62rem] uppercase tracking-[0.04em] transition-colors sm:border-r sm:border-line sm:px-5 sm:text-[0.72rem] sm:tracking-[0.08em] ${
+              className={`flex min-w-0 cursor-pointer items-center justify-center truncate px-1 font-mono text-[0.62rem] uppercase tracking-[0.04em] transition-colors sm:border-r sm:border-line sm:px-5 sm:text-[0.72rem] sm:tracking-[0.08em] ${
                 idx < 3 ? "border-r border-line" : ""
               } ${
                 isActive

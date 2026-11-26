@@ -169,7 +169,7 @@ export function HomeView({
         {/* Friends Recent Ratings (all scores 1–5, no private text notes) */}
         <section
           aria-labelledby="home-friends-activity-heading"
-          className="border-b border-line tablet-h:border-r tablet-h:border-b-0"
+          className="min-w-0 border-b border-line tablet-h:border-r tablet-h:border-b-0"
         >
           <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
             <h2 id="home-friends-activity-heading" className="font-semibold text-ink">
@@ -190,7 +190,7 @@ export function HomeView({
         </section>
 
         {/* Your Listening Queue + Your Recently Rated */}
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <section aria-labelledby="home-up-next-heading" className="border-b border-line">
             <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
               <h2 id="home-up-next-heading" className="font-semibold text-ink">

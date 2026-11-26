@@ -558,7 +558,7 @@ export function ArtistDrawer({
               {dict.drawer.currentSetTitle}
             </div>
             <div className="flex flex-col gap-3 border border-line bg-surface p-4">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <input
                   type="text"
                   value={dayDraft}
@@ -568,7 +568,7 @@ export function ArtistDrawer({
                   }}
                   placeholder={dict.drawer.dayPlaceholder}
                   aria-label={dict.drawer.dayAria}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                 />
                 <input
                   type="text"
@@ -579,7 +579,7 @@ export function ArtistDrawer({
                   }}
                   placeholder={dict.drawer.stagePlaceholder}
                   aria-label={dict.drawer.stageAria}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                 />
                 <input
                   type="text"
@@ -590,7 +590,7 @@ export function ArtistDrawer({
                   }}
                   placeholder={dict.drawer.timePlaceholder}
                   aria-label={dict.drawer.timeAria}
-                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                 />
               </div>
 
