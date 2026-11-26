@@ -326,12 +326,14 @@ async function runCheckFestivalLineupSync(
 
   const now = new Date();
 
+  const effectiveForce = options.force === true || edition.entries.length === 0;
+
   try {
     const fetched = await fetchAndExtractFestivalLineup(edition.lineupSourceUrl, {
       festivalName: edition.festival.name,
       festivalYear: edition.year,
       previousContentHash: edition.lastLineupContentHash,
-      ...(options.force !== undefined ? { force: options.force } : {}),
+      force: effectiveForce,
       ...(envGeminiApiKey !== undefined ? { geminiApiKey: envGeminiApiKey } : {}),
       ...(envGeminiModel !== undefined ? { geminiModel: envGeminiModel } : {}),
       ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),

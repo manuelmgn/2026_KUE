@@ -42,7 +42,7 @@ export function startLineupSyncScheduler(): void {
   globalForLineupScheduler.kueLineupSchedulerStarted = true;
 
   if (
-    process.env.KUE_RECHECK_EMPTY_LINEUPS_ONCE === "1" &&
+    process.env.KUE_RECHECK_EMPTY_LINEUPS_ONCE !== "0" &&
     !globalForLineupScheduler.kueOneTimeRecheckScheduled
   ) {
     globalForLineupScheduler.kueOneTimeRecheckScheduled = true;
