@@ -118,6 +118,7 @@ export function FestivalGroupPlanningView({
   const [addEntryId, setAddEntryId] = useState("");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [editingNoteEntryId, setEditingNoteEntryId] = useState<string | null>(null);
+  const [confirmDeleteAgenda, setConfirmDeleteAgenda] = useState(false);
 
   useEffect(() => {
     setInMyFestivals(isInMyFestivals);
@@ -1408,9 +1409,29 @@ export function FestivalGroupPlanningView({
                         >
                           {showRegeneratePanel ? dict.common.close : gp.regenerateButton}
                         </HairlineButton>
-                        <HairlineButton size="sm" onClick={() => void handleDeleteOrLeaveAgenda()}>
-                          {activeAgenda.isCreator ? gp.deleteAgendaAction : gp.leaveAgendaAction}
-                        </HairlineButton>
+                        {confirmDeleteAgenda ? (
+                          <>
+                            <HairlineButton
+                              size="sm"
+                              variant="inverted"
+                              onClick={() => {
+                                setConfirmDeleteAgenda(false);
+                                void handleDeleteOrLeaveAgenda();
+                              }}
+                            >
+                              {activeAgenda.isCreator
+                                ? gp.deleteAgendaAction
+                                : gp.leaveAgendaAction}
+                            </HairlineButton>
+                            <HairlineButton size="sm" onClick={() => setConfirmDeleteAgenda(false)}>
+                              {dict.common.close}
+                            </HairlineButton>
+                          </>
+                        ) : (
+                          <HairlineButton size="sm" onClick={() => setConfirmDeleteAgenda(true)}>
+                            {activeAgenda.isCreator ? gp.deleteAgendaAction : gp.leaveAgendaAction}
+                          </HairlineButton>
+                        )}
                       </div>
                     </div>
 
