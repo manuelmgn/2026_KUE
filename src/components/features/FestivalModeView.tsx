@@ -139,7 +139,7 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
               </button>
             ) : (
               <Link
-                href={`/?festival=${encodeURIComponent(festival.slug)}`}
+                href={`/lineup?festival=${encodeURIComponent(festival.slug)}`}
                 className="inline-flex border border-acid bg-acid px-4 py-2 font-mono text-xs font-semibold uppercase text-acid-ink"
               >
                 {dict.festivalMode.backToLineup}

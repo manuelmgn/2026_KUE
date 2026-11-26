@@ -17,6 +17,6 @@ describe("PWA manifest (iOS & Android)", () => {
     expect(icons.some((i) => i.sizes === "512x512" && i.purpose === "maskable")).toBe(true);
 
     const shortcuts = data.shortcuts ?? [];
-    expect(shortcuts.map((s) => s.url)).toEqual(["/", "/festival-mode", "/festivals"]);
+    expect(shortcuts.map((s) => s.url)).toEqual(["/lineup", "/festival-mode", "/festivals"]);
   });
 });

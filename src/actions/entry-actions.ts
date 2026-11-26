@@ -20,6 +20,7 @@ export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput)
   return runAction(async () => {
     const updated = await updateEntrySchedule(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festival-mode");
     revalidatePath("/manage");
     return {
@@ -40,6 +41,7 @@ export async function deleteEntryAction(
   return runAction(async () => {
     const deleted = await deleteFestivalEntry(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festivals");
     revalidatePath("/festival-mode");
     revalidatePath("/manage");

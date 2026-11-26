@@ -135,7 +135,7 @@ export function LineupWorkspace({
       params.delete("view");
     }
 
-    window.history.replaceState(null, "", `/?${params.toString()}`);
+    window.history.replaceState(null, "", `/lineup?${params.toString()}`);
   };
 
   const visibleEntries = optimisticEntries.filter((entry) =>

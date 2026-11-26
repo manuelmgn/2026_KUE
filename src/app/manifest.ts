@@ -49,7 +49,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: dict.nav.lineup,
         short_name: dict.nav.lineup,
-        url: "/",
+        url: "/lineup",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
       },
       {

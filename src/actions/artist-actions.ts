@@ -34,6 +34,7 @@ export async function setArtistRatingAction(
   return runAction(async () => {
     const updated = await updateArtistRating(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festival-mode");
     return { id: updated.id, rating: updated.rating, status: updated.status };
   }, dict.errors.saveRating);
@@ -46,6 +47,7 @@ export async function setArtistStatusAction(
   return runAction(async () => {
     const updated = await updateArtistStatus(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festival-mode");
     return { id: updated.id, status: updated.status };
   }, dict.errors.changeStatus);
@@ -58,6 +60,7 @@ export async function saveArtistNotesAction(
   return runAction(async () => {
     const updated = await updateArtistNotes(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festival-mode");
     return { id: updated.id, notes: updated.notes };
   }, dict.errors.saveNotes);
@@ -70,6 +73,7 @@ export async function toggleAlbumPinAction(
   return runAction(async () => {
     const updated = await updateAlbumPin(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     return { id: updated.id, isPinned: updated.isPinned };
   }, dict.errors.togglePin);
 }
@@ -81,6 +85,7 @@ export async function saveAlbumCustomUrlAction(
   return runAction(async () => {
     const updated = await updateAlbumCustomUrl(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     return { id: updated.id, customUrl: updated.customUrl };
   }, dict.errors.saveAlbumUrl);
 }
@@ -94,6 +99,7 @@ export async function disambiguateArtistAction(
   return runAction(async () => {
     const updated = await disambiguateArtist(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     return {
       id: updated.id,
       mbid: updated.mbid,

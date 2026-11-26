@@ -400,7 +400,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
           <Link
             href={
               resultSummary.festivalSlug
-                ? `/?festival=${encodeURIComponent(resultSummary.festivalSlug)}`
+                ? `/lineup?festival=${encodeURIComponent(resultSummary.festivalSlug)}`
                 : "/"
             }
             className="border border-acid bg-acid px-4 py-2 font-mono text-xs font-semibold uppercase text-acid-ink"

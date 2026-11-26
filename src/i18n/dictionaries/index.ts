@@ -82,6 +82,17 @@ export interface Dictionary {
     emptyTitle: string;
     emptyDescription: string;
     emptyAction: string;
+    nextFestivalLabel: string;
+    latestFestivalLabel: string;
+    countdownDays: (days: number) => string;
+    countdownToday: string;
+    viewLineup: string;
+    viewSchedule: string;
+    viewAllFestivals: string;
+    upNextTitle: string;
+    upNextEmpty: string;
+    recentlyRatedTitle: string;
+    recentlyRatedEmpty: string;
   };
   workspace: {
     emptyLineupTitle: string;

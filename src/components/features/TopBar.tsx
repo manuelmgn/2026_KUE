@@ -132,7 +132,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
     params.set("festival", slug);
     const targetPath =
       pathname === "/import" || pathname === "/settings" || pathname === "/festivals"
-        ? "/"
+        ? "/lineup"
         : pathname;
     router.push(`${targetPath}?${params.toString()}`);
   };
@@ -200,10 +200,10 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
           className="hidden min-w-0 items-stretch md:flex md:flex-none"
         >
           <Link
-            href={`/${festivalSuffix}`}
-            aria-current={pathname === "/" ? "page" : undefined}
+            href={`/lineup${festivalSuffix}`}
+            aria-current={pathname === "/lineup" ? "page" : undefined}
             className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
-              pathname === "/"
+              pathname === "/lineup"
                 ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
                 : "text-ink hover:bg-surface-elevated"
             }`}

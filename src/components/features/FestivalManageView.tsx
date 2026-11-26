@@ -267,7 +267,7 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
         </div>
 
         <Link
-          href={`/?festival=${encodeURIComponent(festival.slug)}`}
+          href={`/lineup?festival=${encodeURIComponent(festival.slug)}`}
           className="inline-flex border border-line px-3.5 py-2 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
         >
           {dict.importer.viewLineup}
@@ -604,7 +604,7 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
                 )}
               </span>
               <Link
-                href={`/?festival=${encodeURIComponent(festival.slug)}`}
+                href={`/lineup?festival=${encodeURIComponent(festival.slug)}`}
                 className="border border-acid bg-acid px-3 py-1.5 font-mono text-[0.72rem] font-semibold uppercase text-acid-ink"
               >
                 {dict.importer.viewLineup}

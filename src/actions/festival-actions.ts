@@ -15,6 +15,7 @@ export async function createFestivalAction(
   return runAction(async () => {
     const created = await createFestival(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festivals");
     revalidatePath("/manage");
     revalidatePath("/import");
@@ -30,6 +31,7 @@ export async function updateFestivalAction(
   return runAction(async () => {
     const updated = await updateFestival(input);
     revalidatePath("/");
+    revalidatePath("/lineup");
     revalidatePath("/festivals");
     revalidatePath("/manage");
     revalidatePath("/import");

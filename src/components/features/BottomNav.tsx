@@ -49,12 +49,15 @@ export function BottomNav({ festivals }: BottomNavProps) {
   const isHome = pathname === "/";
   const isFestivals = pathname === "/festivals";
   const isFestivalSubRoute =
-    pathname === "/festival-mode" || pathname === "/manage" || pathname === "/import";
+    pathname === "/lineup" ||
+    pathname === "/festival-mode" ||
+    pathname === "/manage" ||
+    pathname === "/import";
   const isSettings = pathname === "/settings";
   const isCenterActive = festivalMenuOpen || isFestivalSubRoute;
 
   const festivalOptions = [
-    { index: "01", href: `/${festivalSuffix}`, path: "/", label: dict.nav.lineup },
+    { index: "01", href: `/lineup${festivalSuffix}`, path: "/lineup", label: dict.nav.lineup },
     {
       index: "02",
       href: `/festival-mode${festivalSuffix}`,

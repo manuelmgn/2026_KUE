@@ -170,7 +170,7 @@ export function FestivalsView({
         return (
           <li key={fest.id} className="border-b border-line">
             <Link
-              href={`/?festival=${encodeURIComponent(fest.slug)}`}
+              href={`/lineup?festival=${encodeURIComponent(fest.slug)}`}
               className={`flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-elevated sm:px-6 ${
                 isActive ? "border-l-4 border-l-acid bg-surface pl-4 sm:pl-5" : ""
               } ${isPast ? "opacity-80 hover:opacity-100" : ""}`}

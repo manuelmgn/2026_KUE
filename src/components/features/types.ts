@@ -26,6 +26,18 @@ export interface FestivalEditDTO extends FestivalSummary {
   endDate: string | null;
 }
 
+export interface HomeArtistItemDTO {
+  id: string;
+  name: string;
+  imagePath: string | null;
+  rating: number | null;
+  status: ArtistStatus;
+  notes: string;
+  festivalSlug: string;
+  festivalName: string;
+  festivalYear: number;
+}
+
 export interface LineupArtistSummary {
   id: string;
   name: string;

@@ -95,3 +95,57 @@ export async function updateFestival(
     },
   });
 }
+
+export async function listHomeArtists(db: PrismaClient = getDb()) {
+  const [queueRaw, ratedRaw] = await Promise.all([
+    db.artist.findMany({
+      where: {
+        status: { in: ["LISTENING", "PENDING"] },
+        entries: { some: {} },
+      },
+      orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+      take: 8,
+      include: {
+        entries: {
+          take: 1,
+          orderBy: { entry: { festival: { year: "desc" } } },
+          include: {
+            entry: {
+              include: { festival: true },
+            },
+          },
+        },
+      },
+    }),
+    db.artist.findMany({
+      where: {
+        rating: { not: null },
+        status: { not: "DISCARDED" },
+        entries: { some: {} },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 8,
+      include: {
+        entries: {
+          take: 1,
+          orderBy: { entry: { festival: { year: "desc" } } },
+          include: {
+            entry: {
+              include: { festival: true },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const sortedQueue = [...queueRaw].sort((a, b) => {
+    if (a.status === b.status) return 0;
+    return a.status === "LISTENING" ? -1 : 1;
+  });
+
+  return {
+    queue: sortedQueue.slice(0, 6),
+    recentlyRated: ratedRaw.slice(0, 6),
+  };
+}
