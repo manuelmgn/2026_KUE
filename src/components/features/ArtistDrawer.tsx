@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   getArtistDetailAction,
@@ -14,6 +15,7 @@ import { Artwork } from "@/components/ui/Artwork";
 import { Drawer } from "@/components/ui/Drawer";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { RatingControl } from "@/components/ui/RatingControl";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { getAlbumExternalLinks, getArtistExternalLinks } from "@/domain/external-links";
 import { toMediaApiUrl } from "@/domain/media-url";
 import { sortAlbumsForShelf } from "@/domain/rating";
@@ -651,6 +653,79 @@ export function ArtistDrawer({
                   </div>
                 </div>
               </div>
+
+              {detail && detail.friendReviews.length > 0 ? (
+                <div>
+                  <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+                    {dict.drawer.friendReviewsTitle}
+                  </div>
+                  <ul className="border border-line bg-surface">
+                    {detail.friendReviews.map((review) => (
+                      <li
+                        key={review.userId}
+                        className="border-b border-line p-3.5 last:border-b-0"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Link
+                            href={`/u/${encodeURIComponent(review.username)}`}
+                            onClick={onClose}
+                            className="flex min-w-0 items-center gap-2.5 hover:underline"
+                          >
+                            <UserAvatar
+                              avatarPath={review.avatarPath}
+                              username={review.username}
+                              displayName={review.displayName}
+                              size="sm"
+                            />
+                            <span className="truncate font-mono text-xs font-semibold text-ink">
+                              @{review.username}
+                            </span>
+                          </Link>
+
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {review.rating !== null ? (
+                              <span
+                                className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
+                                  review.rating >= 4
+                                    ? "border-acid bg-acid font-semibold text-acid-ink"
+                                    : "border-line text-ink"
+                                }`}
+                              >
+                                {dict.drawer.friendStudioBadge(review.rating)}
+                              </span>
+                            ) : null}
+                            {review.liveRating !== null ? (
+                              <span
+                                className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
+                                  review.liveRating >= 4
+                                    ? "border-acid bg-acid font-semibold text-acid-ink"
+                                    : "border-line text-ink"
+                                }`}
+                              >
+                                {dict.drawer.liveBadge(review.liveRating)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {review.notes ? (
+                          <p className="mt-2 font-serif text-[1.06rem] italic leading-[1.38] text-ink">
+                            “{review.notes}”
+                          </p>
+                        ) : null}
+                        {review.liveNotes ? (
+                          <p className="mt-1.5 font-serif text-[1.02rem] italic leading-[1.38] text-ink-muted">
+                            {review.festivalName
+                              ? `${review.festivalName}${review.festivalYear ? ` ${review.festivalYear}` : ""}: `
+                              : ""}
+                            “{review.liveNotes}”
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div>
                 <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">

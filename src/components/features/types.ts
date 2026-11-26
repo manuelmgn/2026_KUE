@@ -1,10 +1,14 @@
 import type { PendingLineupDiff } from "@/domain/lineup-diff";
 import type {
   ArtistStatus,
+  FriendshipStatus,
   LineupSyncMode,
+  NotificationPayload,
+  NotificationType,
   ReleaseType,
   SyncStatus,
   UserRole,
+  VisibilityScope,
 } from "@/domain/schemas";
 
 export interface AuthUserDTO {
@@ -152,4 +156,120 @@ export interface ArtistDetailDTO {
   syncError: string | null;
   albums: AlbumDTO[];
   festivals: FestivalAppearanceDTO[];
+  friendReviews: FriendArtistReviewDTO[];
+}
+
+export type RelationshipStatus =
+  | "SELF"
+  | "NONE"
+  | "OUTGOING_PENDING"
+  | "INCOMING_PENDING"
+  | "FRIENDS";
+
+export interface UserPrivacySettingsDTO {
+  festivalsVisibility: VisibilityScope;
+  ratingsVisibility: VisibilityScope;
+  notesVisibility: VisibilityScope;
+}
+
+export interface UserProfileSummaryDTO {
+  id: string;
+  username: string;
+  displayName: string | null;
+  bio: string;
+  location: string | null;
+  avatarPath: string | null;
+}
+
+export interface FriendListItemDTO extends UserProfileSummaryDTO {
+  friendshipId: string;
+  status: FriendshipStatus;
+  direction: "OUTGOING" | "INCOMING";
+  sharedFestivalsCount: number;
+  createdAt: string;
+}
+
+export interface UserSearchResultDTO extends UserProfileSummaryDTO {
+  relationship: RelationshipStatus;
+  friendshipId: string | null;
+}
+
+export type SocialPostKind = "ARTIST_REVIEW" | "LIVE_REVIEW" | "FESTIVAL_ADDED";
+
+export interface SocialPostItemDTO {
+  id: string;
+  kind: SocialPostKind;
+  createdAt: string;
+  author: {
+    id: string;
+    username: string;
+    displayName: string | null;
+    avatarPath: string | null;
+  };
+  artist: {
+    id: string;
+    name: string;
+    imagePath: string | null;
+    status?: ArtistStatus;
+  } | null;
+  festival: {
+    id: string;
+    slug: string;
+    name: string;
+    year: number;
+    location: string | null;
+  } | null;
+  entry: {
+    id: string;
+    billingName: string;
+    day: string | null;
+    stage: string | null;
+  } | null;
+  rating: number | null;
+  notes: string | null;
+}
+
+export interface FriendArtistReviewDTO {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarPath: string | null;
+  rating: number | null;
+  notes: string | null;
+  liveRating: number | null;
+  liveNotes: string | null;
+  festivalName: string | null;
+  festivalYear: number | null;
+  updatedAt: string;
+}
+
+export interface UserProfileViewDTO {
+  user: UserProfileSummaryDTO;
+  relationship: RelationshipStatus;
+  friendshipId: string | null;
+  privacy: UserPrivacySettingsDTO | null;
+  canViewFestivals: boolean;
+  canViewRatings: boolean;
+  canViewNotes: boolean;
+  canViewActivity: boolean;
+  sharedFestivals: FestivalSummary[];
+  festivals: FestivalArchiveItemDTO[];
+  posts: SocialPostItemDTO[];
+  friendsCount: number | null;
+}
+
+export interface NotificationItemDTO {
+  id: string;
+  type: NotificationType;
+  actorId: string | null;
+  editionId: string | null;
+  payload: NotificationPayload;
+  readAt: string | null;
+  createdAt: string;
+  pendingFriendshipId: string | null;
+}
+
+export interface NotificationsSnapshotDTO {
+  unreadCount: number;
+  items: NotificationItemDTO[];
 }

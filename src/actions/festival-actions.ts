@@ -149,9 +149,10 @@ export async function updateFestivalAction(
 ): Promise<ActionResult<FestivalSummary>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
-    const updated = await updateFestival(input);
+    const user = await requireActionUser();
+    const updated = await updateFestival(input, undefined, { actorUserId: user.id });
     revalidateFestivalViews();
+    revalidatePath("/notifications");
     return toFestivalSummary(updated);
   }, dict.errors.updateFestival);
 }
@@ -186,9 +187,10 @@ export async function applyPendingLineupDiffAction(
 ): Promise<ActionResult<ApplyLineupDiffResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
-    const result = await applyPendingLineupDiff(input);
+    const user = await requireActionUser();
+    const result = await applyPendingLineupDiff(input, { actorUserId: user.id });
     revalidateFestivalViews();
+    revalidatePath("/notifications");
     return result;
   }, dict.errors.importLineup);
 }

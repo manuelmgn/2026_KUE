@@ -1,12 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
+import { DomainError } from "@/domain/errors";
 
 export { toMediaApiUrl } from "@/domain/media-url";
 
-export type MediaBucket = "artists" | "albums";
+export type MediaBucket = "artists" | "albums" | "avatars";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_AVATAR_INPUT_BYTES = 4 * 1024 * 1024; // 4 MB raw upload hard limit
+export const MAX_AVATAR_OUTPUT_BYTES = 150 * 1024; // 150 KB post-reencode limit
+export const MAX_AVATAR_PIXELS = 16_777_216; // 16 MP (4096x4096) anti-pixel-bomb limit
+export const AVATAR_SIZE_PX = 256;
+export const MIN_AVATAR_DIMENSION_PX = 16;
 
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -152,4 +159,168 @@ export async function downloadAndSaveMedia(options: DownloadMediaOptions): Promi
   } catch {
     return null;
   }
+}
+
+export type AllowedAvatarInputFormat = "jpeg" | "png" | "webp";
+
+/**
+ * Inspects true binary magic bytes (ignoring user-supplied filename and Content-Type)
+ * so SVG, HTML, XML, GIF, scripts, or polyglot files with non-raster headers are rejected
+ * before reaching any decoder.
+ */
+export function detectAllowedAvatarSignature(buffer: Buffer): AllowedAvatarInputFormat | null {
+  if (buffer.byteLength < 12) {
+    return null;
+  }
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "jpeg";
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return "png";
+  }
+
+  // WebP: "RIFF" .... "WEBP"
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return "webp";
+  }
+
+  return null;
+}
+
+export interface ProcessAndSaveAvatarOptions {
+  buffer: Buffer;
+  userId: string;
+  previousAvatarPath?: string | null;
+  mediaDir?: string;
+}
+
+/**
+ * Validates, sanitizes, and re-encodes an uploaded avatar image from scratch:
+ * 1. Enforces strict 4 MB raw byte limit and raster magic-byte signature (JPEG/PNG/WebP only).
+ * 2. Caps decoded pixel budget at 16 MP (`limitInputPixels`) and rejects animated images.
+ * 3. Auto-orients via EXIF, crops square 256x256, and re-encodes to clean WebP stripping
+ *    all EXIF/GPS/XMP/ICC metadata and trailing binary payloads.
+ * 4. Writes atomically into `<MEDIA_DIR>/avatars/` and removes any previous avatar file.
+ */
+export async function processAndSaveAvatar(options: ProcessAndSaveAvatarOptions): Promise<string> {
+  const { buffer, userId, previousAvatarPath, mediaDir } = options;
+
+  if (!buffer || buffer.byteLength === 0) {
+    throw new DomainError("El archivo de imagen está vacío");
+  }
+
+  if (buffer.byteLength > MAX_AVATAR_INPUT_BYTES) {
+    throw new DomainError("La imagen supera el tamaño máximo permitido (4 MB)");
+  }
+
+  const signature = detectAllowedAvatarSignature(buffer);
+  if (!signature) {
+    throw new DomainError("Formato de imagen no permitido. Usa JPEG, PNG o WebP estático.");
+  }
+
+  let cleanWebp: Buffer;
+  try {
+    const decoder = sharp(buffer, {
+      limitInputPixels: MAX_AVATAR_PIXELS,
+      sequentialRead: true,
+      animated: false,
+      failOn: "error",
+    });
+
+    const meta = await decoder.metadata();
+    if (
+      !meta.format ||
+      (meta.format !== "jpeg" && meta.format !== "png" && meta.format !== "webp")
+    ) {
+      throw new DomainError("Formato de imagen no válido");
+    }
+
+    if ((meta.pages ?? 1) > 1) {
+      throw new DomainError("No se permiten imágenes animadas como avatar");
+    }
+
+    const width = meta.width ?? 0;
+    const height = meta.height ?? 0;
+    if (width < MIN_AVATAR_DIMENSION_PX || height < MIN_AVATAR_DIMENSION_PX) {
+      throw new DomainError(
+        `La imagen es demasiado pequeña (mínimo ${MIN_AVATAR_DIMENSION_PX}×${MIN_AVATAR_DIMENSION_PX} px)`,
+      );
+    }
+    if (width * height > MAX_AVATAR_PIXELS) {
+      throw new DomainError("Las dimensiones de la imagen superan el límite de seguridad");
+    }
+
+    cleanWebp = await sharp(buffer, {
+      limitInputPixels: MAX_AVATAR_PIXELS,
+      sequentialRead: true,
+      animated: false,
+      failOn: "error",
+    })
+      .rotate()
+      .resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, {
+        fit: "cover",
+        position: "centre",
+      })
+      .webp({ quality: 82, effort: 4 })
+      .toBuffer();
+  } catch (err: unknown) {
+    if (err instanceof DomainError) {
+      throw err;
+    }
+    const msg = err instanceof Error ? err.message.toLowerCase() : "";
+    if (msg.includes("pixel limit")) {
+      throw new DomainError("Las dimensiones de la imagen superan el límite de seguridad");
+    }
+    throw new DomainError("No se pudo procesar la imagen. Asegúrate de subir un archivo válido.");
+  }
+
+  if (cleanWebp.byteLength === 0 || cleanWebp.byteLength > MAX_AVATAR_OUTPUT_BYTES) {
+    throw new DomainError("La imagen procesada supera el tamaño máximo permitido");
+  }
+
+  const contentHash = createHash("sha256").update(cleanWebp).digest("hex").slice(0, 10);
+  const relativePath = `avatars/usr_${sanitizeBaseName(userId)}-${contentHash}.webp`;
+  const targetPath = resolveSafeMediaPath(relativePath, mediaDir);
+  if (!targetPath) {
+    throw new DomainError("Ruta de almacenamiento no válida");
+  }
+
+  await mkdir(path.dirname(targetPath), { recursive: true });
+  const tmpPath = `${targetPath}.${randomBytes(6).toString("hex")}.tmp`;
+
+  try {
+    await writeFile(tmpPath, cleanWebp);
+    await rename(tmpPath, targetPath);
+  } catch (writeErr) {
+    await rm(tmpPath, { force: true }).catch(() => undefined);
+    throw writeErr;
+  }
+
+  if (previousAvatarPath && previousAvatarPath !== relativePath) {
+    await deleteMediaFile(previousAvatarPath, mediaDir);
+  }
+
+  return relativePath;
 }

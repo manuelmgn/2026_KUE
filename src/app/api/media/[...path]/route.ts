@@ -40,6 +40,8 @@ export async function GET(
         "Content-Length": String(fileBuffer.byteLength),
         "Cache-Control": "private, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "Cross-Origin-Resource-Policy": "same-origin",
       },
     });
   } catch (error: unknown) {

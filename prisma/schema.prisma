@@ -40,26 +40,55 @@ enum LineupSyncMode {
   AUTO
 }
 
-model User {
-  id                 String    @id @default(cuid())
-  username           String
-  normalizedUsername String    @unique
-  email              String
-  normalizedEmail    String    @unique
-  passwordHash       String
-  role               UserRole  @default(USER)
-  isActive           Boolean   @default(true)
-  lastLoginAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+enum VisibilityScope {
+  FRIENDS
+  PRIVATE
+}
 
-  sessions         Session[]
-  editions         UserFestivalEdition[]
-  artistStates     UserArtistState[]
-  albumStates      UserAlbumState[]
-  entryStates      UserEntryState[]
-  createdFestivals Festival[]            @relation("FestivalCreator")
-  createdEditions  FestivalEdition[]     @relation("EditionCreator")
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST_RECEIVED
+  FRIEND_REQUEST_ACCEPTED
+  FESTIVAL_LINEUP_UPDATED
+  FESTIVAL_METADATA_UPDATED
+  FRIEND_JOINED_FESTIVAL
+}
+
+model User {
+  id                  String          @id @default(cuid())
+  username            String
+  normalizedUsername  String          @unique
+  email               String
+  normalizedEmail     String          @unique
+  passwordHash        String
+  displayName         String?
+  bio                 String          @default("")
+  location            String?
+  avatarPath          String?
+  festivalsVisibility VisibilityScope @default(FRIENDS)
+  ratingsVisibility   VisibilityScope @default(FRIENDS)
+  notesVisibility     VisibilityScope @default(FRIENDS)
+  role                UserRole        @default(USER)
+  isActive            Boolean         @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  sessions            Session[]
+  editions            UserFestivalEdition[]
+  artistStates        UserArtistState[]
+  albumStates         UserAlbumState[]
+  entryStates         UserEntryState[]
+  createdFestivals    Festival[]            @relation("FestivalCreator")
+  createdEditions     FestivalEdition[]     @relation("EditionCreator")
+  sentFriendships     Friendship[]          @relation("FriendshipRequester")
+  receivedFriendships Friendship[]          @relation("FriendshipAddressee")
+  notifications       Notification[]        @relation("NotificationRecipient")
+  actedNotifications  Notification[]        @relation("NotificationActor")
 
   @@index([role])
   @@index([isActive])
@@ -190,10 +219,11 @@ model FestivalEdition {
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
 
-  festival  Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  createdBy User?                 @relation("EditionCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  entries   FestivalEntry[]
-  followers UserFestivalEdition[]
+  festival      Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  createdBy     User?                 @relation("EditionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  entries       FestivalEntry[]
+  followers     UserFestivalEdition[]
+  notifications Notification[]
 
   @@unique([festivalId, year])
   @@index([year])
@@ -251,6 +281,7 @@ model UserArtistState {
   rating    Int?
   status    ArtistStatus @default(PENDING)
   notes     String       @default("")
+  ratedAt   DateTime?
   updatedAt DateTime     @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -259,6 +290,7 @@ model UserArtistState {
   @@id([userId, artistId])
   @@index([userId, status])
   @@index([userId, rating])
+  @@index([userId, ratedAt])
 }
 
 model UserAlbumState {
@@ -286,4 +318,42 @@ model UserEntryState {
   entry FestivalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@id([userId, entryId])
+  @@index([userId, updatedAt])
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  pairKey     String           @unique
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+  updatedAt   DateTime         @updatedAt
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@index([requesterId, status])
+  @@index([addresseeId, status])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  actorId   String?
+  editionId String?
+  payload   String           @default("{}")
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user    User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor   User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  edition FestivalEdition? @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+  @@index([actorId])
+  @@index([editionId])
 }

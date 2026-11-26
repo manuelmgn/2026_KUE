@@ -1,3 +1,4 @@
+import type { FriendArtistReviewDTO } from "@/components/features/types";
 import { DomainError } from "@/domain/errors";
 import { resolveStatusOnRating, sortAlbumsForShelf } from "@/domain/rating";
 import {
@@ -17,6 +18,7 @@ import {
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
 import { deleteMediaFile } from "@/server/media-storage";
+import { getAcceptedFriendIds } from "@/server/services/friends";
 import { getSyncQueue, type SyncQueue } from "@/server/sync/queue";
 
 export async function getArtistDetail(
@@ -77,6 +79,109 @@ export async function getArtistDetail(
     };
   });
 
+  const friendIds = await getAcceptedFriendIds(userId, db);
+  let friendReviews: FriendArtistReviewDTO[] = [];
+
+  if (friendIds.length > 0) {
+    const entryIds = artist.entries.map((e) => e.entry.id);
+    const [friendUsers, friendArtistStates, friendEntryStates] = await Promise.all([
+      db.user.findMany({
+        where: { id: { in: friendIds }, isActive: true },
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarPath: true,
+          festivalsVisibility: true,
+          ratingsVisibility: true,
+          notesVisibility: true,
+        },
+      }),
+      db.userArtistState.findMany({
+        where: {
+          artistId: artist.id,
+          userId: { in: friendIds },
+          OR: [{ rating: { not: null } }, { notes: { not: "" } }],
+        },
+      }),
+      entryIds.length > 0
+        ? db.userEntryState.findMany({
+            where: {
+              entryId: { in: entryIds },
+              userId: { in: friendIds },
+              OR: [{ liveRating: { not: null } }, { liveNotes: { not: "" } }],
+            },
+            orderBy: { updatedAt: "desc" },
+            include: {
+              entry: {
+                select: {
+                  edition: {
+                    select: {
+                      year: true,
+                      festival: { select: { name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const stateByFriend = new Map(friendArtistStates.map((s) => [s.userId, s]));
+    const liveByFriend = new Map<string, (typeof friendEntryStates)[number]>();
+    for (const ls of friendEntryStates) {
+      if (!liveByFriend.has(ls.userId)) {
+        liveByFriend.set(ls.userId, ls);
+      }
+    }
+
+    for (const friend of friendUsers) {
+      const aState = stateByFriend.get(friend.id);
+      const lState = liveByFriend.get(friend.id);
+      if (!aState && !lState) continue;
+
+      const canSeeRatings = friend.ratingsVisibility === "FRIENDS";
+      const canSeeNotes = friend.notesVisibility === "FRIENDS";
+
+      const rating = canSeeRatings ? (aState?.rating ?? null) : null;
+      const rawNotes = aState?.notes.trim() ?? "";
+      const notes = canSeeNotes && rawNotes.length > 0 ? rawNotes : null;
+
+      const liveRating = canSeeRatings ? (lState?.liveRating ?? null) : null;
+      const rawLiveNotes = lState?.liveNotes.trim() ?? "";
+      const liveNotes = canSeeNotes && rawLiveNotes.length > 0 ? rawLiveNotes : null;
+
+      if (rating === null && notes === null && liveRating === null && liveNotes === null) {
+        continue;
+      }
+
+      const canSeeFest = friend.festivalsVisibility === "FRIENDS";
+      const updatedAtDate =
+        aState && lState
+          ? new Date(Math.max(aState.updatedAt.getTime(), lState.updatedAt.getTime()))
+          : (aState?.updatedAt ?? lState?.updatedAt ?? new Date(0));
+
+      friendReviews.push({
+        userId: friend.id,
+        username: friend.username,
+        displayName: friend.displayName,
+        avatarPath: friend.avatarPath,
+        rating,
+        notes,
+        liveRating,
+        liveNotes,
+        festivalName: canSeeFest && lState ? lState.entry.edition.festival.name : null,
+        festivalYear: canSeeFest && lState ? lState.entry.edition.year : null,
+        updatedAt: updatedAtDate.toISOString(),
+      });
+    }
+
+    friendReviews = friendReviews.sort((a, b) =>
+      a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
+    );
+  }
+
   return {
     id: artist.id,
     name: artist.name,
@@ -109,6 +214,7 @@ export async function getArtistDetail(
         };
       })
       .sort((a, b) => b.festivalYear - a.festivalYear),
+    friendReviews,
   };
 }
 
@@ -122,7 +228,7 @@ export async function updateArtistRating(
     db.artist.findUnique({ where: { id: input.artistId }, select: { id: true } }),
     db.userArtistState.findUnique({
       where: { userId_artistId: { userId, artistId: input.artistId } },
-      select: { status: true },
+      select: { status: true, notes: true, ratedAt: true },
     }),
   ]);
 
@@ -131,6 +237,9 @@ export async function updateArtistRating(
   }
 
   const nextStatus = resolveStatusOnRating(existingState?.status ?? "PENDING", input.rating);
+  const nextRatedAt =
+    input.rating !== null ? new Date() : existingState?.notes.trim() ? existingState.ratedAt : null;
+
   const updated = await db.userArtistState.upsert({
     where: { userId_artistId: { userId, artistId: input.artistId } },
     create: {
@@ -138,10 +247,12 @@ export async function updateArtistRating(
       artistId: input.artistId,
       rating: input.rating,
       status: nextStatus,
+      ratedAt: nextRatedAt,
     },
     update: {
       rating: input.rating,
       status: nextStatus,
+      ratedAt: nextRatedAt,
     },
   });
 
@@ -181,13 +292,26 @@ export async function updateArtistNotes(
   db: PrismaClient = getDb(),
 ) {
   const input = updateArtistNotesSchema.parse(rawInput);
-  const artist = await db.artist.findUnique({
-    where: { id: input.artistId },
-    select: { id: true },
-  });
+  const [artist, existingState] = await Promise.all([
+    db.artist.findUnique({
+      where: { id: input.artistId },
+      select: { id: true },
+    }),
+    db.userArtistState.findUnique({
+      where: { userId_artistId: { userId, artistId: input.artistId } },
+      select: { rating: true, ratedAt: true },
+    }),
+  ]);
   if (!artist) {
     throw new DomainError("Artista no encontrado");
   }
+
+  const hasText = input.notes.trim().length > 0;
+  const nextRatedAt = hasText
+    ? new Date()
+    : existingState?.rating !== null && existingState?.rating !== undefined
+      ? existingState.ratedAt
+      : null;
 
   const updated = await db.userArtistState.upsert({
     where: { userId_artistId: { userId, artistId: input.artistId } },
@@ -195,8 +319,12 @@ export async function updateArtistNotes(
       userId,
       artistId: input.artistId,
       notes: input.notes,
+      ratedAt: nextRatedAt,
     },
-    update: { notes: input.notes },
+    update: {
+      notes: input.notes,
+      ratedAt: nextRatedAt,
+    },
   });
 
   return { id: input.artistId, notes: updated.notes };

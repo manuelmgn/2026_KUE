@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import type { FestivalArchiveItemDTO, HomeArtistItemDTO } from "@/components/features/types";
+import { SocialPostList } from "@/components/features/SocialPostList";
+import type {
+  FestivalArchiveItemDTO,
+  HomeArtistItemDTO,
+  SocialPostItemDTO,
+} from "@/components/features/types";
 import { Artwork } from "@/components/ui/Artwork";
 import { toMediaApiUrl } from "@/domain/media-url";
 import { useI18n } from "@/i18n/context";
@@ -12,6 +17,8 @@ interface HomeViewProps {
   daysUntil: number | null;
   upNextArtists: HomeArtistItemDTO[];
   recentlyRatedArtists: HomeArtistItemDTO[];
+  friendsPosts?: SocialPostItemDTO[];
+  unreadNotificationsCount?: number;
 }
 
 function formatDateRange(
@@ -54,6 +61,8 @@ export function HomeView({
   daysUntil,
   upNextArtists,
   recentlyRatedArtists,
+  friendsPosts = [],
+  unreadNotificationsCount = 0,
 }: HomeViewProps) {
   const { locale, dict } = useI18n();
   const formattedDates = formatDateRange(
@@ -66,6 +75,20 @@ export function HomeView({
 
   return (
     <main className="mx-auto w-full max-w-[1040px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
+      {unreadNotificationsCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line border-l-4 border-l-acid bg-surface px-4 py-2.5 sm:px-6">
+          <span className="font-mono text-xs font-semibold uppercase tracking-[0.06em] text-ink">
+            {dict.home.unreadNotificationsBanner(unreadNotificationsCount)}
+          </span>
+          <Link
+            href="/notifications"
+            className="border border-acid bg-acid px-2.5 py-1 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+          >
+            {dict.home.viewNotificationsAction}
+          </Link>
+        </div>
+      ) : null}
+
       {/* Featured Next Festival Hero */}
       <section className="border-b border-line px-4 py-6 sm:px-6 sm:py-10">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -181,7 +204,7 @@ export function HomeView({
       </section>
 
       {/* Recently Rated */}
-      <section aria-labelledby="home-recently-rated-heading">
+      <section aria-labelledby="home-recently-rated-heading" className="border-b border-line">
         <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
           <h2 id="home-recently-rated-heading" className="font-semibold text-ink">
             {dict.home.recentlyRatedTitle}
@@ -234,6 +257,34 @@ export function HomeView({
               );
             })}
           </ul>
+        )}
+      </section>
+
+      {/* Friends Activity */}
+      <section aria-labelledby="home-friends-activity-heading">
+        <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
+          <h2 id="home-friends-activity-heading" className="font-semibold text-ink">
+            {dict.home.friendsActivityTitle}
+          </h2>
+          <Link href="/social" className="text-ink-muted transition-colors hover:text-ink">
+            {dict.home.viewAllActivity}
+          </Link>
+        </div>
+
+        {friendsPosts.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
+            <p className="font-serif text-[1.05rem] italic text-ink-muted">
+              {dict.social.emptyFeedDescription}
+            </p>
+            <Link
+              href="/social?tab=friends"
+              className="inline-flex border border-line px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+            >
+              {dict.home.viewAllActivity}
+            </Link>
+          </div>
+        ) : (
+          <SocialPostList posts={friendsPosts} showAuthor />
         )}
       </section>
     </main>

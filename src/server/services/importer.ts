@@ -3,6 +3,7 @@ import { DomainError } from "@/domain/errors";
 import { type ImportLineupInput, importLineupSchema } from "@/domain/schemas";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
+import { notifyFestivalLineupUpdated } from "@/server/services/notifications";
 import { getSyncQueue, type SyncQueue } from "@/server/sync/queue";
 
 export interface ImportLineupResult {
@@ -14,7 +15,13 @@ export interface ImportLineupResult {
 
 export async function importFestivalLineup(
   rawInput: ImportLineupInput,
-  options: { db?: PrismaClient; queue?: SyncQueue; enqueueSync?: boolean } = {},
+  options: {
+    db?: PrismaClient;
+    queue?: SyncQueue;
+    enqueueSync?: boolean;
+    actorUserId?: string | null;
+    suppressNotifications?: boolean;
+  } = {},
 ): Promise<ImportLineupResult> {
   const input = importLineupSchema.parse(rawInput);
   const db = options.db ?? getDb();
@@ -152,6 +159,14 @@ export async function importFestivalLineup(
   if (shouldEnqueue && txResult.enqueuedArtistIds.length > 0) {
     const queue = options.queue ?? getSyncQueue();
     queue.enqueueMany(txResult.enqueuedArtistIds);
+  }
+
+  if (!options.suppressNotifications && txResult.createdEntriesCount > 0) {
+    await notifyFestivalLineupUpdated(
+      input.festivalId,
+      { addedCount: txResult.createdEntriesCount, updatedCount: 0 },
+      { excludeUserId: options.actorUserId ?? null, db },
+    );
   }
 
   return txResult;

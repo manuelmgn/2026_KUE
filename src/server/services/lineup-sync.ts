@@ -19,6 +19,7 @@ import {
 import { getDb } from "@/server/db";
 import { getEnv } from "@/server/env";
 import { importFestivalLineup } from "@/server/services/importer";
+import { notifyFestivalLineupUpdated } from "@/server/services/notifications";
 import { getSyncQueue, type SyncQueue } from "@/server/sync/queue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -120,6 +121,7 @@ async function applyDiffChanges(
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
     enqueueSync?: boolean | undefined;
+    actorUserId?: string | null | undefined;
   } = {},
 ): Promise<ApplyLineupDiffResult> {
   const db = options.db ?? getDb();
@@ -128,7 +130,12 @@ async function applyDiffChanges(
   let newArtistsCount = 0;
 
   if (diff.added.length > 0) {
-    const importOptions: { db: PrismaClient; queue?: SyncQueue; enqueueSync?: boolean } = { db };
+    const importOptions: {
+      db: PrismaClient;
+      queue?: SyncQueue;
+      enqueueSync?: boolean;
+      suppressNotifications: boolean;
+    } = { db, suppressNotifications: true };
     if (options.queue !== undefined) {
       importOptions.queue = options.queue;
     }
@@ -183,6 +190,14 @@ async function applyDiffChanges(
         }
       }
     });
+  }
+
+  if (createdEntriesCount > 0 || updatedEntriesCount > 0) {
+    await notifyFestivalLineupUpdated(
+      editionId,
+      { addedCount: createdEntriesCount, updatedCount: updatedEntriesCount },
+      { excludeUserId: options.actorUserId ?? null, db },
+    );
   }
 
   return {
@@ -426,7 +441,12 @@ async function runCheckFestivalLineupSync(
 
 export async function applyPendingLineupDiff(
   rawInput: ApplyLineupDiffInput,
-  options: { db?: PrismaClient; queue?: SyncQueue; enqueueSync?: boolean } = {},
+  options: {
+    db?: PrismaClient;
+    queue?: SyncQueue;
+    enqueueSync?: boolean;
+    actorUserId?: string | null;
+  } = {},
 ): Promise<ApplyLineupDiffResult> {
   const input = applyLineupDiffSchema.parse(rawInput);
   const db = options.db ?? getDb();
@@ -461,6 +481,7 @@ export async function applyPendingLineupDiff(
       db,
       queue: options.queue ?? getSyncQueue(),
       ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
+      ...(options.actorUserId !== undefined ? { actorUserId: options.actorUserId } : {}),
     },
   );
 

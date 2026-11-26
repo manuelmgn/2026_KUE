@@ -10,6 +10,8 @@ import { requirePageUser } from "@/server/auth/dal";
 import { getLocalizedPlaceName } from "@/server/clients/places";
 import { listHomeArtists, listUserEditionsWithCounts } from "@/server/services/festivals";
 import { resolveActiveFestival, toFestivalSummary } from "@/server/services/mappers";
+import { getUnreadNotificationCount } from "@/server/services/notifications";
+import { listFriendsActivityFeed } from "@/server/services/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +36,15 @@ function computeDaysUntil(startDate: string | null, todayIso: string): number | 
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const user = await requirePageUser("/");
-  const [params, { locale, dict }, rawEditions, homeArtists] = await Promise.all([
-    searchParams,
-    getServerDictionary(),
-    listUserEditionsWithCounts(user.id),
-    listHomeArtists(user.id),
-  ]);
+  const [params, { locale, dict }, rawEditions, homeArtists, friendsPosts, unreadCount] =
+    await Promise.all([
+      searchParams,
+      getServerDictionary(),
+      listUserEditionsWithCounts(user.id),
+      listHomeArtists(user.id),
+      listFriendsActivityFeed(user.id, { limit: 5 }),
+      getUnreadNotificationCount(user.id),
+    ]);
 
   const festivalSummaries = rawEditions.map(toFestivalSummary);
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -135,6 +140,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           daysUntil={daysUntil}
           upNextArtists={upNextArtists}
           recentlyRatedArtists={recentlyRatedArtists}
+          friendsPosts={friendsPosts}
+          unreadNotificationsCount={unreadCount}
         />
       ) : (
         <EmptyState

@@ -25,6 +25,7 @@ export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput)
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
     revalidatePath("/manage");
+    revalidatePath("/social");
     return updated;
   }, dict.errors.saveSchedule);
 }

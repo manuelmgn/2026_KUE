@@ -71,6 +71,8 @@ export class SlidingWindowRateLimiter {
 const globalForAuthLimiter = globalThis as typeof globalThis & {
   kueLoginLimiter?: SlidingWindowRateLimiter;
   kueRegisterLimiter?: SlidingWindowRateLimiter;
+  kueAvatarLimiter?: SlidingWindowRateLimiter;
+  kueFriendActionLimiter?: SlidingWindowRateLimiter;
 };
 
 export function getLoginRateLimiter(): SlidingWindowRateLimiter {
@@ -83,6 +85,18 @@ export function getRegisterRateLimiter(): SlidingWindowRateLimiter {
   // 5 registrations per hour per IP
   globalForAuthLimiter.kueRegisterLimiter ??= new SlidingWindowRateLimiter(5, 60 * 60 * 1000);
   return globalForAuthLimiter.kueRegisterLimiter;
+}
+
+export function getAvatarUploadRateLimiter(): SlidingWindowRateLimiter {
+  // 6 avatar uploads per 15 minutes per user/IP
+  globalForAuthLimiter.kueAvatarLimiter ??= new SlidingWindowRateLimiter(6, 15 * 60 * 1000);
+  return globalForAuthLimiter.kueAvatarLimiter;
+}
+
+export function getFriendActionRateLimiter(): SlidingWindowRateLimiter {
+  // 30 friend requests per 15 minutes per user
+  globalForAuthLimiter.kueFriendActionLimiter ??= new SlidingWindowRateLimiter(30, 15 * 60 * 1000);
+  return globalForAuthLimiter.kueFriendActionLimiter;
 }
 
 export function extractClientIp(headerStore: { get(name: string): string | null }): string {

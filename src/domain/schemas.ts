@@ -5,9 +5,27 @@ export const ARTIST_STATUSES = ["PENDING", "LISTENING", "RATED", "DISCARDED"] as
 export const SYNC_STATUSES = ["PENDING", "SYNCING", "SYNCED", "FAILED"] as const;
 export const RELEASE_TYPES = ["ALBUM", "EP", "LIVE", "OTHER"] as const;
 export const LINEUP_SYNC_MODES = ["REVIEW", "AUTO"] as const;
+export const VISIBILITY_SCOPES = ["FRIENDS", "PRIVATE"] as const;
+export const FRIENDSHIP_STATUSES = ["PENDING", "ACCEPTED"] as const;
+export const NOTIFICATION_TYPES = [
+  "FRIEND_REQUEST_RECEIVED",
+  "FRIEND_REQUEST_ACCEPTED",
+  "FESTIVAL_LINEUP_UPDATED",
+  "FESTIVAL_METADATA_UPDATED",
+  "FRIEND_JOINED_FESTIVAL",
+] as const;
 
 export const userRoleSchema = z.enum(USER_ROLES);
 export type UserRole = z.infer<typeof userRoleSchema>;
+
+export const visibilityScopeSchema = z.enum(VISIBILITY_SCOPES);
+export type VisibilityScope = z.infer<typeof visibilityScopeSchema>;
+
+export const friendshipStatusSchema = z.enum(FRIENDSHIP_STATUSES);
+export type FriendshipStatus = z.infer<typeof friendshipStatusSchema>;
+
+export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);
+export type NotificationType = z.infer<typeof notificationTypeSchema>;
 
 export const artistStatusSchema = z.enum(ARTIST_STATUSES);
 export type ArtistStatus = z.infer<typeof artistStatusSchema>;
@@ -104,6 +122,56 @@ export const adminDeleteUserSchema = z.object({
   userId: z.string().min(1),
 });
 export type AdminDeleteUserInput = z.infer<typeof adminDeleteUserSchema>;
+
+// Profile, Privacy, Friends & Notifications schemas
+
+export const updateProfileSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .max(50, "El nombre visible no puede superar los 50 caracteres")
+    .nullable()
+    .optional(),
+  bio: z.string().trim().max(240, "La biografía no puede superar los 240 caracteres").optional(),
+  location: z
+    .string()
+    .trim()
+    .max(80, "La ubicación no puede superar los 80 caracteres")
+    .nullable()
+    .optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const updatePrivacySchema = z.object({
+  festivalsVisibility: visibilityScopeSchema.optional(),
+  ratingsVisibility: visibilityScopeSchema.optional(),
+  notesVisibility: visibilityScopeSchema.optional(),
+});
+export type UpdatePrivacyInput = z.infer<typeof updatePrivacySchema>;
+
+export const friendTargetSchema = z.object({
+  targetUserId: z.string().trim().min(1, "Usuario no válido"),
+});
+export type FriendTargetInput = z.infer<typeof friendTargetSchema>;
+
+export const userSearchQuerySchema = z.string().trim().max(64, "Búsqueda demasiado larga");
+
+export const notificationIdSchema = z.object({
+  notificationId: z.string().trim().min(1),
+});
+export type NotificationIdInput = z.infer<typeof notificationIdSchema>;
+
+export const notificationPayloadSchema = z.object({
+  actorUsername: z.string().optional(),
+  actorDisplayName: z.string().nullable().optional(),
+  festivalName: z.string().optional(),
+  festivalYear: z.number().int().optional(),
+  festivalSlug: z.string().optional(),
+  addedCount: z.number().int().min(0).optional(),
+  updatedCount: z.number().int().min(0).optional(),
+  friendshipId: z.string().optional(),
+});
+export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 // Festival & Edition schemas
 

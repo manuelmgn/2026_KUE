@@ -4,8 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { changePasswordAction, logoutAction } from "@/actions/auth-actions";
-import type { AuthUserDTO } from "@/components/features/types";
+import { updatePrivacyAction } from "@/actions/social-actions";
+import type {
+  AuthUserDTO,
+  UserPrivacySettingsDTO,
+  UserProfileSummaryDTO,
+} from "@/components/features/types";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { UserAvatar } from "@/components/ui/UserAvatar";
+import type { VisibilityScope } from "@/domain/schemas";
 import type { Locale } from "@/i18n/config";
 import { useI18n } from "@/i18n/context";
 
@@ -13,6 +20,9 @@ type ThemePreference = "system" | "dark" | "light";
 
 interface SettingsViewProps {
   currentUser: AuthUserDTO;
+  initialProfile?: UserProfileSummaryDTO;
+  initialPrivacy?: UserPrivacySettingsDTO;
+  unreadNotificationsCount?: number;
 }
 
 function readStoredTheme(): ThemePreference {
@@ -65,7 +75,12 @@ function applyThemePreference(next: ThemePreference) {
   }
 }
 
-export function SettingsView({ currentUser }: SettingsViewProps) {
+export function SettingsView({
+  currentUser,
+  initialProfile,
+  initialPrivacy,
+  unreadNotificationsCount = 0,
+}: SettingsViewProps) {
   const { locale, dict, setLocale } = useI18n();
   const router = useRouter();
   const formId = useId();
@@ -73,6 +88,18 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
   const [systemScheme, setSystemScheme] = useState<"dark" | "light">("dark");
   const [savingLocale, setSavingLocale] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const [privacy, setPrivacy] = useState<UserPrivacySettingsDTO>(
+    initialPrivacy ?? {
+      festivalsVisibility: "FRIENDS",
+      ratingsVisibility: "FRIENDS",
+      notesVisibility: "FRIENDS",
+    },
+  );
+  const [savingPrivacyKey, setSavingPrivacyKey] = useState<keyof UserPrivacySettingsDTO | null>(
+    null,
+  );
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
 
   const [loggingOut, setLoggingOut] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -135,6 +162,32 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
     setTheme(next);
     applyThemePreference(next);
     setSavedNotice(true);
+  };
+
+  const handlePrivacyToggle = async (
+    key: keyof UserPrivacySettingsDTO,
+    nextValue: VisibilityScope,
+  ) => {
+    if (privacy[key] === nextValue || savingPrivacyKey !== null) {
+      return;
+    }
+    const prevValue = privacy[key];
+    setPrivacy((prev) => ({ ...prev, [key]: nextValue }));
+    setSavingPrivacyKey(key);
+    setPrivacyError(null);
+    setSavedNotice(false);
+    try {
+      const res = await updatePrivacyAction({ [key]: nextValue });
+      if (!res.ok) {
+        setPrivacy((prev) => ({ ...prev, [key]: prevValue }));
+        setPrivacyError(res.error);
+        return;
+      }
+      setPrivacy(res.data);
+      setSavedNotice(true);
+    } finally {
+      setSavingPrivacyKey(null);
+    }
   };
 
   const handleLogout = async () => {
@@ -252,22 +305,32 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
 
         <div className="border border-line bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display text-xl font-extrabold tracking-[-0.02em] text-ink">
-                  @{currentUser.username}
-                </span>
-                <span
-                  className={
-                    currentUser.role === "ADMIN"
-                      ? "bg-acid px-1.5 py-0.5 font-mono text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
-                      : "border border-line px-1.5 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.08em] text-ink-muted"
-                  }
-                >
-                  {currentUser.role === "ADMIN" ? dict.account.roleAdmin : dict.account.roleUser}
-                </span>
+            <div className="flex items-center gap-3.5">
+              <UserAvatar
+                avatarPath={initialProfile?.avatarPath ?? null}
+                username={currentUser.username}
+                displayName={initialProfile?.displayName ?? null}
+                size="md"
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-display text-xl font-extrabold tracking-[-0.02em] text-ink">
+                    {initialProfile?.displayName || `@${currentUser.username}`}
+                  </span>
+                  <span
+                    className={
+                      currentUser.role === "ADMIN"
+                        ? "bg-acid px-1.5 py-0.5 font-mono text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+                        : "border border-line px-1.5 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.08em] text-ink-muted"
+                    }
+                  >
+                    {currentUser.role === "ADMIN" ? dict.account.roleAdmin : dict.account.roleUser}
+                  </span>
+                </div>
+                <div className="mt-1 font-mono text-xs text-ink-muted">
+                  @{currentUser.username} · {currentUser.email}
+                </div>
               </div>
-              <div className="mt-1 font-mono text-xs text-ink-muted">{currentUser.email}</div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -293,6 +356,31 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
                 {loggingOut ? dict.account.loggingOut : dict.account.logoutAction}
               </HairlineButton>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-bg px-4 py-3 sm:px-5">
+            <Link
+              href={`/u/${encodeURIComponent(currentUser.username)}`}
+              className="inline-flex border border-line px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+            >
+              {dict.account.openMyProfile}
+            </Link>
+            <Link
+              href="/social"
+              className="inline-flex border border-line px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+            >
+              {dict.account.openSocialHub}
+            </Link>
+            <Link
+              href="/notifications"
+              className={
+                unreadNotificationsCount > 0
+                  ? "inline-flex border border-acid bg-acid px-3 py-1.5 font-mono text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+                  : "inline-flex border border-line px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+              }
+            >
+              {dict.account.openNotifications(unreadNotificationsCount)}
+            </Link>
           </div>
 
           {showPasswordForm ? (
@@ -380,6 +468,101 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
             className="border border-acid bg-surface px-4 py-2.5 font-mono text-xs text-ink"
           >
             {passwordNotice}
+          </p>
+        ) : null}
+      </section>
+
+      {/* Privacy Section */}
+      <section
+        id="privacy"
+        aria-labelledby="settings-privacy-heading"
+        className="flex flex-col gap-4 border-t border-line pt-8"
+      >
+        <div>
+          <h2
+            id="settings-privacy-heading"
+            className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
+          >
+            {dict.privacy.sectionTitle}
+          </h2>
+          <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
+            {dict.privacy.sectionDescription}
+          </p>
+        </div>
+
+        <div className="border border-line bg-surface">
+          {(
+            [
+              {
+                key: "festivalsVisibility" as const,
+                label: dict.privacy.festivalsLabel,
+                hint: dict.privacy.festivalsHint,
+              },
+              {
+                key: "ratingsVisibility" as const,
+                label: dict.privacy.ratingsLabel,
+                hint: dict.privacy.ratingsHint,
+              },
+              {
+                key: "notesVisibility" as const,
+                label: dict.privacy.notesLabel,
+                hint: dict.privacy.notesHint,
+              },
+            ] as const
+          ).map((row) => {
+            const currentScope = privacy[row.key];
+            const isBusy = savingPrivacyKey !== null;
+            return (
+              <div
+                key={row.key}
+                className="flex flex-col justify-between gap-3 border-b border-line p-4 last:border-b-0 sm:flex-row sm:items-center sm:px-5"
+              >
+                <div className="min-w-0">
+                  <div className="font-display text-base font-extrabold text-ink">{row.label}</div>
+                  <p className="mt-0.5 font-serif text-[0.98rem] italic text-ink-muted">
+                    {row.hint}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 border border-line bg-bg">
+                  <button
+                    type="button"
+                    aria-pressed={currentScope === "FRIENDS"}
+                    disabled={isBusy}
+                    onClick={() => void handlePrivacyToggle(row.key, "FRIENDS")}
+                    className={`cursor-pointer border-r border-line px-3.5 py-2 font-mono text-[0.7rem] uppercase tracking-[0.08em] transition-colors disabled:opacity-50 ${
+                      currentScope === "FRIENDS"
+                        ? "bg-acid font-semibold text-acid-ink"
+                        : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    {dict.privacy.scopeFriends}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={currentScope === "PRIVATE"}
+                    disabled={isBusy}
+                    onClick={() => void handlePrivacyToggle(row.key, "PRIVATE")}
+                    className={`cursor-pointer px-3.5 py-2 font-mono text-[0.7rem] uppercase tracking-[0.08em] transition-colors disabled:opacity-50 ${
+                      currentScope === "PRIVATE"
+                        ? "bg-ink font-semibold text-bg"
+                        : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    {dict.privacy.scopePrivate}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {privacyError ? (
+          <p
+            role="alert"
+            className="border border-line-strong bg-surface px-4 py-2.5 font-mono text-xs text-ink"
+          >
+            {privacyError}
           </p>
         ) : null}
       </section>

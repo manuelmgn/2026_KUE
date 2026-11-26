@@ -4,6 +4,8 @@ import { TopBar } from "@/components/features/TopBar";
 import { requirePageUser } from "@/server/auth/dal";
 import { listUserEditions } from "@/server/services/festivals";
 import { resolveActiveFestival, toFestivalSummary } from "@/server/services/mappers";
+import { getUnreadNotificationCount } from "@/server/services/notifications";
+import { getOwnAccountProfileAndPrivacy } from "@/server/services/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,12 @@ interface SettingsPageProps {
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const user = await requirePageUser("/settings");
-  const [params, editions] = await Promise.all([searchParams, listUserEditions(user.id)]);
+  const [params, editions, accountData, unreadCount] = await Promise.all([
+    searchParams,
+    listUserEditions(user.id),
+    getOwnAccountProfileAndPrivacy(user.id),
+    getUnreadNotificationCount(user.id),
+  ]);
   const summaries = editions.map(toFestivalSummary);
   const active = resolveActiveFestival(summaries, params.festival);
 
@@ -26,7 +33,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           currentUser={user}
         />
       </Suspense>
-      <SettingsView currentUser={user} />
+      <SettingsView
+        currentUser={user}
+        initialProfile={accountData.profile}
+        initialPrivacy={accountData.privacy}
+        unreadNotificationsCount={unreadCount}
+      />
     </div>
   );
 }

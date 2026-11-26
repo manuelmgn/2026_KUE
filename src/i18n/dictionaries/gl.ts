@@ -143,6 +143,11 @@ export const gl: Dictionary = {
     upNextEmpty: "Non tes artistas pendentes nin en escoita neste momento.",
     recentlyRatedTitle: "Últimos valorados",
     recentlyRatedEmpty: "Aínda non valoraches ningún artista.",
+    friendsActivityTitle: "Actividade recente de amigos",
+    viewAllActivity: "Comunidade e amigos →",
+    unreadNotificationsBanner: (count: number) =>
+      count === 1 ? "Tes 1 notificación sen ler" : `Tes ${count} notificacións sen ler`,
+    viewNotificationsAction: "Ver avisos →",
   },
   workspace: {
     emptyLineupTitle: "Cartaz baleiro",
@@ -214,6 +219,8 @@ export const gl: Dictionary = {
     saveSet: "Gardar actuación",
     festivalHistoryTitle: "Historial en festivais",
     liveBadge: (rating: number) => `AO VIVO ${rating}/5`,
+    friendReviewsTitle: "Valoracións de amigos",
+    friendStudioBadge: (rating: number) => `ESTUDIO ${rating}/5`,
   },
   disambiguate: {
     title: "Desambiguar en MusicBrainz",
@@ -335,6 +342,11 @@ export const gl: Dictionary = {
     placesServiceError: "Erro ao consultar o servizo de lugares",
     missingQueryParam: "Parámetro q obrigatorio",
     musicBrainzServiceError: "Erro ao consultar MusicBrainz",
+    updateProfile: "Non se puido actualizar o perfil",
+    updatePrivacy: "Non se puideron gardar os axustes de privacidade",
+    friendAction: "Non se puido completar a acción de amizade",
+    notificationAction: "Non se puido actualizar a notificación",
+    avatarUpload: "Non se puido actualizar a imaxe de perfil",
   },
   auth: {
     loginTitle: "Acceder a KUE",
@@ -377,6 +389,124 @@ export const gl: Dictionary = {
     confirmNewPasswordLabel: "Repetir novo contrasinal",
     changePasswordSubmit: "Actualizar contrasinal",
     passwordUpdated: "Contrasinal actualizado. Pecháronse as túas outras sesións.",
+    openMyProfile: "O meu perfil →",
+    openSocialHub: "Amigos e actividade →",
+    openNotifications: (unreadCount: number) =>
+      unreadCount > 0 ? `Notificacións (${unreadCount})` : "Notificacións",
+  },
+  privacy: {
+    sectionTitle: "Privacidade entre amigos",
+    sectionDescription:
+      "Controla que parte do teu arquivo persoal poden ver as persoas que aceptaches como amigas.",
+    scopeFriends: "Amigos",
+    scopeFriendsMeta: "Visible só para os teus amigos aceptados",
+    scopePrivate: "Só eu",
+    scopePrivateMeta: "Oculto para todos os demais usuarios",
+    festivalsLabel: "Festivais engadidos",
+    festivalsHint: "Próximos festivais, arquivo de edicións pasadas e coincidencias.",
+    ratingsLabel: "Puntuacións (1–5)",
+    ratingsHint: "Notas numéricas de estudio e directo no teu perfil, feed e fichas de artista.",
+    notesLabel: "Notas e recensións escritas",
+    notesHint: "Texto escrito nos teus apuntamentos persoais de artistas e crónicas post-concerto.",
+  },
+  profile: {
+    editProfileButton: "Editar perfil",
+    cancelEditButton: "Cancelar",
+    saveProfileButton: "Gardar perfil",
+    profileSaved: "Perfil actualizado.",
+    displayNameLabel: "Nome visible",
+    displayNamePlaceholder: "O teu nome ou alcume",
+    locationLabel: "Localización",
+    locationPlaceholder: "Cidade ou rexión",
+    bioLabel: "Biografía",
+    bioPlaceholder: "Que escoitas, festivais fetiche, notas...",
+    avatarLabel: "Foto de perfil",
+    uploadAvatarButton: "Subir imaxe",
+    uploadingAvatar: "Procesando...",
+    removeAvatarButton: "Quitar foto",
+    avatarHint: "JPEG, PNG ou WebP. Recórtase a cadrado 256×256 e elimínanse metadatos EXIF.",
+    avatarTooLargeError: "A imaxe é demasiado pesada (máximo 4 MB).",
+    tabPosts: (count: number) => `Publicacións (${count})`,
+    tabFestivals: (count: number) => `Festivais (${count})`,
+    friendsStat: (count: number) => (count === 1 ? "1 AMIGO" : `${count} AMIGOS`),
+    sharedFestivalsLabel: (count: number) =>
+      count === 1 ? "Coincidides en 1 festival" : `Coincidides en ${count} festivais`,
+    privateContentTitle: "Contido privado",
+    privateContentFriendsOnly:
+      "Engade a esta persoa como amiga para ver as súas publicacións e festivais compartidos.",
+    privateContentSelfOnly:
+      "Este usuario mantén esta sección privada nos seus axustes de privacidade.",
+    emptyPostsSelf:
+      "As túas valoracións, notas de artistas, crónicas de directo e festivais aparecerán aquí.",
+    emptyPostsFriend: "Aínda non hai publicacións visibles.",
+    emptyFestivalsFriend: "Sen festivais visibles.",
+    privacySettingsLink: "Axustes de privacidade →",
+  },
+  social: {
+    title: "Comunidade",
+    subtitle: "Publicacións musicais dos teus amigos, solicitudes e directorio.",
+    tabActivity: "Publicacións",
+    tabFriends: (count: number) => `Amigos (${count})`,
+    myProfileLink: "O meu perfil →",
+    notificationsLink: (unreadCount: number) =>
+      unreadCount > 0 ? `Avisos (${unreadCount})` : "Avisos",
+    searchTitle: "Buscar usuarios",
+    searchPlaceholder: "Buscar por @usuario ou nome...",
+    searchAria: "Buscar usuarios para engadir como amigos",
+    searchMinChars: "Escribe polo menos 2 caracteres para buscar.",
+    searchNoResults: (query: string) => `Non se atoparon usuarios para «${query}».`,
+    addFriendAction: "+ Engadir",
+    cancelRequestAction: "Cancelar solicitude",
+    acceptAction: "Aceptar",
+    rejectAction: "Rexeitar",
+    friendsBadge: "AMIGOS ✓",
+    removeFriendAction: "Eliminar amigo",
+    removeFriendConfirm: (username: string) => `Eliminar a @${username} da túa lista de amigos?`,
+    pendingBadge: "PENDENTE",
+    incomingRequestsTitle: (count: number) => `Solicitudes recibidas (${count})`,
+    outgoingRequestsTitle: (count: number) => `Solicitudes enviadas (${count})`,
+    friendsListTitle: (count: number) => `Os teus amigos (${count})`,
+    emptyFriendsTitle: "Sen amigos engadidos aínda",
+    emptyFriendsDescription:
+      "Busca por nome de usuario arriba para conectar e compartir festivais e valoracións.",
+    emptyFeedTitle: "Sen publicacións recentes",
+    emptyFeedDescription:
+      "Cando os teus amigos valoren artistas, escriban crónicas de directo ou engadan festivais, aparecerán aquí.",
+    sharedFestivalsBadge: (count: number) =>
+      count === 1 ? "1 FESTIVAL EN COMÚN" : `${count} EN COMÚN`,
+    postRatedArtist: "valorou artista",
+    postNotedArtist: "escribiu nota sobre",
+    postLiveReview: "valorou en directo",
+    postAddedFestival: "apuntouse ao festival",
+    liveScoreBadge: (rating: number) => `DIRECTO ${rating}/5`,
+  },
+  notifications: {
+    title: "Notificacións",
+    subtitle: "Solicitudes de amizade e novidades nos festivais que segues.",
+    markAllRead: "Marcar todo como lido",
+    markingAllRead: "Marcando...",
+    markReadAria: "Marcar notificación como lida",
+    unreadBadge: (count: number) => (count === 1 ? "1 SEN LER" : `${count} SEN LER`),
+    emptyTitle: "Todo ao día",
+    emptyDescription: "Non tes notificacións aínda.",
+    backToSocial: "← Comunidade e amigos",
+    friendRequestReceived: (actor: string) => `@${actor} enviouche unha solicitude de amizade.`,
+    friendRequestAccepted: (actor: string) => `@${actor} aceptou a túa solicitude de amizade.`,
+    festivalLineupUpdated: (festival: string, added: number, updated: number) => {
+      if (added > 0 && updated > 0) {
+        return `${festival} actualizouse: +${added} artistas e ${updated} horarios.`;
+      }
+      if (added > 0) {
+        return `${festival} engadiu ${added === 1 ? "1 novo artista" : `${added} novos artistas`} ao cartaz.`;
+      }
+      return `${festival} actualizou ${updated === 1 ? "1 horario" : `${updated} horarios`} do cartaz.`;
+    },
+    festivalMetadataUpdated: (festival: string) =>
+      `${festival} actualizou as súas datas ou localización.`,
+    friendJoinedFestival: (actor: string, festival: string) =>
+      `@${actor} tamén engadiu ${festival} aos seus festivais.`,
+    openProfileAction: "Ver perfil →",
+    openFestivalAction: "Ver cartaz →",
   },
   catalog: {
     addFestivalButton: "+ Engadir festival",

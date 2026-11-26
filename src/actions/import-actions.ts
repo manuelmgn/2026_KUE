@@ -12,14 +12,15 @@ export async function importLineupAction(
 ): Promise<ActionResult<ImportLineupResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
-    const result = await importFestivalLineup(input);
+    const user = await requireActionUser();
+    const result = await importFestivalLineup(input, { actorUserId: user.id });
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festivals");
     revalidatePath("/festival-mode");
     revalidatePath("/manage");
     revalidatePath("/import");
+    revalidatePath("/notifications");
     return result;
   }, dict.errors.importLineup);
 }

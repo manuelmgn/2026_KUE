@@ -15,6 +15,10 @@ import {
 import type { Festival, FestivalEdition, PrismaClient } from "@/generated/prisma/client";
 import { validateLineupSourceUrl } from "@/server/clients/lineup-source";
 import { getDb } from "@/server/db";
+import {
+  notifyFestivalMetadataUpdated,
+  notifyFriendsJoinedFestival,
+} from "@/server/services/notifications";
 
 export interface EditionWithFestival extends FestivalEdition {
   festival: Pick<Festival, "id" | "slug" | "name">;
@@ -130,13 +134,19 @@ export async function addEditionToUserFestivals(
   editionId: string,
   db: PrismaClient = getDb(),
 ): Promise<EditionWithFestivalAndCount> {
-  const edition = await db.festivalEdition.findUnique({
-    where: { id: editionId },
-    include: {
-      festival: { select: { id: true, slug: true, name: true } },
-      _count: { select: { entries: true } },
-    },
-  });
+  const [edition, alreadyAdded] = await Promise.all([
+    db.festivalEdition.findUnique({
+      where: { id: editionId },
+      include: {
+        festival: { select: { id: true, slug: true, name: true } },
+        _count: { select: { entries: true } },
+      },
+    }),
+    db.userFestivalEdition.findUnique({
+      where: { userId_editionId: { userId, editionId } },
+      select: { editionId: true },
+    }),
+  ]);
   if (!edition) {
     throw new DomainError("Edición de festival no encontrada");
   }
@@ -146,6 +156,10 @@ export async function addEditionToUserFestivals(
     create: { userId, editionId },
     update: {},
   });
+
+  if (!alreadyAdded) {
+    await notifyFriendsJoinedFestival(userId, editionId, db);
+  }
 
   return edition;
 }
@@ -339,6 +353,7 @@ export async function createFestivalEdition(
 export async function updateFestival(
   rawInput: UpdateFestivalInput,
   db: PrismaClient = getDb(),
+  options: { actorUserId?: string | null } = {},
 ): Promise<EditionWithFestival> {
   const input = updateFestivalSchema.parse(rawInput);
 
@@ -373,7 +388,16 @@ export async function updateFestival(
     }
   }
 
-  return db.$transaction(async (tx) => {
+  const nextLocation = input.location || null;
+  const nextStart = input.startDate ?? null;
+  const nextEnd = input.endDate ?? null;
+
+  const metadataChanged =
+    existing.location !== nextLocation ||
+    (existing.startDate?.toISOString() ?? null) !== (nextStart?.toISOString() ?? null) ||
+    (existing.endDate?.toISOString() ?? null) !== (nextEnd?.toISOString() ?? null);
+
+  const updated = await db.$transaction(async (tx) => {
     await tx.festival.update({
       where: { id: existing.festivalId },
       data: {
@@ -386,7 +410,7 @@ export async function updateFestival(
       where: { id: input.festivalId },
       data: {
         year: input.year,
-        location: input.location || null,
+        location: nextLocation,
         locationProvince: input.locationProvince ?? null,
         locationRegion: input.locationRegion ?? null,
         locationCountry: input.locationCountry ?? null,
@@ -394,14 +418,23 @@ export async function updateFestival(
         locationLatitude: input.locationLatitude ?? null,
         locationLongitude: input.locationLongitude ?? null,
         locationPlaceId: input.locationPlaceId ?? null,
-        startDate: input.startDate ?? null,
-        endDate: input.endDate ?? null,
+        startDate: nextStart,
+        endDate: nextEnd,
       },
       include: {
         festival: { select: { id: true, slug: true, name: true } },
       },
     });
   });
+
+  if (metadataChanged) {
+    await notifyFestivalMetadataUpdated(updated.id, {
+      excludeUserId: options.actorUserId ?? null,
+      db,
+    });
+  }
+
+  return updated;
 }
 
 export async function deleteFestivalEdition(

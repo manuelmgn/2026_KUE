@@ -97,6 +97,7 @@ async function claimLegacyDataForAdmin(
           rating: item.rating,
           status: item.status ?? "PENDING",
           notes: item.notes,
+          ratedAt: item.rating !== null || item.notes.trim().length > 0 ? new Date() : null,
         },
         update: {},
       });

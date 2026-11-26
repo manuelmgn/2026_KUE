@@ -1,4 +1,4 @@
-const CACHE_NAME = "kue-shell-v5";
+const CACHE_NAME = "kue-shell-v6";
 const STATIC_SHELL_URLS = [
   "/manifest.webmanifest",
   "/icons/icon.svg",
@@ -37,11 +37,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Never cache authentication or admin routes
+  // Never cache authentication, admin, or private social/notification routes
   if (
     url.pathname === "/login" ||
     url.pathname === "/register" ||
-    url.pathname.startsWith("/admin")
+    url.pathname.startsWith("/admin") ||
+    url.pathname.startsWith("/social") ||
+    url.pathname.startsWith("/notifications") ||
+    url.pathname.startsWith("/u/") ||
+    url.pathname.startsWith("/api/profile/") ||
+    url.pathname.startsWith("/api/notifications")
   ) {
     return;
   }

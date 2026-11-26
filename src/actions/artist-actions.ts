@@ -39,6 +39,7 @@ export async function setArtistRatingAction(
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
+    revalidatePath("/social");
     return { id: updated.id, rating: updated.rating, status: updated.status };
   }, dict.errors.saveRating);
 }
@@ -53,6 +54,7 @@ export async function setArtistStatusAction(
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
+    revalidatePath("/social");
     return { id: updated.id, status: updated.status };
   }, dict.errors.changeStatus);
 }
@@ -67,6 +69,7 @@ export async function saveArtistNotesAction(
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
+    revalidatePath("/social");
     return { id: updated.id, notes: updated.notes };
   }, dict.errors.saveNotes);
 }
