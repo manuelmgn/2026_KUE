@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { ZodError } from "zod";
-import { DomainError, ForbiddenError, UnauthorizedError } from "@/domain/errors";
 import type { JointAgendaStrategy } from "@/domain/schemas";
+import { handleGroupPlanningApiError, parseJsonObjectBody } from "@/server/api-helpers";
 import { getCurrentUser } from "@/server/auth/dal";
 import {
   deleteJointAgenda,
@@ -13,26 +12,6 @@ import {
 } from "@/server/services/group-planning";
 
 export const dynamic = "force-dynamic";
-
-function handleApiError(error: unknown): NextResponse {
-  if (error instanceof UnauthorizedError) {
-    return NextResponse.json({ error: error.message }, { status: 401 });
-  }
-  if (error instanceof ForbiddenError) {
-    return NextResponse.json({ error: error.message }, { status: 403 });
-  }
-  if (error instanceof ZodError) {
-    return NextResponse.json(
-      { error: error.issues[0]?.message ?? "Datos no válidos" },
-      { status: 400 },
-    );
-  }
-  if (error instanceof DomainError) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-  console.error("[KUE] Joint agenda detail API error:", error);
-  return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
-}
 
 export async function GET(
   _request: NextRequest,
@@ -51,7 +30,7 @@ export async function GET(
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error: unknown) {
-    return handleApiError(error);
+    return handleGroupPlanningApiError(error, "Joint agenda detail GET error");
   }
 }
 
@@ -89,7 +68,7 @@ export async function PATCH(
 
   try {
     const { agendaId } = await params;
-    const body = (await request.json()) as PatchJointAgendaPayload;
+    const body = (await parseJsonObjectBody(request)) as unknown as PatchJointAgendaPayload;
 
     if (body.action === "setEntry") {
       const updated = await setJointAgendaEntry(user.id, {
@@ -146,7 +125,7 @@ export async function PATCH(
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error: unknown) {
-    return handleApiError(error);
+    return handleGroupPlanningApiError(error, "Joint agenda detail PATCH error");
   }
 }
 
@@ -170,6 +149,6 @@ export async function DELETE(
       },
     );
   } catch (error: unknown) {
-    return handleApiError(error);
+    return handleGroupPlanningApiError(error, "Joint agenda detail DELETE error");
   }
 }

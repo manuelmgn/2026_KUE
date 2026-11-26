@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DomainError } from "@/domain/errors";
 import {
   buildComparisonMatrix,
   evaluateFestivalRecommendation,
@@ -10,6 +11,7 @@ import {
   type RawComparisonParticipantInput,
   selectEntriesForJointAgenda,
 } from "@/domain/group-planning";
+import { parseJsonObjectBody } from "@/server/api-helpers";
 
 const sampleEdition = {
   id: "ed_rewire_2027",
@@ -282,5 +284,37 @@ describe("domain: group-planning recommendation and comparison matrix", () => {
     expect(organized.items[0]?.hasClash).toBe(true);
     expect(organized.items[1]?.hasClash).toBe(true);
     expect(organized.items[2]?.hasClash).toBe(false);
+  });
+
+  it("rejects malformed or non-object JSON payloads cleanly as DomainError (400)", async () => {
+    const validReq = new Request("http://localhost/api/joint-agendas", {
+      method: "POST",
+      body: JSON.stringify({ editionId: "ed_1" }),
+    });
+    await expect(parseJsonObjectBody(validReq)).resolves.toEqual({ editionId: "ed_1" });
+
+    const emptyAllowed = new Request("http://localhost/api/editions/ed_1/comparison", {
+      method: "POST",
+      body: "",
+    });
+    await expect(parseJsonObjectBody(emptyAllowed, { allowEmpty: true })).resolves.toEqual({});
+
+    const malformedReq = new Request("http://localhost/api/joint-agendas", {
+      method: "POST",
+      body: "{broken-json",
+    });
+    await expect(parseJsonObjectBody(malformedReq)).rejects.toThrow(DomainError);
+
+    const nullReq = new Request("http://localhost/api/joint-agendas", {
+      method: "POST",
+      body: "null",
+    });
+    await expect(parseJsonObjectBody(nullReq)).rejects.toThrow(DomainError);
+
+    const arrayReq = new Request("http://localhost/api/joint-agendas", {
+      method: "POST",
+      body: "[1, 2, 3]",
+    });
+    await expect(parseJsonObjectBody(arrayReq)).rejects.toThrow(DomainError);
   });
 });

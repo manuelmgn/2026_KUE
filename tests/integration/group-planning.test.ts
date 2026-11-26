@@ -421,12 +421,14 @@ describe("integration: festival comparative table (>= 3.2) and joint agendas", (
     expect(aliceAfterCharliePrivateFest.recommendation.averageRating).toBe(2);
     expect(aliceAfterCharliePrivateFest.recommendation.recommended).toBe(false);
 
-    // Unfriending Bob removes Bob from Alice's visible participants too
+    // Unfriending Bob removes Bob from Alice's visible participants AND revokes Bob's access to Alice's agenda!
     await removeOrRejectFriendship(alice.id, { targetUserId: bob.id }, db);
     const aliceAfterUnfriend = await getJointAgenda(alice.id, agenda.id, db);
     expect(aliceAfterUnfriend.participants.map((p) => p.user.username)).toEqual(["alice_priv"]);
+    expect(await listJointAgendas(bob.id, { db })).toHaveLength(0);
+    await expect(getJointAgenda(bob.id, agenda.id, db)).rejects.toThrow(ForbiddenError);
 
-    // If Bob removes the festival from his list, Bob can no longer open the agenda
+    // If Bob removes the festival from his list, Bob still cannot open the agenda
     await removeEditionFromUserFestivals(bob.id, edition.id, db);
     await expect(getJointAgenda(bob.id, agenda.id, db)).rejects.toThrow(DomainError);
   });

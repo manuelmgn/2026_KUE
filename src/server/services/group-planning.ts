@@ -252,6 +252,78 @@ async function filterVisibleStoredMembers(
   return [viewer, ...visibleOthers];
 }
 
+async function resolveBatchVisibleMembers<
+  TRow extends {
+    editionId: string;
+    createdById: string;
+    members: ReadonlyArray<{ user: ParticipantUserRecord }>;
+  },
+>(
+  viewer: ParticipantUserRecord,
+  rows: ReadonlyArray<TRow>,
+  db: PrismaClient,
+): Promise<Array<{ row: TRow; visibleUsers: ParticipantUserRecord[] }>> {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const editionIdSet = new Set<string>();
+  const candidateIdSet = new Set<string>();
+
+  for (const row of rows) {
+    editionIdSet.add(row.editionId);
+    for (const m of row.members) {
+      if (m.user.id !== viewer.id && m.user.isActive && m.user.festivalsVisibility === "FRIENDS") {
+        candidateIdSet.add(m.user.id);
+      }
+    }
+  }
+
+  const candidateIds = Array.from(candidateIdSet);
+  const [acceptedFriendIds, activeFollows] =
+    candidateIds.length > 0
+      ? await Promise.all([
+          getAcceptedFriendIds(viewer.id, db),
+          db.userFestivalEdition.findMany({
+            where: {
+              editionId: { in: Array.from(editionIdSet) },
+              userId: { in: candidateIds },
+            },
+            select: { editionId: true, userId: true },
+          }),
+        ])
+      : [[], []];
+
+  const friendSet = new Set(acceptedFriendIds);
+  const editionUserPairs = new Set(activeFollows.map((f) => `${f.editionId}:${f.userId}`));
+
+  const resolved: Array<{ row: TRow; visibleUsers: ParticipantUserRecord[] }> = [];
+  for (const row of rows) {
+    const visibleOthers = row.members
+      .map((m) => m.user)
+      .filter(
+        (u) =>
+          u.id !== viewer.id &&
+          u.isActive &&
+          u.festivalsVisibility === "FRIENDS" &&
+          friendSet.has(u.id) &&
+          editionUserPairs.has(`${row.editionId}:${u.id}`),
+      )
+      .sort((a, b) => a.username.localeCompare(b.username));
+
+    const visibleUsers = [viewer, ...visibleOthers];
+
+    // If viewer is not the creator and the creator is no longer visible (unfriended, private, or left festival), hide
+    if (viewer.id !== row.createdById && !visibleUsers.some((u) => u.id === row.createdById)) {
+      continue;
+    }
+
+    resolved.push({ row, visibleUsers });
+  }
+
+  return resolved;
+}
+
 async function hydrateComparisonTable(params: {
   viewer: ParticipantUserRecord;
   edition: EditionWithBrandRecord;
@@ -635,28 +707,18 @@ export async function listSavedFestivalComparisons(
     },
   });
 
-  const summaries: SavedFestivalComparisonSummaryDTO[] = [];
-  for (const row of rows) {
-    const visibleUsers = await filterVisibleStoredMembers(
-      viewer,
-      row.editionId,
-      row.members.map((m) => m.user),
-      db,
-    );
+  const resolvedRows = await resolveBatchVisibleMembers(viewer, rows, db);
 
-    summaries.push({
-      id: row.id,
-      name: row.name,
-      createdById: row.createdById,
-      edition: toEditionSummaryDTO(row.edition),
-      participants: visibleUsers.map(toGroupParticipantDTO),
-      jointAgendasCount: row._count.jointAgendas,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    });
-  }
-
-  return summaries;
+  return resolvedRows.map(({ row, visibleUsers }) => ({
+    id: row.id,
+    name: row.name,
+    createdById: row.createdById,
+    edition: toEditionSummaryDTO(row.edition),
+    participants: visibleUsers.map(toGroupParticipantDTO),
+    jointAgendasCount: row._count.jointAgendas,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
 }
 
 /**
@@ -703,6 +765,10 @@ export async function getSavedFestivalComparison(
     row.members.map((m) => m.user),
     db,
   );
+
+  if (viewer.id !== row.createdById && !visibleUsers.some((u) => u.id === row.createdById)) {
+    throw new ForbiddenError("No tienes acceso a esta tabla comparativa");
+  }
 
   const table = await hydrateComparisonTable({
     viewer,
@@ -968,30 +1034,20 @@ export async function listJointAgendas(
     },
   });
 
-  const summaries: JointAgendaSummaryDTO[] = [];
-  for (const row of rows) {
-    const visibleUsers = await filterVisibleStoredMembers(
-      viewer,
-      row.editionId,
-      row.members.map((m) => m.user),
-      db,
-    );
+  const resolvedRows = await resolveBatchVisibleMembers(viewer, rows, db);
 
-    summaries.push({
-      id: row.id,
-      name: row.name,
-      comparisonId: row.comparisonId,
-      createdById: row.createdById,
-      minRatingThreshold: row.minRatingThreshold,
-      edition: toEditionSummaryDTO(row.edition),
-      participants: visibleUsers.map(toGroupParticipantDTO),
-      itemsCount: row._count.items,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    });
-  }
-
-  return summaries;
+  return resolvedRows.map(({ row, visibleUsers }) => ({
+    id: row.id,
+    name: row.name,
+    comparisonId: row.comparisonId,
+    createdById: row.createdById,
+    minRatingThreshold: row.minRatingThreshold,
+    edition: toEditionSummaryDTO(row.edition),
+    participants: visibleUsers.map(toGroupParticipantDTO),
+    itemsCount: row._count.items,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
 }
 
 /**
@@ -1040,6 +1096,10 @@ export async function getJointAgenda(
     row.members.map((m) => m.user),
     db,
   );
+
+  if (viewer.id !== row.createdById && !visibleUsers.some((u) => u.id === row.createdById)) {
+    throw new ForbiddenError("No tienes acceso a esta agenda conjunta");
+  }
 
   const table = await hydrateComparisonTable({
     viewer,
@@ -1169,7 +1229,9 @@ export async function setJointAgendaEntry(
     db.jointAgenda.findUnique({
       where: { id: input.agendaId },
       include: {
-        members: { select: { userId: true } },
+        members: {
+          include: { user: { select: participantUserSelect } },
+        },
       },
     }),
     db.festivalEntry.findUnique({
@@ -1188,12 +1250,24 @@ export async function setJointAgendaEntry(
     throw new DomainError("La actuación seleccionada no pertenece a este festival");
   }
 
-  await resolveViewerAndEdition(
+  const { viewer } = await resolveViewerAndEdition(
     viewerId,
     agenda.editionId,
     { requireViewerSharesFestivals: false },
     db,
   );
+
+  if (viewer.id !== agenda.createdById) {
+    const visibleUsers = await filterVisibleStoredMembers(
+      viewer,
+      agenda.editionId,
+      agenda.members.map((m) => m.user),
+      db,
+    );
+    if (!visibleUsers.some((u) => u.id === agenda.createdById)) {
+      throw new ForbiddenError("No tienes acceso a esta agenda conjunta");
+    }
+  }
 
   await db.$transaction(async (tx) => {
     const existingItem = await tx.jointAgendaItem.findUnique({
@@ -1284,6 +1358,10 @@ export async function regenerateJointAgenda(
     row.members.map((m) => m.user),
     db,
   );
+
+  if (viewer.id !== row.createdById && !visibleUsers.some((u) => u.id === row.createdById)) {
+    throw new ForbiddenError("No tienes acceso a esta agenda conjunta");
+  }
 
   const nextThreshold = input.minRatingThreshold ?? row.minRatingThreshold;
 
