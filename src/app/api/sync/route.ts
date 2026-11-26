@@ -39,8 +39,11 @@ export async function POST(): Promise<NextResponse> {
   const queue = getSyncQueue();
   const enqueued = await retryFailedArtists(getDb(), queue);
 
-  return NextResponse.json({
-    enqueued,
-    queue: queue.getStatus(),
-  });
+  return NextResponse.json(
+    {
+      enqueued,
+      queue: queue.getStatus(),
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

@@ -227,7 +227,9 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
           </h2>
           <span
             className={`border px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.06em] ${
-              hasGeminiApiKey ? "border-acid/60 text-acid" : "border-line text-ink-muted"
+              hasGeminiApiKey
+                ? "border-acid bg-acid font-semibold text-acid-ink"
+                : "border-line text-ink-muted"
             }`}
           >
             {hasGeminiApiKey ? t.geminiActive : t.geminiMissing}

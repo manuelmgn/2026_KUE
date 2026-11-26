@@ -117,6 +117,8 @@ export function ArtistDrawer({
     try {
       const data = await getArtistDetailAction(artistId);
       setDetail(data);
+    } catch {
+      // Keep previous detail on transient fetch failure
     } finally {
       setLoadingDetail(false);
     }
@@ -147,6 +149,7 @@ export function ArtistDrawer({
           setDetail(data);
         }
       })
+      .catch(() => undefined)
       .finally(() => {
         if (!cancelled) {
           setLoadingDetail(false);

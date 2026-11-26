@@ -156,4 +156,44 @@ describe("lineup-source", () => {
     expect(result.entries).toHaveLength(1);
     expect(llmExtractor).toHaveBeenCalledTimes(1);
   });
+
+  it("decodes hex HTML entities safely and ignores out-of-range code points", () => {
+    const html = "<p>Sun O&#x27;Brien &amp; Co &#x26; &#99999999; &#x2014; Live</p>";
+    const text = htmlToCompactText(html);
+    expect(text).toContain("Sun O'Brien & Co &");
+    expect(text).toContain("— Live");
+  });
+
+  it("blocks SSRF redirects to private addresses and handles malformed Clashfinder JSON", async () => {
+    expect(() => validateLineupSourceUrl("http://[::ffff:127.0.0.1]/lineup")).toThrow();
+    expect(() => validateLineupSourceUrl("http://100.64.0.1/lineup")).toThrow();
+
+    const redirectedResponse = new Response("ok", {
+      status: 200,
+      headers: { "content-type": "text/plain" },
+    });
+    Object.defineProperty(redirectedResponse, "url", {
+      value: "http://127.0.0.1:5030/secret",
+    });
+
+    await expect(
+      fetchAndExtractFestivalLineup("https://example.com/lineup.txt", {
+        festivalName: "Test",
+        festivalYear: 2027,
+        fetchImpl: async () => redirectedResponse,
+      }),
+    ).rejects.toThrow("direcciones privadas o locales");
+
+    await expect(
+      fetchAndExtractFestivalLineup("https://clashfinder.com/s/testfest/", {
+        festivalName: "Test",
+        festivalYear: 2027,
+        fetchImpl: async () =>
+          new Response("{not-valid-json", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    ).rejects.toThrow("JSON inválido");
+  });
 });

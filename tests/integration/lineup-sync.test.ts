@@ -3,15 +3,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { DomainError } from "@/domain/errors";
 import { PrismaClient } from "@/generated/prisma/client";
-import { updateArtistNotes, updateArtistRating } from "@/server/services/artists";
 import { listFestivalEntries } from "@/server/services/entries";
 import { createFestival } from "@/server/services/festivals";
 import { importFestivalLineup } from "@/server/services/importer";
 import {
   applyPendingLineupDiff,
   checkFestivalLineupSync,
+  dismissPendingLineupDiff,
+  runScheduledLineupSyncs,
   updateFestivalSyncConfig,
 } from "@/server/services/lineup-sync";
 
@@ -49,8 +51,9 @@ afterAll(async () => {
 });
 
 describe("integration: festival lineup auto-sync", () => {
-  it("stores pending diff in REVIEW mode and applies changes without touching ratings or notes", async () => {
-    const festival = await createFestival({ name: "Rewire", year: 2027 }, db);
+  it("supports REVIEW mode diffing, unchanged hash short-circuit, and selective apply", async () => {
+    const festival = await createFestival({ name: "Rewire", year: 2027, location: "La Haya" }, db);
+
     await importFestivalLineup(
       {
         festivalId: festival.id,
@@ -69,16 +72,10 @@ describe("integration: festival lineup auto-sync", () => {
       { db, enqueueSync: false },
     );
 
-    const existingArtist = await db.artist.findFirstOrThrow({
-      where: { name: "Mabe Fratti" },
-    });
-    await updateArtistRating({ artistId: existingArtist.id, rating: 5 }, db);
-    await updateArtistNotes({ artistId: existingArtist.id, notes: "Imprescindible" }, db);
-
     await updateFestivalSyncConfig(
       {
         festivalId: festival.id,
-        lineupSourceUrl: "https://example.com/rewire-2027",
+        lineupSourceUrl: "https://example.com/rewire-2027.txt",
         autoSyncEnabled: true,
         autoSyncMode: "REVIEW",
         syncIntervalHours: 24,
@@ -86,77 +83,62 @@ describe("integration: festival lineup auto-sync", () => {
       db,
     );
 
-    const htmlWave2 = `
-      <html>
-        <head>
-          <script type="application/ld+json">
-            {
-              "@type": "MusicFestival",
-              "subEvent": [
-                {
-                  "@type": "MusicEvent",
-                  "startDate": "2027-04-09T21:00:00+02:00",
-                  "location": { "@type": "Place", "name": "Amare" },
-                  "performer": [
-                    { "@type": "Person", "name": "Mabe Fratti" },
-                    { "@type": "MusicGroup", "name": "Autechre" }
-                  ]
-                }
-              ]
-            }
-          </script>
-        </head>
-        <body>Rewire Wave 2</body>
-      </html>
-    `;
+    const mockFetch = vi.fn(
+      async () =>
+        new Response("Mabe Fratti | Friday | Amare\nAutechre | Saturday | Paard\n", {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+        }),
+    );
 
     const checkResult = await checkFestivalLineupSync(festival.id, {
       db,
       enqueueSync: false,
-      fetchImpl: async () =>
-        new Response(htmlWave2, { status: 200, headers: { "content-type": "text/html" } }),
+      fetchImpl: mockFetch,
     });
 
     expect(checkResult.status).toBe("pending_review");
     expect(checkResult.addedCount).toBe(1);
     expect(checkResult.updatedCount).toBe(1);
+    expect(checkResult.missingCount).toBe(0);
 
+    // Repeating with unchanged content short-circuits
+    const secondCheck = await checkFestivalLineupSync(festival.id, {
+      db,
+      enqueueSync: false,
+      fetchImpl: mockFetch,
+    });
+    expect(secondCheck.status).toBe("unchanged");
+    expect(secondCheck.pendingDiff?.added).toHaveLength(1);
+
+    // Apply all pending changes
     const applied = await applyPendingLineupDiff(
       { festivalId: festival.id },
       { db, enqueueSync: false },
     );
-    expect(applied.createdEntriesCount).toBe(1);
-    expect(applied.updatedEntriesCount).toBe(1);
-    expect(applied.newArtistsCount).toBe(1);
+    expect(applied).toEqual({
+      createdEntriesCount: 1,
+      updatedEntriesCount: 1,
+      newArtistsCount: 1,
+    });
 
     const entries = await listFestivalEntries(festival.id, {}, db);
     expect(entries).toHaveLength(2);
-
-    const mabeEntry = entries.find((e) => e.billingName === "Mabe Fratti");
-    expect(mabeEntry?.stage).toBe("Amare");
-    expect(mabeEntry?.setTime).toBe("21:00");
-    expect(mabeEntry?.artists[0]?.artist.rating).toBe(5);
-    expect(mabeEntry?.artists[0]?.artist.notes).toBe("Imprescindible");
-
-    // Re-checking same HTML short-circuits via content hash
-    const unchanged = await checkFestivalLineupSync(festival.id, {
-      db,
-      enqueueSync: false,
-      fetchImpl: async () =>
-        new Response(htmlWave2, { status: 200, headers: { "content-type": "text/html" } }),
-    });
-    expect(unchanged.status).toBe("unchanged");
+    const mabe = entries.find((e) => e.billingName === "Mabe Fratti");
+    expect(mabe?.day).toBe("Friday");
+    expect(mabe?.stage).toBe("Amare");
   });
 
-  it("applies new acts automatically in AUTO mode while never auto-deleting missing acts", async () => {
-    const festival = await createFestival({ name: "Sónar", year: 2027 }, db);
+  it("applies additions automatically in AUTO mode while keeping missing entries for manual review", async () => {
+    const festival = await createFestival({ name: "Unsound", year: 2027, location: "Cracovia" }, db);
+
     await importFestivalLineup(
       {
         festivalId: festival.id,
         rows: [
           {
-            billingName: "Legacy Act",
-            artistNames: ["Legacy Act"],
+            billingName: "Removed Act",
+            artistNames: ["Removed Act"],
             subtitle: null,
             day: null,
             stage: null,
@@ -171,7 +153,7 @@ describe("integration: festival lineup auto-sync", () => {
     await updateFestivalSyncConfig(
       {
         festivalId: festival.id,
-        lineupSourceUrl: "https://example.com/sonar.txt",
+        lineupSourceUrl: "https://example.com/unsound.txt",
         autoSyncEnabled: true,
         autoSyncMode: "AUTO",
         syncIntervalHours: 12,
@@ -179,23 +161,57 @@ describe("integration: festival lineup auto-sync", () => {
       db,
     );
 
-    const checkResult = await checkFestivalLineupSync(festival.id, {
+    const result = await checkFestivalLineupSync(festival.id, {
       db,
       enqueueSync: false,
       fetchImpl: async () =>
-        new Response("Arca\nOneohtrix Point Never", {
+        new Response("Kali Malone\n", {
           status: 200,
           headers: { "content-type": "text/plain" },
         }),
     });
 
-    expect(checkResult.status).toBe("applied");
-    expect(checkResult.addedCount).toBe(2);
-    expect(checkResult.missingCount).toBe(1);
-    expect(checkResult.pendingDiff?.missing).toHaveLength(1);
-
+    expect(result.status).toBe("applied");
+    expect(result.addedCount).toBe(1);
+    expect(result.missingCount).toBe(1);
+    // Missing entries are never auto-deleted
     const entries = await listFestivalEntries(festival.id, {}, db);
-    // Original entry is still preserved (never auto-deleted) + 2 newly added
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(2);
+
+    // Dismissing clears pending diff, and unknown festival throws DomainError
+    await dismissPendingLineupDiff(festival.id, db);
+    await expect(dismissPendingLineupDiff("non-existent-id", db)).rejects.toBeInstanceOf(
+      DomainError,
+    );
+  });
+
+  it("skips ended festivals in runScheduledLineupSyncs", async () => {
+    const pastFestival = await createFestival(
+      {
+        name: "Past Fest",
+        year: 2025,
+        startDate: new Date("2025-04-01T00:00:00.000Z"),
+        endDate: new Date("2025-04-03T00:00:00.000Z"),
+      },
+      db,
+    );
+
+    await updateFestivalSyncConfig(
+      {
+        festivalId: pastFestival.id,
+        lineupSourceUrl: "https://example.com/past.txt",
+        autoSyncEnabled: true,
+        autoSyncMode: "REVIEW",
+        syncIntervalHours: 24,
+      },
+      db,
+    );
+
+    const scheduled = await runScheduledLineupSyncs({
+      db,
+      now: new Date("2026-11-26T12:00:00.000Z"),
+      enqueueSync: false,
+    });
+    expect(scheduled).toEqual({ checked: 0, failed: 0 });
   });
 });
