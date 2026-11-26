@@ -1,11 +1,5 @@
-const CACHE_NAME = "kue-shell-v4";
-const SHELL_URLS = [
-  "/",
-  "/lineup",
-  "/festival-mode",
-  "/festivals",
-  "/manage",
-  "/settings",
+const CACHE_NAME = "kue-shell-v5";
+const STATIC_SHELL_URLS = [
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/apple-touch-icon.png",
@@ -15,7 +9,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_URLS))
+      .then((cache) => cache.addAll(STATIC_SHELL_URLS))
       .catch(() => undefined),
   );
   self.skipWaiting();
@@ -43,13 +37,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Never cache authentication or admin routes
+  if (
+    url.pathname === "/login" ||
+    url.pathname === "/register" ||
+    url.pathname.startsWith("/admin")
+  ) {
+    return;
+  }
+
   // Network-first for document navigations so fresh data loads when online,
   // falling back to the last cached response when offline inside a venue.
   if (request.mode === "navigate" || url.pathname.startsWith("/festival-mode")) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok && response.type === "basic") {
+          if (response.ok && response.type === "basic" && !response.redirected) {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
@@ -58,8 +61,8 @@ self.addEventListener("fetch", (event) => {
         .catch(async () => {
           const cached =
             (await caches.match(request)) ??
-            (await caches.match("/")) ??
-            (await caches.match("/festival-mode"));
+            (await caches.match("/festival-mode")) ??
+            (await caches.match("/"));
           return (
             cached ??
             new Response("KUE sin conexión. Abre la app con cobertura al menos una vez.", {
@@ -72,12 +75,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for static Next assets, icons, and local cached media
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname.startsWith("/api/media/")
-  ) {
+  // Cache-first for static Next assets and icons
+  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>

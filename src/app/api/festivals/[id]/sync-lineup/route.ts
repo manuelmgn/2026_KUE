@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { DomainError } from "@/domain/errors";
+import { getCurrentUser } from "@/server/auth/dal";
 import { checkFestivalLineupSync } from "@/server/services/lineup-sync";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const { id } = await context.params;
   if (!id) {
     return NextResponse.json(

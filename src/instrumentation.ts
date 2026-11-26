@@ -7,10 +7,13 @@ export async function register(): Promise<void> {
   }
 
   try {
-    const [{ recoverPendingArtists }, { startLineupSyncScheduler }] = await Promise.all([
-      import("@/server/sync/queue"),
-      import("@/server/sync/lineup-scheduler"),
-    ]);
+    const [{ recoverPendingArtists }, { startLineupSyncScheduler }, { ensureBootstrapAdmin }] =
+      await Promise.all([
+        import("@/server/sync/queue"),
+        import("@/server/sync/lineup-scheduler"),
+        import("@/server/services/users"),
+      ]);
+    await ensureBootstrapAdmin();
     await recoverPendingArtists();
     startLineupSyncScheduler();
   } catch {

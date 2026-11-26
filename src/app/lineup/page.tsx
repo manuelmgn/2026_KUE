@@ -5,8 +5,9 @@ import { TopBar } from "@/components/features/TopBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ratingFilterSchema, statusFilterSchema, viewModeSchema } from "@/domain/schemas";
 import { getServerDictionary } from "@/i18n/server";
+import { requirePageUser } from "@/server/auth/dal";
 import { listFestivalEntries } from "@/server/services/entries";
-import { listFestivals } from "@/server/services/festivals";
+import { getEditionBySlug, listUserEditions } from "@/server/services/festivals";
 import {
   resolveActiveFestival,
   toFestivalSummary,
@@ -27,10 +28,18 @@ interface LineupPageProps {
 }
 
 export default async function LineupPage({ searchParams }: LineupPageProps) {
-  const [params, { locale, dict }] = await Promise.all([searchParams, getServerDictionary()]);
-  const festivals = await listFestivals();
-  const festivalSummaries = festivals.map(toFestivalSummary);
-  const activeFestivalRaw = resolveActiveFestival(festivals, params.festival);
+  const user = await requirePageUser("/lineup");
+  const [params, { locale, dict }, myEditions] = await Promise.all([
+    searchParams,
+    getServerDictionary(),
+    listUserEditions(user.id),
+  ]);
+
+  const festivalSummaries = myEditions.map(toFestivalSummary);
+  let activeFestivalRaw = resolveActiveFestival(myEditions, params.festival);
+  if (!activeFestivalRaw && params.festival) {
+    activeFestivalRaw = await getEditionBySlug(params.festival);
+  }
   const activeFestival = activeFestivalRaw
     ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
     : null;
@@ -44,13 +53,17 @@ export default async function LineupPage({ searchParams }: LineupPageProps) {
   const initialView = parsedView.success ? parsedView.data : "grid";
 
   const entries = activeFestival
-    ? (await listFestivalEntries(activeFestival.id)).map(toLineupEntryDTO)
+    ? (await listFestivalEntries(user.id, activeFestival.id)).map(toLineupEntryDTO)
     : [];
 
   return (
     <div className="min-h-screen bg-bg text-ink">
       <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar festivals={festivalSummaries} activeFestivalSlug={activeFestival?.slug ?? null} />
+        <TopBar
+          festivals={festivalSummaries}
+          activeFestivalSlug={activeFestival?.slug ?? null}
+          currentUser={user}
+        />
       </Suspense>
 
       {activeFestival ? (

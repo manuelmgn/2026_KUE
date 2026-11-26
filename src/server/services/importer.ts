@@ -20,12 +20,12 @@ export async function importFestivalLineup(
   const db = options.db ?? getDb();
   const shouldEnqueue = options.enqueueSync ?? true;
 
-  const festival = await db.festival.findUnique({
+  const edition = await db.festivalEdition.findUnique({
     where: { id: input.festivalId },
     select: { id: true },
   });
-  if (!festival) {
-    throw new DomainError("Festival no encontrado");
+  if (!edition) {
+    throw new DomainError("Edición de festival no encontrada");
   }
 
   const includedRows = input.rows.filter((row) => row.included);
@@ -38,7 +38,6 @@ export async function importFestivalLineup(
     };
   }
 
-  // Collect all unique normalized names up front so we can batch-fetch existing artists in one query.
   const allNormalized = new Set<string>();
   for (const row of includedRows) {
     for (const rawName of row.artistNames) {
@@ -50,16 +49,24 @@ export async function importFestivalLineup(
   }
 
   const txResult = await db.$transaction(async (tx) => {
-    const [existingMax, existingArtists] = await Promise.all([
+    const [existingMax, existingEntries, existingArtists] = await Promise.all([
       tx.festivalEntry.aggregate({
-        where: { festivalId: input.festivalId },
+        where: { editionId: input.festivalId },
         _max: { sortOrder: true },
+      }),
+      tx.festivalEntry.findMany({
+        where: { editionId: input.festivalId },
+        select: { billingName: true },
       }),
       tx.artist.findMany({
         where: { normalizedName: { in: Array.from(allNormalized) } },
         select: { id: true, normalizedName: true },
       }),
     ]);
+
+    const existingBillings = new Set(
+      existingEntries.map((entry) => normalizeArtistName(entry.billingName)),
+    );
 
     let nextSortOrder = (existingMax._max.sortOrder ?? -1) + 1;
     const artistCache = new Map<string, string>(
@@ -70,6 +77,11 @@ export async function importFestivalLineup(
     let createdEntriesCount = 0;
 
     for (const row of includedRows) {
+      const normalizedBilling = normalizeArtistName(row.billingName);
+      if (normalizedBilling && existingBillings.has(normalizedBilling)) {
+        continue;
+      }
+
       const resolvedArtistIds: string[] = [];
       const seenInEntry = new Set<string>();
 
@@ -105,7 +117,7 @@ export async function importFestivalLineup(
 
       await tx.festivalEntry.create({
         data: {
-          festivalId: input.festivalId,
+          editionId: input.festivalId,
           billingName: row.billingName,
           subtitle: row.subtitle,
           day: row.day,
@@ -121,6 +133,9 @@ export async function importFestivalLineup(
         },
       });
 
+      if (normalizedBilling) {
+        existingBillings.add(normalizedBilling);
+      }
       nextSortOrder += 1;
       createdEntriesCount += 1;
       linkedArtistsCount += resolvedArtistIds.length;

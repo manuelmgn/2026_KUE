@@ -13,6 +13,7 @@ import type {
   UpdateArtistStatusInput,
 } from "@/domain/schemas";
 import { getServerDictionary } from "@/i18n/server";
+import { requireActionUser } from "@/server/auth/dal";
 import {
   disambiguateArtist,
   getArtistDetail,
@@ -24,7 +25,8 @@ import {
 } from "@/server/services/artists";
 
 export async function getArtistDetailAction(artistId: string) {
-  return getArtistDetail(artistId);
+  const user = await requireActionUser();
+  return getArtistDetail(user.id, artistId);
 }
 
 export async function setArtistRatingAction(
@@ -32,7 +34,8 @@ export async function setArtistRatingAction(
 ): Promise<ActionResult<{ id: string; rating: number | null; status: ArtistStatus }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const updated = await updateArtistRating(input);
+    const user = await requireActionUser();
+    const updated = await updateArtistRating(user.id, input);
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
@@ -45,7 +48,8 @@ export async function setArtistStatusAction(
 ): Promise<ActionResult<{ id: string; status: ArtistStatus }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const updated = await updateArtistStatus(input);
+    const user = await requireActionUser();
+    const updated = await updateArtistStatus(user.id, input);
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
@@ -58,7 +62,8 @@ export async function saveArtistNotesAction(
 ): Promise<ActionResult<{ id: string; notes: string }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const updated = await updateArtistNotes(input);
+    const user = await requireActionUser();
+    const updated = await updateArtistNotes(user.id, input);
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");
@@ -71,7 +76,8 @@ export async function toggleAlbumPinAction(
 ): Promise<ActionResult<{ id: string; isPinned: boolean }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const updated = await updateAlbumPin(input);
+    const user = await requireActionUser();
+    const updated = await updateAlbumPin(user.id, input);
     revalidatePath("/");
     revalidatePath("/lineup");
     return { id: updated.id, isPinned: updated.isPinned };
@@ -83,7 +89,8 @@ export async function saveAlbumCustomUrlAction(
 ): Promise<ActionResult<{ id: string; customUrl: string | null }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const updated = await updateAlbumCustomUrl(input);
+    const user = await requireActionUser();
+    const updated = await updateAlbumCustomUrl(user.id, input);
     revalidatePath("/");
     revalidatePath("/lineup");
     return { id: updated.id, customUrl: updated.customUrl };
@@ -97,6 +104,7 @@ export async function disambiguateArtistAction(
 > {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
+    await requireActionUser();
     const updated = await disambiguateArtist(input);
     revalidatePath("/");
     revalidatePath("/lineup");

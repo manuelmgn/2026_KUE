@@ -1,4 +1,4 @@
-import type { Album, Artist, PrismaClient } from "@/generated/prisma/client";
+import type { Artist, PrismaClient } from "@/generated/prisma/client";
 import { searchDeezerAlbumCover, searchDeezerArtistPhoto } from "@/server/clients/deezer";
 import {
   fetchMusicBrainzReleaseGroups,
@@ -36,10 +36,6 @@ async function saveImage(
   });
 }
 
-/**
- * Finds the MusicBrainz identity for an artist without an MBID. Never steals an MBID that
- * another artist in the archive already owns (the unique constraint would reject it anyway).
- */
 async function resolveIdentity(
   ctx: SyncContext,
   artist: Artist,
@@ -68,7 +64,7 @@ async function isIdentityUnchanged(ctx: SyncContext, artistId: string, mbid: str
 
 /**
  * Upserts the fresh discography, downloads missing covers, and prunes stale releases that are
- * no longer part of the artist's shelf — unless the user pinned them or attached a custom URL.
+ * no longer part of the artist's shelf — unless any user pinned them or attached a custom URL.
  */
 async function syncAlbums(
   ctx: SyncContext,
@@ -76,11 +72,22 @@ async function syncAlbums(
   releaseGroups: ReadonlyArray<NormalizedReleaseGroup>,
 ): Promise<void> {
   const freshMbids = new Set(releaseGroups.map((rg) => rg.mbid));
-  const existing = await ctx.db.album.findMany({ where: { artistId: artist.id } });
+  const existing = await ctx.db.album.findMany({
+    where: { artistId: artist.id },
+    include: {
+      userStates: {
+        where: {
+          OR: [{ isPinned: true }, { customUrl: { not: null } }],
+        },
+        select: { userId: true },
+        take: 1,
+      },
+    },
+  });
 
   const stale = existing.filter(
-    (album: Album) =>
-      (album.mbid === null || !freshMbids.has(album.mbid)) && !album.isPinned && !album.customUrl,
+    (album) =>
+      (album.mbid === null || !freshMbids.has(album.mbid)) && album.userStates.length === 0,
   );
   if (stale.length > 0) {
     await ctx.db.album.deleteMany({ where: { id: { in: stale.map((album) => album.id) } } });
@@ -107,13 +114,6 @@ async function syncAlbums(
   }
 }
 
-/**
- * Enriches one artist: MusicBrainz identity + discography, Deezer photo/covers (cached in
- * MEDIA_DIR) and a short Wikipedia bio. MusicBrainz pacing is enforced by its client.
- *
- * If the artist's MBID changes concurrently (manual disambiguation while this job runs), the
- * job stops without writing stale data; the disambiguation re-queues a fresh run.
- */
 export async function syncArtist(artistId: string, options: SyncArtistOptions = {}): Promise<void> {
   const ctx: SyncContext = { db: options.db ?? getDb(), mediaDir: options.mediaDir };
 
@@ -130,7 +130,6 @@ export async function syncArtist(artistId: string, options: SyncArtistOptions = 
   try {
     const identity = await resolveIdentity(ctx, artist);
     if (identity.mbid !== artist.mbid || identity.country !== artist.country) {
-      // Conditional write: only if nobody changed the MBID since we read it.
       const { count } = await ctx.db.artist.updateMany({
         where: { id: artistId, mbid: artist.mbid },
         data: { mbid: identity.mbid, country: identity.country },

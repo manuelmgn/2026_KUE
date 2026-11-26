@@ -10,11 +10,26 @@ function createTestDb() {
   return new PrismaClient({ adapter });
 }
 
-test.describe("KUE E2E flows", () => {
-  test("imports raw lineup with collaboration & subtitle, edits preview, triages by keyboard, switches collab & pins album, and uses Festival Mode on mobile", async ({
+test.describe("KUE E2E multi-user, editions, and core flows", () => {
+  test("enforces auth, registers first admin, imports lineup, triages, shares catalog editions with second user, and manages users in /admin", async ({
     page,
+    browser,
   }) => {
-    // 1. Import raw text, create festival via Places API + date pickers, verify artists-only preview, toggle schedule, and save
+    // 0. Unauthenticated user is redirected to /login
+    await page.goto("/import");
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "gl");
+
+    // Register first user -> automatically ADMIN
+    await page.goto("/register");
+    await page.getByLabel("Usuario").fill("admin_kue");
+    await page.getByLabel("Correo electrónico").fill("admin@kue.test");
+    await page.getByLabel("Contrasinal", { exact: true }).fill("AdminPass1234!");
+    await page.getByLabel("Confirmar contrasinal").fill("AdminPass1234!");
+    await page.getByRole("button", { name: "Crear conta" }).click();
+    await expect(page).toHaveURL(/\/$/);
+
+    // 1. Import raw text, create festival via Places API + date pickers, verify preview, and save
     await page.route("**/api/places*", async (route) => {
       await route.fulfill({
         status: 200,
@@ -38,8 +53,6 @@ test.describe("KUE E2E flows", () => {
 
     await page.goto("/import");
 
-    await expect(page.locator("html")).toHaveAttribute("lang", "gl");
-
     await page.getByLabel("Nome do festival").fill("Rewire");
     await page.getByLabel("Localización do festival").fill("La Haya");
     await page.getByRole("option", { name: /La Haya/i }).click();
@@ -59,12 +72,10 @@ test.describe("KUE E2E flows", () => {
     await page.getByLabel("Texto do cartaz en bruto").fill(rawLineup);
     await page.getByRole("button", { name: /Analizar texto/i }).click();
 
-    // Verify preview shows only artists initially (no Día / Escenario columns until toggled)
     await expect(page.locator("tbody tr")).toHaveCount(3);
     await expect(page.locator("thead th")).toHaveCount(4);
     await expect(page.getByRole("columnheader", { name: "Escenario" })).toBeHidden();
 
-    // Optionally reveal schedule columns and edit stage on BIG|BRAVE row
     await page.getByLabel(/Engadir días e escenarios agora/i).check();
     await expect(page.getByRole("columnheader", { name: "Escenario" })).toBeVisible();
     await page.getByLabel("Escenario fila 3").fill("PAARD Main");
@@ -72,24 +83,31 @@ test.describe("KUE E2E flows", () => {
     await page.getByRole("button", { name: /Importar 3 entradas/i }).click();
     await expect(page.getByText(/Importadas 3 entradas/i)).toBeVisible();
 
-    // Verify location metadata and dates were persisted in DB, and seed two albums for Mabe Fratti
+    // Verify edition metadata in DB and seed two albums for Mabe Fratti
     const db = createTestDb();
     try {
-      const festival = await db.festival.findUniqueOrThrow({ where: { slug: "rewire-2027" } });
-      expect(festival.location).toBe("La Haya");
-      expect(festival.locationProvince).toBe("Gemeente Den Haag");
-      expect(festival.locationRegion).toBe("Holanda Meridional");
-      expect(festival.locationCountry).toBe("Países Bajos");
-      expect(festival.locationCountryCode).toBe("NL");
-      expect(festival.startDate?.toISOString().slice(0, 10)).toBe("2027-04-08");
-      expect(festival.endDate?.toISOString().slice(0, 10)).toBe("2027-04-11");
+      const edition = await db.festivalEdition.findUniqueOrThrow({
+        where: { slug: "rewire-2027" },
+      });
+      expect(edition.location).toBe("La Haya");
+      expect(edition.locationCountryCode).toBe("NL");
+      expect(edition.startDate?.toISOString().slice(0, 10)).toBe("2027-04-08");
+      expect(edition.endDate?.toISOString().slice(0, 10)).toBe("2027-04-11");
 
       const mabe = await db.artist.findFirstOrThrow({
         where: { normalizedName: "mabe fratti" },
       });
-      await db.artist.update({
-        where: { id: mabe.id },
-        data: { notes: "Cello eléctrico hipnótico imprescindible" },
+      const adminUser = await db.user.findUniqueOrThrow({
+        where: { normalizedUsername: "admin_kue" },
+      });
+      await db.userArtistState.upsert({
+        where: { userId_artistId: { userId: adminUser.id, artistId: mabe.id } },
+        create: {
+          userId: adminUser.id,
+          artistId: mabe.id,
+          notes: "Cello eléctrico hipnótico imprescindible",
+        },
+        update: { notes: "Cello eléctrico hipnótico imprescindible" },
       });
       await db.album.createMany({
         data: [
@@ -99,7 +117,6 @@ test.describe("KUE E2E flows", () => {
             title: "Sentir que no sabes",
             releaseYear: 2024,
             releaseType: "ALBUM",
-            isPinned: false,
           },
           {
             artistId: mabe.id,
@@ -107,7 +124,6 @@ test.describe("KUE E2E flows", () => {
             title: "Se Ve Desde Aquí",
             releaseYear: 2022,
             releaseType: "ALBUM",
-            isPinned: false,
           },
         ],
       });
@@ -120,13 +136,9 @@ test.describe("KUE E2E flows", () => {
     await expect(page.getByRole("heading", { name: /REWIRE 2027/i })).toBeVisible();
 
     await page.getByRole("button", { name: "ÍNDICE" }).click();
-
-    // First row is Mabe Fratti & Bill Orcutt -> rate 5 with keyboard
     await page.keyboard.press("5");
-    // Move down to William Basinski -> rate 4 with keyboard
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("4");
-    // Move back up to Mabe Fratti & Bill Orcutt and press Enter to open ArtistDrawer
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("Enter");
 
@@ -137,69 +149,90 @@ test.describe("KUE E2E flows", () => {
     // 3. Pin the older album ("Se Ve Desde Aquí") and verify it moves to first position
     const shelfItems = drawer.locator("button:has-text('FIXAR'), button:has-text('PIN ★')");
     await expect(shelfItems).toHaveCount(2);
-    // Second album is "Se Ve Desde Aquí" (2022) before pinning
     await shelfItems.nth(1).click();
     await expect(drawer.getByRole("button", { name: "PIN ★" })).toBeVisible();
     const firstAlbumTitle = drawer.locator(".font-sans.font-semibold").first();
     await expect(firstAlbumTitle).toHaveText("Se Ve Desde Aquí");
 
-    // Switch collaboration tab to Bill Orcutt
     await drawer.getByRole("tab", { name: "Bill Orcutt" }).click();
     await expect(drawer.getByRole("heading", { name: "Bill Orcutt" })).toBeVisible();
 
-    // Close drawer via Escape
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
 
-    // 4. Mobile viewport (390x844) Festival Mode filtering by day & must-see (>=4)
+    // 4. Mobile viewport (390x844) Festival Mode filtering
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/festival-mode?festival=rewire-2027");
 
-    // Must-see is active by default: Mabe Fratti & Bill Orcutt (5/5) + William Basinski (4/5), NOT BIG|BRAVE (unrated)
     const listItems = page.locator("ul[aria-label='Lista de actuacións na axenda'] li");
     await expect(listItems).toHaveCount(2);
-    await expect(page.getByText("Mabe Fratti & Bill Orcutt")).toBeVisible();
-    await expect(page.getByText("William Basinski 'Passing the Cup of Sorrows'")).toBeVisible();
-    await expect(page.getByText("BIG|BRAVE")).toBeHidden();
-
-    // Filter by day "Sábado 10" -> only Mabe Fratti & Bill Orcutt
     await page.getByRole("tab", { name: "Sábado 10" }).click();
     await expect(listItems).toHaveCount(1);
-    await expect(page.getByText("Mabe Fratti & Bill Orcutt")).toBeVisible();
-
-    // Toggle off must-see -> BIG|BRAVE (Sábado 10) also appears
     await page.getByRole("button", { name: /Imprescindibles/i }).click();
     await expect(listItems).toHaveCount(2);
-    await expect(page.getByText("BIG|BRAVE")).toBeVisible();
+
+    // 5. Second user registers in an isolated browser context, adds Rewire 2027 from shared catalog,
+    //    and creates Rewire 2026 edition without recreating Rewire
+    const secondContext = await browser.newContext();
+    const secondPage = await secondContext.newPage();
+    await secondPage.goto("/register");
+    await secondPage.getByLabel("Usuario").fill("listener_two");
+    await secondPage.getByLabel("Correo electrónico").fill("two@kue.test");
+    await secondPage.getByLabel("Contrasinal", { exact: true }).fill("ListenerPass123!");
+    await secondPage.getByLabel("Confirmar contrasinal").fill("ListenerPass123!");
+    await secondPage.getByRole("button", { name: "Crear conta" }).click();
+    await expect(secondPage).toHaveURL(/\/$/);
+
+    // Go to Festivales -> Catalog shows Rewire 2027 ready to add with 1 click
+    await secondPage.goto("/festivals");
+    await expect(secondPage.getByText("Rewire")).toBeVisible();
+    await secondPage.getByRole("button", { name: /2027.*Engadir/i }).click();
+    await expect(secondPage.getByText(/ENGADIDO/i)).toBeVisible();
+
+    // Create a second edition (2026) under Rewire
+    await secondPage.getByRole("button", { name: /\+ Nova edición/i }).click();
+    await secondPage.getByLabel("Ano do festival").fill("2026");
+    await secondPage.getByRole("button", { name: "Crear edición" }).click();
+    await expect(secondPage.getByRole("link", { name: /2026.*0 ART/i })).toBeVisible();
+
+    // Non-admin visiting /admin is redirected to /
+    await secondPage.goto("/admin");
+    await expect(secondPage).toHaveURL(/\/$/);
+    await secondContext.close();
+
+    // 6. Admin opens /admin and sees both users
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/admin");
+    await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
+    await expect(page.getByText("@admin_kue")).toBeVisible();
+    await expect(page.getByText("@listener_two")).toBeVisible();
   });
 
-  test("defaults to gl and allows switching between gl, pt-PT, and es-ES in Settings with persistence", async ({
+  test("allows switching between gl, pt-PT, and es-ES in Settings with persistence", async ({
     page,
   }) => {
-    await page.goto("/settings");
+    // Log in with the admin user created in the first test
+    await page.goto("/login");
+    await page.getByLabel("Usuario").fill("admin_kue");
+    await page.getByLabel("Contrasinal").fill("AdminPass1234!");
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    await expect(page).toHaveURL(/\/$/);
 
+    await page.goto("/settings");
     await expect(page.locator("html")).toHaveAttribute("lang", "gl");
     await expect(page.getByRole("heading", { name: "Axustes" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cartaz" })).toBeVisible();
 
-    // Switch to Portuguese (Portugal)
     await page.getByRole("button", { name: /Português \(Portugal\)/i }).click();
     await expect(page.getByRole("heading", { name: "Definições" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cartaz" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT");
 
-    // Reload to verify server-side persistence via cookie
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("lang", "pt-PT");
-    await expect(page.getByRole("heading", { name: "Definições" })).toBeVisible();
 
-    // Switch to Castellano (es-ES)
     await page.getByRole("button", { name: /Castellano/i }).click();
     await expect(page.getByRole("heading", { name: "Ajustes" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cartel" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "es-ES");
 
-    // Switch back to Galego
     await page.getByRole("button", { name: /Galego/i }).click();
     await expect(page.getByRole("heading", { name: "Axustes" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "gl");

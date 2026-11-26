@@ -8,3 +8,17 @@ export class DomainError extends Error {
     this.name = "DomainError";
   }
 }
+
+export class UnauthorizedError extends DomainError {
+  constructor(message = "Debes iniciar sesión para realizar esta acción") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends DomainError {
+  constructor(message = "No tienes permisos para realizar esta acción") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}

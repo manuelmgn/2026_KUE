@@ -5,7 +5,8 @@ import { BottomNav } from "@/components/features/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/features/ServiceWorkerRegistrar";
 import { I18nProvider } from "@/i18n/context";
 import { getServerDictionary } from "@/i18n/server";
-import { listFestivals } from "@/server/services/festivals";
+import { getCurrentUser } from "@/server/auth/dal";
+import { listUserEditions } from "@/server/services/festivals";
 import { toFestivalSummary } from "@/server/services/mappers";
 import "./globals.css";
 
@@ -75,12 +76,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  const [{ locale }, festivalSummaries] = await Promise.all([
-    getServerDictionary(),
-    listFestivals()
-      .then((rows) => rows.map(toFestivalSummary))
-      .catch(() => []),
-  ]);
+  const [{ locale }, currentUser] = await Promise.all([getServerDictionary(), getCurrentUser()]);
+  const festivalSummaries = currentUser
+    ? await listUserEditions(currentUser.id)
+        .then((rows) => rows.map(toFestivalSummary))
+        .catch(() => [])
+    : [];
 
   return (
     <html
@@ -97,9 +98,11 @@ export default async function RootLayout({
         <I18nProvider initialLocale={locale}>
           <ServiceWorkerRegistrar />
           {children}
-          <Suspense fallback={null}>
-            <BottomNav festivals={festivalSummaries} />
-          </Suspense>
+          {currentUser ? (
+            <Suspense fallback={null}>
+              <BottomNav festivals={festivalSummaries} />
+            </Suspense>
+          ) : null}
         </I18nProvider>
       </body>
     </html>

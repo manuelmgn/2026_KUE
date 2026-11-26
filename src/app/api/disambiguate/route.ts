@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerDictionary } from "@/i18n/server";
+import { getCurrentUser } from "@/server/auth/dal";
 import { ExternalApiError, searchMusicBrainzArtists } from "@/server/clients/musicbrainz";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,11 @@ export const dynamic = "force-dynamic";
 const MAX_QUERY_LENGTH = 200;
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { dict } = await getServerDictionary();
   const url = new URL(request.url);
   const query = url.searchParams.get("q")?.trim() ?? "";

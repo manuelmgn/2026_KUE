@@ -1,38 +1,35 @@
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
-import type { Festival } from "@/generated/prisma/client";
 import { getPlacesApiLanguage, type Locale } from "@/i18n/config";
 import { getLocalizedPlaceName } from "@/server/clients/places";
 import type { listFestivalEntries } from "@/server/services/entries";
+import type { EditionWithFestival } from "@/server/services/festivals";
 
-export function toFestivalSummary(festival: Festival): FestivalSummary {
+export function toFestivalSummary(edition: EditionWithFestival): FestivalSummary {
   return {
-    id: festival.id,
-    slug: festival.slug,
-    name: festival.name,
-    year: festival.year,
-    location: festival.location,
+    id: edition.id,
+    festivalId: edition.festival.id,
+    slug: edition.slug,
+    name: edition.festival.name,
+    year: edition.year,
+    location: edition.location,
   };
 }
 
 export async function toLocalizedFestivalSummary(
-  festival: Festival,
+  edition: EditionWithFestival,
   locale: Locale,
 ): Promise<FestivalSummary> {
   const localizedLocation = await getLocalizedPlaceName(
-    festival.locationPlaceId,
+    edition.locationPlaceId,
     getPlacesApiLanguage(locale),
-    festival.location,
+    edition.location,
   );
   return {
-    ...toFestivalSummary(festival),
+    ...toFestivalSummary(edition),
     location: localizedLocation,
   };
 }
 
-/**
- * Picks the requested festival by slug from an already-fetched list, falling back to the
- * first (most recent) festival. Avoids redundant DB roundtrips on every page render.
- */
 export function resolveActiveFestival<T extends { slug: string }>(
   festivals: ReadonlyArray<T>,
   requestedSlug?: string,
@@ -51,7 +48,7 @@ type RawLineupEntry = Awaited<ReturnType<typeof listFestivalEntries>>[number];
 export function toLineupEntryDTO(entry: RawLineupEntry): LineupEntryDTO {
   return {
     id: entry.id,
-    festivalId: entry.festivalId,
+    festivalId: entry.editionId,
     billingName: entry.billingName,
     subtitle: entry.subtitle,
     day: entry.day,

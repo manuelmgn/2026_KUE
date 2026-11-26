@@ -19,6 +19,7 @@ import {
 
 let tempDir = "";
 let db: PrismaClient;
+let testUserId = "";
 
 beforeAll(() => {
   tempDir = mkdtempSync(path.join(os.tmpdir(), "kue-sync-int-db-"));
@@ -36,11 +37,30 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
+  await db.session.deleteMany();
+  await db.userEntryState.deleteMany();
+  await db.userAlbumState.deleteMany();
+  await db.userArtistState.deleteMany();
+  await db.userFestivalEdition.deleteMany();
   await db.festivalEntryArtist.deleteMany();
   await db.festivalEntry.deleteMany();
   await db.album.deleteMany();
   await db.artist.deleteMany();
+  await db.festivalEdition.deleteMany();
   await db.festival.deleteMany();
+  await db.user.deleteMany();
+
+  const user = await db.user.create({
+    data: {
+      username: "synctester",
+      normalizedUsername: "synctester",
+      email: "synctester@example.com",
+      normalizedEmail: "synctester@example.com",
+      passwordHash: "scrypt$16384$8$1$00$00",
+      role: "ADMIN",
+    },
+  });
+  testUserId = user.id;
 });
 
 afterAll(async () => {
@@ -52,7 +72,11 @@ afterAll(async () => {
 
 describe("integration: festival lineup auto-sync", () => {
   it("supports REVIEW mode diffing, unchanged hash short-circuit, and selective apply", async () => {
-    const festival = await createFestival({ name: "Rewire", year: 2027, location: "La Haya" }, db);
+    const festival = await createFestival(
+      { name: "Rewire", year: 2027, location: "La Haya" },
+      testUserId,
+      db,
+    );
 
     await importFestivalLineup(
       {
@@ -102,7 +126,6 @@ describe("integration: festival lineup auto-sync", () => {
     expect(checkResult.updatedCount).toBe(1);
     expect(checkResult.missingCount).toBe(0);
 
-    // Repeating with unchanged content short-circuits
     const secondCheck = await checkFestivalLineupSync(festival.id, {
       db,
       enqueueSync: false,
@@ -111,7 +134,6 @@ describe("integration: festival lineup auto-sync", () => {
     expect(secondCheck.status).toBe("unchanged");
     expect(secondCheck.pendingDiff?.added).toHaveLength(1);
 
-    // Apply all pending changes
     const applied = await applyPendingLineupDiff(
       { festivalId: festival.id },
       { db, enqueueSync: false },
@@ -122,7 +144,7 @@ describe("integration: festival lineup auto-sync", () => {
       newArtistsCount: 1,
     });
 
-    const entries = await listFestivalEntries(festival.id, {}, db);
+    const entries = await listFestivalEntries(testUserId, festival.id, {}, db);
     expect(entries).toHaveLength(2);
     const mabe = entries.find((e) => e.billingName === "Mabe Fratti");
     expect(mabe?.day).toBe("Friday");
@@ -132,6 +154,7 @@ describe("integration: festival lineup auto-sync", () => {
   it("applies additions automatically in AUTO mode while keeping missing entries for manual review", async () => {
     const festival = await createFestival(
       { name: "Unsound", year: 2027, location: "Cracovia" },
+      testUserId,
       db,
     );
 
@@ -177,11 +200,9 @@ describe("integration: festival lineup auto-sync", () => {
     expect(result.status).toBe("applied");
     expect(result.addedCount).toBe(1);
     expect(result.missingCount).toBe(1);
-    // Missing entries are never auto-deleted
-    const entries = await listFestivalEntries(festival.id, {}, db);
+    const entries = await listFestivalEntries(testUserId, festival.id, {}, db);
     expect(entries).toHaveLength(2);
 
-    // Dismissing clears pending diff, and unknown festival throws DomainError
     await dismissPendingLineupDiff(festival.id, db);
     await expect(dismissPendingLineupDiff("non-existent-id", db)).rejects.toBeInstanceOf(
       DomainError,
@@ -196,6 +217,7 @@ describe("integration: festival lineup auto-sync", () => {
         startDate: new Date("2025-04-01T00:00:00.000Z"),
         endDate: new Date("2025-04-03T00:00:00.000Z"),
       },
+      testUserId,
       db,
     );
 
@@ -227,6 +249,7 @@ describe("integration: festival lineup auto-sync", () => {
         autoSyncEnabled: false,
         syncIntervalHours: 24,
       },
+      testUserId,
       db,
     );
 
@@ -247,7 +270,7 @@ describe("integration: festival lineup auto-sync", () => {
     expect(checkResult.status).toBe("applied");
     expect(checkResult.addedCount).toBe(2);
 
-    const entries = await listFestivalEntries(festival.id, {}, db);
+    const entries = await listFestivalEntries(testUserId, festival.id, {}, db);
     expect(entries).toHaveLength(2);
   });
 });

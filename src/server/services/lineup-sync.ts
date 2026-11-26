@@ -85,17 +85,17 @@ export async function updateFestivalSyncConfig(
     throw new DomainError("Indica una URL del cartel para activar la actualización automática");
   }
 
-  const current = await db.festival.findUnique({
+  const current = await db.festivalEdition.findUnique({
     where: { id: input.festivalId },
     select: { id: true, lineupSourceUrl: true },
   });
   if (!current) {
-    throw new DomainError("Festival no encontrado");
+    throw new DomainError("Edición de festival no encontrada");
   }
 
   const urlChanged = current.lineupSourceUrl !== cleanedUrl;
 
-  return db.festival.update({
+  return db.festivalEdition.update({
     where: { id: input.festivalId },
     data: {
       lineupSourceUrl: cleanedUrl,
@@ -114,7 +114,7 @@ export async function updateFestivalSyncConfig(
 }
 
 async function applyDiffChanges(
-  festivalId: string,
+  editionId: string,
   diff: Pick<PendingLineupDiff, "added" | "updated">,
   options: {
     db?: PrismaClient | undefined;
@@ -138,7 +138,7 @@ async function applyDiffChanges(
 
     const importResult = await importFestivalLineup(
       {
-        festivalId,
+        festivalId: editionId,
         rows: diff.added.map((row) => ({
           billingName: row.billingName,
           artistNames: row.artistNames,
@@ -175,7 +175,7 @@ async function applyDiffChanges(
         }
 
         const updated = await tx.festivalEntry.updateMany({
-          where: { id: item.entryId, festivalId },
+          where: { id: item.entryId, editionId },
           data,
         });
         if (updated.count > 0) {
@@ -193,10 +193,9 @@ async function applyDiffChanges(
 }
 
 export async function checkFestivalLineupSync(
-  festivalId: string,
+  editionId: string,
   options: {
     force?: boolean | undefined;
-    /** When true, applies detected additions/updates immediately regardless of `autoSyncMode` (used on initial creation). */
     applyDirectly?: boolean | undefined;
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
@@ -208,22 +207,22 @@ export async function checkFestivalLineupSync(
   } = {},
 ): Promise<CheckFestivalLineupResult> {
   const inFlight = getInFlightLineupSyncs();
-  const existingPromise = inFlight.get(festivalId);
+  const existingPromise = inFlight.get(editionId);
   if (existingPromise) {
     return existingPromise;
   }
 
-  const runPromise = runCheckFestivalLineupSync(festivalId, options).finally(() => {
-    if (inFlight.get(festivalId) === runPromise) {
-      inFlight.delete(festivalId);
+  const runPromise = runCheckFestivalLineupSync(editionId, options).finally(() => {
+    if (inFlight.get(editionId) === runPromise) {
+      inFlight.delete(editionId);
     }
   });
-  inFlight.set(festivalId, runPromise);
+  inFlight.set(editionId, runPromise);
   return runPromise;
 }
 
 async function runCheckFestivalLineupSync(
-  festivalId: string,
+  editionId: string,
   options: {
     force?: boolean | undefined;
     applyDirectly?: boolean | undefined;
@@ -237,9 +236,10 @@ async function runCheckFestivalLineupSync(
   },
 ): Promise<CheckFestivalLineupResult> {
   const db = options.db ?? getDb();
-  const festival = await db.festival.findUnique({
-    where: { id: festivalId },
+  const edition = await db.festivalEdition.findUnique({
+    where: { id: editionId },
     include: {
+      festival: { select: { name: true } },
       entries: {
         orderBy: [{ sortOrder: "asc" }],
         include: {
@@ -256,11 +256,11 @@ async function runCheckFestivalLineupSync(
     },
   });
 
-  if (!festival) {
-    throw new DomainError("Festival no encontrado");
+  if (!edition) {
+    throw new DomainError("Edición de festival no encontrada");
   }
 
-  if (!festival.lineupSourceUrl) {
+  if (!edition.lineupSourceUrl) {
     throw new DomainError("Este festival no tiene configurada una URL de cartel");
   }
 
@@ -279,10 +279,10 @@ async function runCheckFestivalLineupSync(
   const now = new Date();
 
   try {
-    const fetched = await fetchAndExtractFestivalLineup(festival.lineupSourceUrl, {
-      festivalName: festival.name,
-      festivalYear: festival.year,
-      previousContentHash: festival.lastLineupContentHash,
+    const fetched = await fetchAndExtractFestivalLineup(edition.lineupSourceUrl, {
+      festivalName: edition.festival.name,
+      festivalYear: edition.year,
+      previousContentHash: edition.lastLineupContentHash,
       ...(options.force !== undefined ? { force: options.force } : {}),
       ...(envGeminiApiKey !== undefined ? { geminiApiKey: envGeminiApiKey } : {}),
       ...(envGeminiModel !== undefined ? { geminiModel: envGeminiModel } : {}),
@@ -291,8 +291,8 @@ async function runCheckFestivalLineupSync(
     });
 
     if (fetched.unchanged) {
-      await db.festival.update({
-        where: { id: festival.id },
+      await db.festivalEdition.update({
+        where: { id: edition.id },
         data: {
           lastLineupSyncAt: now,
           lastLineupSyncError: null,
@@ -305,11 +305,11 @@ async function runCheckFestivalLineupSync(
         updatedCount: 0,
         missingCount: 0,
         newArtistsCount: 0,
-        pendingDiff: parsePendingLineupDiff(festival.pendingLineupDiff),
+        pendingDiff: parsePendingLineupDiff(edition.pendingLineupDiff),
       };
     }
 
-    const existingSnapshots = festival.entries.map((entry) => ({
+    const existingSnapshots = edition.entries.map((entry) => ({
       id: entry.id,
       billingName: entry.billingName,
       subtitle: entry.subtitle,
@@ -322,14 +322,14 @@ async function runCheckFestivalLineupSync(
     const diffParts = computeLineupDiff(existingSnapshots, fetched.entries);
     const fullDiff: PendingLineupDiff = {
       checkedAt: now.toISOString(),
-      sourceUrl: festival.lineupSourceUrl,
+      sourceUrl: edition.lineupSourceUrl,
       method: fetched.method ?? "gemini",
       ...diffParts,
     };
 
     if (!hasPendingDiffChanges(diffParts)) {
-      await db.festival.update({
-        where: { id: festival.id },
+      await db.festivalEdition.update({
+        where: { id: edition.id },
         data: {
           lastLineupSyncAt: now,
           lastLineupContentHash: fetched.contentHash,
@@ -348,9 +348,9 @@ async function runCheckFestivalLineupSync(
       };
     }
 
-    if (options.applyDirectly || festival.autoSyncMode === "AUTO") {
+    if (options.applyDirectly || edition.autoSyncMode === "AUTO") {
       const applied = await applyDiffChanges(
-        festival.id,
+        edition.id,
         { added: diffParts.added, updated: diffParts.updated },
         {
           db,
@@ -359,7 +359,6 @@ async function runCheckFestivalLineupSync(
         },
       );
 
-      // Never auto-delete missing entries; keep them in pendingDiff only if any disappeared
       const remainingDiff: PendingLineupDiff | null =
         diffParts.missing.length > 0
           ? {
@@ -369,8 +368,8 @@ async function runCheckFestivalLineupSync(
             }
           : null;
 
-      await db.festival.update({
-        where: { id: festival.id },
+      await db.festivalEdition.update({
+        where: { id: edition.id },
         data: {
           lastLineupSyncAt: now,
           lastLineupContentHash: fetched.contentHash,
@@ -390,9 +389,8 @@ async function runCheckFestivalLineupSync(
       };
     }
 
-    // REVIEW mode: save diff for 1-click user confirmation
-    await db.festival.update({
-      where: { id: festival.id },
+    await db.festivalEdition.update({
+      where: { id: edition.id },
       data: {
         lastLineupSyncAt: now,
         lastLineupContentHash: fetched.contentHash,
@@ -412,8 +410,8 @@ async function runCheckFestivalLineupSync(
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error desconocido al sincronizar";
-    await db.festival.update({
-      where: { id: festival.id },
+    await db.festivalEdition.update({
+      where: { id: edition.id },
       data: {
         lastLineupSyncAt: now,
         lastLineupSyncError: message.slice(0, 500),
@@ -433,15 +431,15 @@ export async function applyPendingLineupDiff(
   const input = applyLineupDiffSchema.parse(rawInput);
   const db = options.db ?? getDb();
 
-  const festival = await db.festival.findUnique({
+  const edition = await db.festivalEdition.findUnique({
     where: { id: input.festivalId },
     select: { id: true, pendingLineupDiff: true },
   });
-  if (!festival) {
-    throw new DomainError("Festival no encontrado");
+  if (!edition) {
+    throw new DomainError("Edición de festival no encontrada");
   }
 
-  const pending = parsePendingLineupDiff(festival.pendingLineupDiff);
+  const pending = parsePendingLineupDiff(edition.pendingLineupDiff);
   if (!pending) {
     return { createdEntriesCount: 0, updatedEntriesCount: 0, newArtistsCount: 0 };
   }
@@ -457,7 +455,7 @@ export async function applyPendingLineupDiff(
       : pending.updated;
 
   const applied = await applyDiffChanges(
-    festival.id,
+    edition.id,
     { added: selectedAdded, updated: selectedUpdated },
     {
       db,
@@ -466,8 +464,8 @@ export async function applyPendingLineupDiff(
     },
   );
 
-  await db.festival.update({
-    where: { id: festival.id },
+  await db.festivalEdition.update({
+    where: { id: edition.id },
     data: { pendingLineupDiff: null },
   });
 
@@ -475,15 +473,15 @@ export async function applyPendingLineupDiff(
 }
 
 export async function dismissPendingLineupDiff(
-  festivalId: string,
+  editionId: string,
   db: PrismaClient = getDb(),
 ): Promise<void> {
-  const result = await db.festival.updateMany({
-    where: { id: festivalId },
+  const result = await db.festivalEdition.updateMany({
+    where: { id: editionId },
     data: { pendingLineupDiff: null },
   });
   if (result.count === 0) {
-    throw new DomainError("Festival no encontrado");
+    throw new DomainError("Edición de festival no encontrada");
   }
 }
 
@@ -493,7 +491,7 @@ export async function runScheduledLineupSyncs(
   const db = options.db ?? getDb();
   const now = options.now ?? new Date();
 
-  const candidates = await db.festival.findMany({
+  const candidates = await db.festivalEdition.findMany({
     where: {
       autoSyncEnabled: true,
       lineupSourceUrl: { not: null },
@@ -510,22 +508,21 @@ export async function runScheduledLineupSyncs(
   let checked = 0;
   let failed = 0;
 
-  for (const festival of candidates) {
-    // Stop auto-checking once the festival ended (with 1-day grace period)
-    if (festival.endDate && festival.endDate.getTime() + DAY_MS < now.getTime()) {
+  for (const edition of candidates) {
+    if (edition.endDate && edition.endDate.getTime() + DAY_MS < now.getTime()) {
       continue;
     }
 
-    const intervalMs = Math.max(1, festival.syncIntervalHours) * HOUR_MS;
+    const intervalMs = Math.max(1, edition.syncIntervalHours) * HOUR_MS;
     if (
-      festival.lastLineupSyncAt &&
-      now.getTime() - festival.lastLineupSyncAt.getTime() < intervalMs
+      edition.lastLineupSyncAt &&
+      now.getTime() - edition.lastLineupSyncAt.getTime() < intervalMs
     ) {
       continue;
     }
 
     try {
-      await checkFestivalLineupSync(festival.id, {
+      await checkFestivalLineupSync(edition.id, {
         db,
         ...(options.queue !== undefined ? { queue: options.queue } : {}),
         ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
@@ -535,7 +532,7 @@ export async function runScheduledLineupSyncs(
       failed += 1;
       if (process.env.NODE_ENV !== "test") {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[KUE] Scheduled lineup sync failed for festival ${festival.id}: ${message}`);
+        console.warn(`[KUE] Scheduled lineup sync failed for edition ${edition.id}: ${message}`);
       }
     }
   }

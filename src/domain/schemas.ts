@@ -1,9 +1,13 @@
 import { z } from "zod";
 
+export const USER_ROLES = ["USER", "ADMIN"] as const;
 export const ARTIST_STATUSES = ["PENDING", "LISTENING", "RATED", "DISCARDED"] as const;
 export const SYNC_STATUSES = ["PENDING", "SYNCING", "SYNCED", "FAILED"] as const;
 export const RELEASE_TYPES = ["ALBUM", "EP", "LIVE", "OTHER"] as const;
 export const LINEUP_SYNC_MODES = ["REVIEW", "AUTO"] as const;
+
+export const userRoleSchema = z.enum(USER_ROLES);
+export type UserRole = z.infer<typeof userRoleSchema>;
 
 export const artistStatusSchema = z.enum(ARTIST_STATUSES);
 export type ArtistStatus = z.infer<typeof artistStatusSchema>;
@@ -29,6 +33,91 @@ export type RatingFilter = z.infer<typeof ratingFilterSchema>;
 export const viewModeSchema = z.enum(["grid", "index"]);
 export type ViewMode = z.infer<typeof viewModeSchema>;
 
+// Auth & User Management schemas
+
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, "El nombre de usuario debe tener al menos 3 caracteres")
+  .max(32, "El nombre de usuario no puede superar los 32 caracteres")
+  .regex(
+    /^[a-zA-Z0-9._-]+$/,
+    "El nombre de usuario solo puede incluir letras, números, puntos, guiones y guion bajo",
+  );
+
+export const emailSchema = z
+  .email("Introduce un correo electrónico válido")
+  .trim()
+  .max(160, "El correo electrónico es demasiado largo");
+
+export const passwordSchema = z
+  .string()
+  .min(8, "La contraseña debe tener al menos 8 caracteres")
+  .max(128, "La contraseña no puede superar los 128 caracteres");
+
+export const loginSchema = z.object({
+  username: z.string().trim().min(1, "Introduce tu nombre de usuario").max(64),
+  password: z.string().min(1, "Introduce tu contraseña").max(128),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const registerSchema = z.object({
+  username: usernameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+});
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Introduce tu contraseña actual").max(128),
+  newPassword: passwordSchema,
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const adminCreateUserSchema = z.object({
+  username: usernameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  role: userRoleSchema.default("USER"),
+});
+export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
+
+export const adminUpdateUserRoleSchema = z.object({
+  userId: z.string().min(1),
+  role: userRoleSchema,
+});
+export type AdminUpdateUserRoleInput = z.infer<typeof adminUpdateUserRoleSchema>;
+
+export const adminUpdateUserActiveSchema = z.object({
+  userId: z.string().min(1),
+  isActive: z.boolean(),
+});
+export type AdminUpdateUserActiveInput = z.infer<typeof adminUpdateUserActiveSchema>;
+
+export const adminResetPasswordSchema = z.object({
+  userId: z.string().min(1),
+  newPassword: passwordSchema,
+});
+export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
+
+export const adminDeleteUserSchema = z.object({
+  userId: z.string().min(1),
+});
+export type AdminDeleteUserInput = z.infer<typeof adminDeleteUserSchema>;
+
+// Festival & Edition schemas
+
+const lineupUrlField = z
+  .string()
+  .trim()
+  .max(500)
+  .nullable()
+  .optional()
+  .refine(
+    (value) => !value || (URL.canParse(value) && /^https?:\/\//i.test(value)),
+    "Debe ser una URL válida (http:// o https://)",
+  );
+
 export const createFestivalSchema = z
   .object({
     name: z.string().trim().min(1, "El nombre del festival es obligatorio").max(120),
@@ -47,16 +136,7 @@ export const createFestivalSchema = z
     locationPlaceId: z.string().trim().max(64).nullable().optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
-    lineupSourceUrl: z
-      .string()
-      .trim()
-      .max(500)
-      .nullable()
-      .optional()
-      .refine(
-        (value) => !value || (URL.canParse(value) && /^https?:\/\//i.test(value)),
-        "Debe ser una URL válida (http:// o https://)",
-      ),
+    lineupSourceUrl: lineupUrlField,
     autoSyncEnabled: z.boolean().optional(),
     syncIntervalHours: z.coerce.number().int().min(1).max(168).optional(),
   })
@@ -65,6 +145,34 @@ export const createFestivalSchema = z
     path: ["endDate"],
   });
 export type CreateFestivalInput = z.infer<typeof createFestivalSchema>;
+
+export const createFestivalEditionSchema = z
+  .object({
+    festivalId: z.string().min(1),
+    year: z.coerce
+      .number({ error: "El año debe ser un número" })
+      .int("El año debe ser un número entero")
+      .min(1950, "El año debe estar entre 1950 y 2100")
+      .max(2100, "El año debe estar entre 1950 y 2100"),
+    location: z.string().trim().max(120).nullable().optional(),
+    locationProvince: z.string().trim().max(120).nullable().optional(),
+    locationRegion: z.string().trim().max(120).nullable().optional(),
+    locationCountry: z.string().trim().max(120).nullable().optional(),
+    locationCountryCode: z.string().trim().max(10).nullable().optional(),
+    locationLatitude: z.number().min(-90).max(90).nullable().optional(),
+    locationLongitude: z.number().min(-180).max(180).nullable().optional(),
+    locationPlaceId: z.string().trim().max(64).nullable().optional(),
+    startDate: z.coerce.date().nullable().optional(),
+    endDate: z.coerce.date().nullable().optional(),
+    lineupSourceUrl: lineupUrlField,
+    autoSyncEnabled: z.boolean().optional(),
+    syncIntervalHours: z.coerce.number().int().min(1).max(168).optional(),
+  })
+  .refine((value) => !value.startDate || !value.endDate || value.endDate >= value.startDate, {
+    error: "La fecha de fin no puede ser anterior a la de inicio",
+    path: ["endDate"],
+  });
+export type CreateFestivalEditionInput = z.infer<typeof createFestivalEditionSchema>;
 
 export const updateFestivalSchema = z
   .object({
@@ -92,18 +200,14 @@ export const updateFestivalSchema = z
   });
 export type UpdateFestivalInput = z.infer<typeof updateFestivalSchema>;
 
+export const userEditionMembershipSchema = z.object({
+  editionId: z.string().min(1),
+});
+export type UserEditionMembershipInput = z.infer<typeof userEditionMembershipSchema>;
+
 export const updateFestivalSyncConfigSchema = z.object({
   festivalId: z.string().min(1),
-  lineupSourceUrl: z
-    .string()
-    .trim()
-    .max(500)
-    .nullable()
-    .optional()
-    .refine(
-      (value) => !value || (URL.canParse(value) && /^https?:\/\//i.test(value)),
-      "Debe ser una URL válida (http:// o https://)",
-    ),
+  lineupSourceUrl: lineupUrlField,
   autoSyncEnabled: z.boolean().default(false),
   autoSyncMode: lineupSyncModeSchema.default("REVIEW"),
   syncIntervalHours: z.coerce.number().int().min(1).max(168).default(24),

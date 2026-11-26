@@ -18,6 +18,7 @@ interface FestivalManageViewProps {
   festival: FestivalEditDTO;
   initialEntries: LineupEntryDTO[];
   hasGeminiApiKey: boolean;
+  isAdmin: boolean;
 }
 
 type ManageTab = "details" | "artists" | "import" | "autosync";
@@ -53,6 +54,7 @@ export function FestivalManageView({
   festival,
   initialEntries,
   hasGeminiApiKey,
+  isAdmin,
 }: FestivalManageViewProps) {
   const { dict } = useI18n();
   const router = useRouter();
@@ -474,7 +476,7 @@ export function FestivalManageView({
               {dict.manage.artistsTitle}
             </h2>
             <p className="mt-1 font-serif text-[1.02rem] italic text-ink-muted">
-              {dict.manage.artistsDescription}
+              {isAdmin ? dict.manage.artistsDescription : dict.catalog.adminDeleteOnlyHint}
             </p>
 
             {entries.length > 0 ? (
@@ -531,14 +533,16 @@ export function FestivalManageView({
                       ) : null}
                     </div>
 
-                    <HairlineButton
-                      variant="default"
-                      size="sm"
-                      disabled={isRemoving}
-                      onClick={() => void handleRemoveEntry(entry.id)}
-                    >
-                      {isRemoving ? dict.manage.removingArtist : dict.manage.removeArtist}
-                    </HairlineButton>
+                    {isAdmin ? (
+                      <HairlineButton
+                        variant="default"
+                        size="sm"
+                        disabled={isRemoving}
+                        onClick={() => void handleRemoveEntry(entry.id)}
+                      >
+                        {isRemoving ? dict.manage.removingArtist : dict.manage.removeArtist}
+                      </HairlineButton>
+                    ) : null}
                   </li>
                 );
               })}

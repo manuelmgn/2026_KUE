@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/server/auth/dal";
 import { getDb } from "@/server/db";
 import { getSyncQueue, retryFailedArtists } from "@/server/sync/queue";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const db = getDb();
   const queue = getSyncQueue();
 
@@ -36,6 +42,11 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(): Promise<NextResponse> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const queue = getSyncQueue();
   const enqueued = await retryFailedArtists(getDb(), queue);
 

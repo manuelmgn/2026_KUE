@@ -6,9 +6,14 @@ import type { FestivalEditDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getPlacesApiLanguage } from "@/i18n/config";
 import { getServerDictionary } from "@/i18n/server";
+import { requirePageUser } from "@/server/auth/dal";
 import { getLocalizedPlaceName } from "@/server/clients/places";
 import { listFestivalEntries } from "@/server/services/entries";
-import { listFestivals } from "@/server/services/festivals";
+import {
+  getEditionBySlug,
+  getEditionWithSiblingYears,
+  listUserEditions,
+} from "@/server/services/festivals";
 import { parsePendingLineupDiff } from "@/server/services/lineup-sync";
 import {
   resolveActiveFestival,
@@ -23,28 +28,38 @@ interface ManagePageProps {
 }
 
 export default async function ManagePage({ searchParams }: ManagePageProps) {
-  const [params, { locale, dict }] = await Promise.all([searchParams, getServerDictionary()]);
-  const festivals = await listFestivals();
-  const summaries = festivals.map(toFestivalSummary);
-  const activeRaw = resolveActiveFestival(festivals, params.festival);
+  const user = await requirePageUser("/manage");
+  const [params, { locale, dict }, myEditions] = await Promise.all([
+    searchParams,
+    getServerDictionary(),
+    listUserEditions(user.id),
+  ]);
+
+  const summaries = myEditions.map(toFestivalSummary);
+  let activeRaw = resolveActiveFestival(myEditions, params.festival);
+  if (!activeRaw && params.festival) {
+    activeRaw = await getEditionBySlug(params.festival);
+  }
 
   let activeEdit: FestivalEditDTO | null = null;
   let entries: ReturnType<typeof toLineupEntryDTO>[] = [];
 
   if (activeRaw) {
-    const [localizedLocation, rawEntries] = await Promise.all([
+    const [localizedLocation, rawEntries, existingYears] = await Promise.all([
       getLocalizedPlaceName(
         activeRaw.locationPlaceId,
         getPlacesApiLanguage(locale),
         activeRaw.location,
       ),
-      listFestivalEntries(activeRaw.id),
+      listFestivalEntries(user.id, activeRaw.id),
+      getEditionWithSiblingYears(activeRaw.id),
     ]);
 
     activeEdit = {
       id: activeRaw.id,
+      festivalId: activeRaw.festival.id,
       slug: activeRaw.slug,
-      name: activeRaw.name,
+      name: activeRaw.festival.name,
       year: activeRaw.year,
       location: localizedLocation,
       locationProvince: activeRaw.locationProvince,
@@ -65,6 +80,7 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
         : null,
       lastLineupSyncError: activeRaw.lastLineupSyncError,
       pendingLineupDiff: parsePendingLineupDiff(activeRaw.pendingLineupDiff),
+      existingYears,
     };
     entries = rawEntries.map(toLineupEntryDTO);
   }
@@ -74,7 +90,11 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
   return (
     <div className="min-h-screen bg-bg text-ink">
       <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar festivals={summaries} activeFestivalSlug={activeEdit?.slug ?? null} />
+        <TopBar
+          festivals={summaries}
+          activeFestivalSlug={activeEdit?.slug ?? null}
+          currentUser={user}
+        />
       </Suspense>
 
       {activeEdit ? (
@@ -83,6 +103,7 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
           festival={activeEdit}
           initialEntries={entries}
           hasGeminiApiKey={hasGeminiApiKey}
+          isAdmin={user.role === "ADMIN"}
         />
       ) : (
         <EmptyState

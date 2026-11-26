@@ -7,6 +7,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 enum ArtistStatus {
   PENDING
   LISTENING
@@ -33,29 +38,85 @@ enum LineupSyncMode {
   AUTO
 }
 
+model User {
+  id                 String    @id @default(cuid())
+  username           String
+  normalizedUsername String    @unique
+  email              String
+  normalizedEmail    String    @unique
+  passwordHash       String
+  role               UserRole  @default(USER)
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions         Session[]
+  editions         UserFestivalEdition[]
+  artistStates     UserArtistState[]
+  albumStates      UserAlbumState[]
+  entryStates      UserEntryState[]
+  createdFestivals Festival[]            @relation("FestivalCreator")
+  createdEditions  FestivalEdition[]     @relation("EditionCreator")
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model LegacyPersonalItem {
+  id        String        @id @default(cuid())
+  kind      String
+  targetId  String
+  rating    Int?
+  status    ArtistStatus?
+  notes     String        @default("")
+  isPinned  Boolean       @default(false)
+  customUrl String?
+
+  @@index([kind])
+}
+
 model Artist {
-  id             String                @id @default(cuid())
+  id             String     @id @default(cuid())
   name           String
-  normalizedName String                @unique
-  mbid           String?               @unique
+  normalizedName String     @unique
+  mbid           String?    @unique
   deezerId       String?
   country        String?
   bio            String?
   imagePath      String?
-  rating         Int?
-  status         ArtistStatus          @default(PENDING)
-  notes          String                @default("")
-  syncStatus     SyncStatus            @default(PENDING)
+  syncStatus     SyncStatus @default(PENDING)
   syncError      String?
   syncedAt       DateTime?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  albums  Album[]
-  entries FestivalEntryArtist[]
+  albums     Album[]
+  entries    FestivalEntryArtist[]
+  userStates UserArtistState[]
 
-  @@index([status])
-  @@index([rating])
   @@index([syncStatus])
 }
 
@@ -67,22 +128,21 @@ model Album {
   releaseYear Int?
   releaseType ReleaseType @default(ALBUM)
   coverPath   String?
-  isPinned    Boolean     @default(false)
-  customUrl   String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artist     Artist           @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  userStates UserAlbumState[]
 
   @@unique([artistId, mbid])
-  @@index([artistId, isPinned])
+  @@index([artistId])
 }
 
 model Festival {
-  id                  String          @id @default(cuid())
-  slug                String          @unique
+  id                  String   @id @default(cuid())
+  slug                String   @unique
   name                String
-  year                Int
+  normalizedName      String   @unique
   location            String?
   locationProvince    String?
   locationRegion      String?
@@ -91,43 +151,84 @@ model Festival {
   locationLatitude    Float?
   locationLongitude   Float?
   locationPlaceId     String?
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  createdBy User?             @relation("FestivalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  editions  FestivalEdition[]
+
+  @@index([name])
+}
+
+model FestivalEdition {
+  id                    String         @id @default(cuid())
+  festivalId            String
+  slug                  String         @unique
+  year                  Int
+  location              String?
+  locationProvince      String?
+  locationRegion        String?
+  locationCountry       String?
+  locationCountryCode   String?
+  locationLatitude      Float?
+  locationLongitude     Float?
+  locationPlaceId       String?
   startDate             DateTime?
   endDate               DateTime?
   lineupSourceUrl       String?
-  autoSyncEnabled       Boolean         @default(false)
-  autoSyncMode          LineupSyncMode  @default(REVIEW)
-  syncIntervalHours     Int             @default(24)
+  autoSyncEnabled       Boolean        @default(false)
+  autoSyncMode          LineupSyncMode @default(REVIEW)
+  syncIntervalHours     Int            @default(24)
   lastLineupSyncAt      DateTime?
   lastLineupContentHash String?
   lastLineupSyncError   String?
   pendingLineupDiff     String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdById           String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-  entries FestivalEntry[]
+  festival  Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  createdBy User?                 @relation("EditionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  entries   FestivalEntry[]
+  followers UserFestivalEdition[]
 
+  @@unique([festivalId, year])
   @@index([year])
+  @@index([festivalId])
+}
+
+model UserFestivalEdition {
+  userId    String
+  editionId String
+  addedAt   DateTime @default(now())
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  edition FestivalEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, editionId])
+  @@index([editionId])
+  @@index([userId, addedAt])
 }
 
 model FestivalEntry {
-  id          String                @id @default(cuid())
-  festivalId  String
+  id          String   @id @default(cuid())
+  editionId   String
   billingName String
   subtitle    String?
   day         String?
   stage       String?
   setTime     String?
-  liveRating  Int?
-  liveNotes   String                @default("")
-  sortOrder   Int                   @default(0)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  festival Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
-  artists  FestivalEntryArtist[]
+  edition    FestivalEdition       @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  artists    FestivalEntryArtist[]
+  userStates UserEntryState[]
 
-  @@index([festivalId, day])
-  @@index([festivalId, sortOrder])
+  @@index([editionId, day])
+  @@index([editionId, sortOrder])
 }
 
 model FestivalEntryArtist {
@@ -140,4 +241,47 @@ model FestivalEntryArtist {
 
   @@id([entryId, artistId])
   @@index([artistId])
+}
+
+model UserArtistState {
+  userId    String
+  artistId  String
+  rating    Int?
+  status    ArtistStatus @default(PENDING)
+  notes     String       @default("")
+  updatedAt DateTime     @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([userId, artistId])
+  @@index([userId, status])
+  @@index([userId, rating])
+}
+
+model UserAlbumState {
+  userId    String
+  albumId   String
+  isPinned  Boolean  @default(false)
+  customUrl String?
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@id([userId, albumId])
+  @@index([userId, isPinned])
+}
+
+model UserEntryState {
+  userId     String
+  entryId    String
+  liveRating Int?
+  liveNotes  String   @default("")
+  updatedAt  DateTime @updatedAt
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry FestivalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entryId])
 }

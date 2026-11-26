@@ -4,8 +4,9 @@ import { FestivalModeView } from "@/components/features/FestivalModeView";
 import { TopBar } from "@/components/features/TopBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getServerDictionary } from "@/i18n/server";
+import { requirePageUser } from "@/server/auth/dal";
 import { listFestivalEntries } from "@/server/services/entries";
-import { listFestivals } from "@/server/services/festivals";
+import { getEditionBySlug, listUserEditions } from "@/server/services/festivals";
 import {
   resolveActiveFestival,
   toFestivalSummary,
@@ -20,22 +21,34 @@ interface FestivalModePageProps {
 }
 
 export default async function FestivalModePage({ searchParams }: FestivalModePageProps) {
-  const [params, { locale, dict }] = await Promise.all([searchParams, getServerDictionary()]);
-  const festivals = await listFestivals();
-  const summaries = festivals.map(toFestivalSummary);
-  const activeFestivalRaw = resolveActiveFestival(festivals, params.festival);
+  const user = await requirePageUser("/festival-mode");
+  const [params, { locale, dict }, editions] = await Promise.all([
+    searchParams,
+    getServerDictionary(),
+    listUserEditions(user.id),
+  ]);
+
+  const summaries = editions.map(toFestivalSummary);
+  let activeFestivalRaw = resolveActiveFestival(editions, params.festival);
+  if (!activeFestivalRaw && params.festival) {
+    activeFestivalRaw = await getEditionBySlug(params.festival);
+  }
   const activeFestival = activeFestivalRaw
     ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
     : null;
 
   const entries = activeFestival
-    ? (await listFestivalEntries(activeFestival.id)).map(toLineupEntryDTO)
+    ? (await listFestivalEntries(user.id, activeFestival.id)).map(toLineupEntryDTO)
     : [];
 
   return (
     <div className="min-h-screen bg-bg text-ink">
       <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar festivals={summaries} activeFestivalSlug={activeFestival?.slug ?? null} />
+        <TopBar
+          festivals={summaries}
+          activeFestivalSlug={activeFestival?.slug ?? null}
+          currentUser={user}
+        />
       </Suspense>
 
       {activeFestival ? (
@@ -46,10 +59,10 @@ export default async function FestivalModePage({ searchParams }: FestivalModePag
           description={dict.festivalMode.noFestivalDescription}
           action={
             <Link
-              href="/import"
+              href="/festivals"
               className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-xs font-semibold uppercase text-acid-ink"
             >
-              {dict.festivalMode.noFestivalAction}
+              {dict.home.emptyAction}
             </Link>
           }
         />

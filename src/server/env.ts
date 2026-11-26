@@ -7,6 +7,13 @@ const envSchema = z.object({
   MEDIA_DIR: z.string().min(1).default("./data/media"),
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default("gemini-3.5-flash-lite"),
+  ADMIN_USERNAME: z.string().trim().min(3).max(32).optional(),
+  ADMIN_EMAIL: z.email().optional(),
+  ADMIN_PASSWORD: z.string().min(8).max(128).optional(),
+  COOKIE_SECURE: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === "true")),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -25,6 +32,10 @@ export function getEnv(): Env {
     MEDIA_DIR: process.env.MEDIA_DIR,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || undefined,
     GEMINI_MODEL: process.env.GEMINI_MODEL || undefined,
+    ADMIN_USERNAME: process.env.ADMIN_USERNAME || undefined,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || undefined,
+    COOKIE_SECURE: process.env.COOKIE_SECURE || undefined,
   });
 
   if (!parsed.success) {

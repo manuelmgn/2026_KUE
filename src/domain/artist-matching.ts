@@ -24,13 +24,30 @@ export function areArtistNamesEquivalent(a: string, b: string): boolean {
   return normalizeArtistName(a) === normalizeArtistName(b);
 }
 
-export function slugifyFestival(name: string, year: number): string {
+export function normalizeFestivalName(name: string): string {
+  return normalizeArtistName(name);
+}
+
+export function slugifyFestivalBrand(name: string): string {
   const base = normalizeArtistName(name)
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+  return base || "festival";
+}
+
+export function slugifyFestival(name: string, year: number): string {
+  const base = slugifyFestivalBrand(name);
   const yearStr = String(year);
   if (base.endsWith(`-${yearStr}`) || base === yearStr) {
     return base || `festival-${yearStr}`;
   }
   return base ? `${base}-${yearStr}` : `festival-${yearStr}`;
+}
+
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/server/auth/dal";
 import { getServableMediaType, resolveSafeMediaPath } from "@/server/media-storage";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,11 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ path: string[] }> },
 ): Promise<NextResponse> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { path: segments } = await context.params;
   if (!segments || segments.length === 0) {
     return NextResponse.json({ error: "Ruta de medio inválida" }, { status: 400 });
@@ -19,7 +25,6 @@ export async function GET(
     return NextResponse.json({ error: "Ruta no permitida" }, { status: 400 });
   }
 
-  // Only cached images are ever served (never `.tmp` leftovers or any other file type).
   const contentType = getServableMediaType(safePath);
   if (!contentType) {
     return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
@@ -33,8 +38,7 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(fileBuffer.byteLength),
-        // File names are content-hashed, so the same URL always maps to the same bytes.
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "private, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       },
     });

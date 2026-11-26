@@ -6,8 +6,9 @@ import type { FestivalArchiveItemDTO, HomeArtistItemDTO } from "@/components/fea
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getPlacesApiLanguage } from "@/i18n/config";
 import { getServerDictionary } from "@/i18n/server";
+import { requirePageUser } from "@/server/auth/dal";
 import { getLocalizedPlaceName } from "@/server/clients/places";
-import { listFestivalsWithCounts, listHomeArtists } from "@/server/services/festivals";
+import { listHomeArtists, listUserEditionsWithCounts } from "@/server/services/festivals";
 import { resolveActiveFestival, toFestivalSummary } from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
@@ -32,25 +33,24 @@ function computeDaysUntil(startDate: string | null, todayIso: string): number | 
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const [params, { locale, dict }, rawFestivals, homeArtists] = await Promise.all([
+  const user = await requirePageUser("/");
+  const [params, { locale, dict }, rawEditions, homeArtists] = await Promise.all([
     searchParams,
     getServerDictionary(),
-    listFestivalsWithCounts(),
-    listHomeArtists(),
+    listUserEditionsWithCounts(user.id),
+    listHomeArtists(user.id),
   ]);
 
-  const festivalSummaries = rawFestivals.map(toFestivalSummary);
+  const festivalSummaries = rawEditions.map(toFestivalSummary);
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  // Pick the requested festival if specified, otherwise the nearest upcoming festival,
-  // falling back to the most recent festival.
-  const upcomingFestivals = rawFestivals
+  const upcomingEditions = rawEditions
     .filter(
-      (fest) =>
+      (ed) =>
         !isPastDate(
-          fest.startDate ? fest.startDate.toISOString().slice(0, 10) : null,
-          fest.endDate ? fest.endDate.toISOString().slice(0, 10) : null,
-          fest.year,
+          ed.startDate ? ed.startDate.toISOString().slice(0, 10) : null,
+          ed.endDate ? ed.endDate.toISOString().slice(0, 10) : null,
+          ed.year,
           todayIso,
         ),
     )
@@ -61,8 +61,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     });
 
   const featuredRaw = params.festival
-    ? resolveActiveFestival(rawFestivals, params.festival)
-    : (upcomingFestivals[0] ?? rawFestivals[0] ?? null);
+    ? resolveActiveFestival(rawEditions, params.festival)
+    : (upcomingEditions[0] ?? rawEditions[0] ?? null);
 
   let featuredFestival: FestivalArchiveItemDTO | null = null;
   let isUpcoming = false;
@@ -81,8 +81,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
     featuredFestival = {
       id: featuredRaw.id,
+      festivalId: featuredRaw.festival.id,
       slug: featuredRaw.slug,
-      name: featuredRaw.name,
+      name: featuredRaw.festival.name,
       year: featuredRaw.year,
       location: localizedLocation,
       startDate,
@@ -96,8 +97,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const mapArtist = (
     artist: Awaited<ReturnType<typeof listHomeArtists>>["queue"][number],
   ): HomeArtistItemDTO | null => {
-    const firstFestival = artist.entries[0]?.entry.festival;
-    if (!firstFestival) return null;
+    if (!artist.edition) return null;
     return {
       id: artist.id,
       name: artist.name,
@@ -105,9 +105,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       rating: artist.rating,
       status: artist.status,
       notes: artist.notes,
-      festivalSlug: firstFestival.slug,
-      festivalName: firstFestival.name,
-      festivalYear: firstFestival.year,
+      festivalSlug: artist.edition.slug,
+      festivalName: artist.edition.festival.name,
+      festivalYear: artist.edition.year,
     };
   };
 
@@ -121,7 +121,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <div className="min-h-screen bg-bg text-ink">
       <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar festivals={festivalSummaries} activeFestivalSlug={featuredFestival?.slug ?? null} />
+        <TopBar
+          festivals={festivalSummaries}
+          activeFestivalSlug={featuredFestival?.slug ?? null}
+          currentUser={user}
+        />
       </Suspense>
 
       {featuredFestival ? (

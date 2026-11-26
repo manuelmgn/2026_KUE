@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useState } from "react";
+import { changePasswordAction, logoutAction } from "@/actions/auth-actions";
+import type { AuthUserDTO } from "@/components/features/types";
+import { HairlineButton } from "@/components/ui/HairlineButton";
 import type { Locale } from "@/i18n/config";
 import { useI18n } from "@/i18n/context";
 
 type ThemePreference = "system" | "dark" | "light";
+
+interface SettingsViewProps {
+  currentUser: AuthUserDTO;
+}
 
 function readStoredTheme(): ThemePreference {
   try {
@@ -56,12 +65,23 @@ function applyThemePreference(next: ThemePreference) {
   }
 }
 
-export function SettingsView() {
+export function SettingsView({ currentUser }: SettingsViewProps) {
   const { locale, dict, setLocale } = useI18n();
+  const router = useRouter();
+  const formId = useId();
   const [theme, setTheme] = useState<ThemePreference>("system");
   const [systemScheme, setSystemScheme] = useState<"dark" | "light">("dark");
   const [savingLocale, setSavingLocale] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const syncTheme = () => {
@@ -117,6 +137,48 @@ export function SettingsView() {
     setSavedNotice(true);
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      if (typeof caches !== "undefined") {
+        const keys = await caches.keys().catch(() => []);
+        await Promise.all(keys.map((key) => caches.delete(key).catch(() => false)));
+      }
+      await logoutAction();
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordNotice(null);
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError(dict.auth.passwordMismatch);
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const res = await changePasswordAction({ currentPassword, newPassword });
+      if (!res.ok) {
+        setPasswordError(res.error);
+        return;
+      }
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setShowPasswordForm(false);
+      setPasswordNotice(dict.account.passwordUpdated);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const languageOptions: Array<{ value: Locale; label: string; meta: string }> = [
     {
       value: "gl",
@@ -164,7 +226,158 @@ export function SettingsView() {
         </p>
       </div>
 
-      <section aria-labelledby="settings-language-heading" className="flex flex-col gap-4">
+      {/* Account & Security Section */}
+      <section aria-labelledby="settings-account-heading" className="flex flex-col gap-4">
+        <div>
+          <h2
+            id="settings-account-heading"
+            className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
+          >
+            {dict.account.sectionTitle}
+          </h2>
+          <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
+            {dict.account.sectionDescription}
+          </p>
+        </div>
+
+        <div className="border border-line bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-display text-xl font-extrabold tracking-[-0.02em] text-ink">
+                  @{currentUser.username}
+                </span>
+                <span
+                  className={
+                    currentUser.role === "ADMIN"
+                      ? "bg-acid px-1.5 py-0.5 font-mono text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+                      : "border border-line px-1.5 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.08em] text-ink-muted"
+                  }
+                >
+                  {currentUser.role === "ADMIN" ? dict.account.roleAdmin : dict.account.roleUser}
+                </span>
+              </div>
+              <div className="mt-1 font-mono text-xs text-ink-muted">{currentUser.email}</div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {currentUser.role === "ADMIN" ? (
+                <Link
+                  href="/admin"
+                  className="inline-flex border border-acid bg-acid px-3.5 py-2 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+                >
+                  {dict.account.openAdminDashboard}
+                </Link>
+              ) : null}
+              <HairlineButton
+                size="sm"
+                onClick={() => {
+                  setPasswordError(null);
+                  setPasswordNotice(null);
+                  setShowPasswordForm((prev) => !prev);
+                }}
+              >
+                {showPasswordForm ? dict.common.close : dict.account.changePasswordTitle}
+              </HairlineButton>
+              <HairlineButton size="sm" disabled={loggingOut} onClick={() => void handleLogout()}>
+                {loggingOut ? dict.account.loggingOut : dict.account.logoutAction}
+              </HairlineButton>
+            </div>
+          </div>
+
+          {showPasswordForm ? (
+            <form
+              onSubmit={(event) => void handlePasswordChange(event)}
+              className="flex flex-col gap-3 border-t border-line bg-bg p-4 sm:p-5"
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`${formId}-curr-pw`}
+                    className="font-mono text-[0.66rem] uppercase tracking-[0.08em] text-ink-muted"
+                  >
+                    {dict.account.currentPasswordLabel}
+                  </label>
+                  <input
+                    id={`${formId}-curr-pw`}
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    className="border border-line bg-surface px-3 py-2 font-mono text-xs text-ink focus:border-acid focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`${formId}-new-pw`}
+                    className="font-mono text-[0.66rem] uppercase tracking-[0.08em] text-ink-muted"
+                  >
+                    {dict.account.newPasswordLabel}
+                  </label>
+                  <input
+                    id={`${formId}-new-pw`}
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    className="border border-line bg-surface px-3 py-2 font-mono text-xs text-ink focus:border-acid focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`${formId}-conf-pw`}
+                    className="font-mono text-[0.66rem] uppercase tracking-[0.08em] text-ink-muted"
+                  >
+                    {dict.account.confirmNewPasswordLabel}
+                  </label>
+                  <input
+                    id={`${formId}-conf-pw`}
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={confirmNewPassword}
+                    onChange={(event) => setConfirmNewPassword(event.target.value)}
+                    className="border border-line bg-surface px-3 py-2 font-mono text-xs text-ink focus:border-acid focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {passwordError ? (
+                <p
+                  role="alert"
+                  className="border border-line-strong bg-surface px-3 py-2 font-mono text-xs text-ink"
+                >
+                  {passwordError}
+                </p>
+              ) : null}
+
+              <div className="flex justify-end">
+                <HairlineButton type="submit" variant="acid" size="sm" disabled={savingPassword}>
+                  {savingPassword ? dict.common.saving : dict.account.changePasswordSubmit}
+                </HairlineButton>
+              </div>
+            </form>
+          ) : null}
+        </div>
+
+        {passwordNotice ? (
+          <p
+            role="status"
+            className="border border-acid bg-surface px-4 py-2.5 font-mono text-xs text-ink"
+          >
+            {passwordNotice}
+          </p>
+        ) : null}
+      </section>
+
+      <section
+        aria-labelledby="settings-language-heading"
+        className="flex flex-col gap-4 border-t border-line pt-8"
+      >
         <div>
           <h2
             id="settings-language-heading"

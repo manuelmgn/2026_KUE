@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { FestivalSummary } from "@/components/features/types";
+import type { AuthUserDTO, FestivalSummary } from "@/components/features/types";
 import { KueLogo } from "@/components/ui/KueLogo";
 import { useI18n } from "@/i18n/context";
 
 interface TopBarProps {
   festivals: FestivalSummary[];
   activeFestivalSlug: string | null;
+  currentUser?: AuthUserDTO | null;
 }
 
 interface SyncApiSnapshot {
@@ -22,7 +23,7 @@ interface SyncApiSnapshot {
   };
 }
 
-export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
+export function TopBar({ festivals, activeFestivalSlug, currentUser }: TopBarProps) {
   const { dict } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
@@ -131,7 +132,10 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("festival", slug);
     const targetPath =
-      pathname === "/import" || pathname === "/settings" || pathname === "/festivals"
+      pathname === "/import" ||
+      pathname === "/settings" ||
+      pathname === "/festivals" ||
+      pathname === "/admin"
         ? "/lineup"
         : pathname;
     router.push(`${targetPath}?${params.toString()}`);
@@ -246,6 +250,20 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
           >
             {dict.nav.festivals}
           </Link>
+
+          {currentUser?.role === "ADMIN" ? (
+            <Link
+              href="/admin"
+              aria-current={pathname === "/admin" ? "page" : undefined}
+              className={`hidden items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors md:flex ${
+                pathname === "/admin"
+                  ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
+                  : "text-ink hover:bg-surface-elevated"
+              }`}
+            >
+              {dict.nav.admin}
+            </Link>
+          ) : null}
 
           <Link
             href={`/settings${festivalSuffix}`}
