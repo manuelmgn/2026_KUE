@@ -196,6 +196,8 @@ export async function checkFestivalLineupSync(
   festivalId: string,
   options: {
     force?: boolean | undefined;
+    /** When true, applies detected additions/updates immediately regardless of `autoSyncMode` (used on initial creation). */
+    applyDirectly?: boolean | undefined;
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
     enqueueSync?: boolean | undefined;
@@ -224,6 +226,7 @@ async function runCheckFestivalLineupSync(
   festivalId: string,
   options: {
     force?: boolean | undefined;
+    applyDirectly?: boolean | undefined;
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
     enqueueSync?: boolean | undefined;
@@ -345,7 +348,7 @@ async function runCheckFestivalLineupSync(
       };
     }
 
-    if (festival.autoSyncMode === "AUTO") {
+    if (options.applyDirectly || festival.autoSyncMode === "AUTO") {
       const applied = await applyDiffChanges(
         festival.id,
         { added: diffParts.added, updated: diffParts.updated },

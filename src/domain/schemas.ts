@@ -47,6 +47,18 @@ export const createFestivalSchema = z
     locationPlaceId: z.string().trim().max(64).nullable().optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
+    lineupSourceUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .nullable()
+      .optional()
+      .refine(
+        (value) => !value || (URL.canParse(value) && /^https?:\/\//i.test(value)),
+        "Debe ser una URL válida (http:// o https://)",
+      ),
+    autoSyncEnabled: z.boolean().optional(),
+    syncIntervalHours: z.coerce.number().int().min(1).max(168).optional(),
   })
   .refine((value) => !value.startDate || !value.endDate || value.endDate >= value.startDate, {
     error: "La fecha de fin no puede ser anterior a la de inicio",

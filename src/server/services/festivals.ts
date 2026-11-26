@@ -6,6 +6,7 @@ import {
   updateFestivalSchema,
 } from "@/domain/schemas";
 import type { Festival, PrismaClient } from "@/generated/prisma/client";
+import { validateLineupSourceUrl } from "@/server/clients/lineup-source";
 import { getDb } from "@/server/db";
 
 export async function listFestivals(db: PrismaClient = getDb()): Promise<Festival[]> {
@@ -52,6 +53,11 @@ export async function createFestival(
     suffix += 1;
   }
 
+  const cleanedSourceUrl = input.lineupSourceUrl?.trim() || null;
+  if (cleanedSourceUrl) {
+    validateLineupSourceUrl(cleanedSourceUrl);
+  }
+
   return db.festival.create({
     data: {
       slug,
@@ -67,6 +73,9 @@ export async function createFestival(
       locationPlaceId: input.locationPlaceId ?? null,
       startDate: input.startDate ?? null,
       endDate: input.endDate ?? null,
+      lineupSourceUrl: cleanedSourceUrl,
+      autoSyncEnabled: cleanedSourceUrl ? (input.autoSyncEnabled ?? false) : false,
+      syncIntervalHours: input.syncIntervalHours ?? 24,
     },
   });
 }

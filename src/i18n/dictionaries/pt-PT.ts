@@ -82,6 +82,7 @@ export const ptPT: Dictionary = {
       description:
         "Liga o site oficial do festival (ou Clashfinder) para detetar novas confirmações e horários sem mexer nas tuas avaliações nem notas.",
       sourceUrlLabel: "URL do cartaz",
+      sourceUrlOptionalLabel: "URL do cartaz (opcional)",
       sourceUrlPlaceholder: "https://www.rewirefestival.nl/lineup",
       enabledLabel: "Ativar verificação periódica em segundo plano",
       enabledHint:
@@ -89,9 +90,14 @@ export const ptPT: Dictionary = {
       modeLabel: "Modo de aplicação",
       modeReview: "Revisão prévia (recomendado)",
       modeAuto: "Aplicar novidades automaticamente",
-      intervalLabel: "Frequência",
-      intervalHours: (hours: number) => `A cada ${hours} h`,
+      intervalLabel: "Atualização",
+      intervalOnce: "Apenas uma vez (importação única)",
+      intervalHours: (hours: number) => `A cada ${hours} horas`,
       intervalDays: (days: number) => (days === 1 ? "Todos os dias" : `A cada ${days} dias`),
+      intervalWeek: "Todas as semanas",
+      creatingAndImporting: "A criar e importar cartaz...",
+      initialImportWarning: (error: string) =>
+        `Festival criado, mas a importação inicial do cartaz falhou: ${error}`,
       saveConfig: "Guardar configuração",
       configSaved: "Configuração guardada.",
       checkNow: "Verificar agora",

@@ -130,7 +130,10 @@ describe("integration: festival lineup auto-sync", () => {
   });
 
   it("applies additions automatically in AUTO mode while keeping missing entries for manual review", async () => {
-    const festival = await createFestival({ name: "Unsound", year: 2027, location: "Cracovia" }, db);
+    const festival = await createFestival(
+      { name: "Unsound", year: 2027, location: "Cracovia" },
+      db,
+    );
 
     await importFestivalLineup(
       {
@@ -213,5 +216,38 @@ describe("integration: festival lineup auto-sync", () => {
       enqueueSync: false,
     });
     expect(scheduled).toEqual({ checked: 0, failed: 0 });
+  });
+
+  it("supports creating a festival with lineupSourceUrl for one-time import (applyDirectly)", async () => {
+    const festival = await createFestival(
+      {
+        name: "Primavera",
+        year: 2027,
+        lineupSourceUrl: "https://example.com/primavera.txt",
+        autoSyncEnabled: false,
+        syncIntervalHours: 24,
+      },
+      db,
+    );
+
+    expect(festival.lineupSourceUrl).toBe("https://example.com/primavera.txt");
+    expect(festival.autoSyncEnabled).toBe(false);
+
+    const checkResult = await checkFestivalLineupSync(festival.id, {
+      db,
+      enqueueSync: false,
+      applyDirectly: true,
+      fetchImpl: async () =>
+        new Response("FKA twigs\nFour Tet", {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        }),
+    });
+
+    expect(checkResult.status).toBe("applied");
+    expect(checkResult.addedCount).toBe(2);
+
+    const entries = await listFestivalEntries(festival.id, {}, db);
+    expect(entries).toHaveLength(2);
   });
 });

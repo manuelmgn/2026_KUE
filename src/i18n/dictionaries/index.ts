@@ -82,6 +82,7 @@ export interface Dictionary {
       title: string;
       description: string;
       sourceUrlLabel: string;
+      sourceUrlOptionalLabel: string;
       sourceUrlPlaceholder: string;
       enabledLabel: string;
       enabledHint: string;
@@ -89,8 +90,12 @@ export interface Dictionary {
       modeReview: string;
       modeAuto: string;
       intervalLabel: string;
+      intervalOnce: string;
       intervalHours: (hours: number) => string;
       intervalDays: (days: number) => string;
+      intervalWeek: string;
+      creatingAndImporting: string;
+      initialImportWarning: (error: string) => string;
       saveConfig: string;
       configSaved: string;
       checkNow: string;

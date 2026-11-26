@@ -42,6 +42,10 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
   const [locationInvalid, setLocationInvalid] = useState(false);
   const [newFestStartDate, setNewFestStartDate] = useState("");
   const [newFestEndDate, setNewFestEndDate] = useState("");
+  const [newFestLineupUrl, setNewFestLineupUrl] = useState("");
+  const [newFestSyncSchedule, setNewFestSyncSchedule] = useState<"once" | "12" | "24" | "168">(
+    "24",
+  );
   const [creatingFestival, setCreatingFestival] = useState(false);
 
   const [rawText, setRawText] = useState("");
@@ -80,6 +84,10 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       return;
     }
 
+    const trimmedUrl = newFestLineupUrl.trim();
+    const autoSyncEnabled = trimmedUrl.length > 0 && newFestSyncSchedule !== "once";
+    const syncIntervalHours = newFestSyncSchedule === "once" ? 24 : Number(newFestSyncSchedule);
+
     setCreatingFestival(true);
     try {
       const res = await createFestivalAction({
@@ -95,6 +103,9 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
         locationPlaceId: selectedPlace?.placeId ?? null,
         startDate: newFestStartDate ? new Date(`${newFestStartDate}T00:00:00.000Z`) : undefined,
         endDate: newFestEndDate ? new Date(`${newFestEndDate}T00:00:00.000Z`) : undefined,
+        lineupSourceUrl: trimmedUrl || null,
+        autoSyncEnabled,
+        syncIntervalHours,
       });
       if (!res.ok) {
         setError(res.error);
@@ -109,6 +120,17 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       setLocationInvalid(false);
       setNewFestStartDate("");
       setNewFestEndDate("");
+      setNewFestLineupUrl("");
+      setNewFestSyncSchedule("24");
+      if (res.data.initialSyncError) {
+        setError(dict.manage.autoSync.initialImportWarning(res.data.initialSyncError));
+      } else if (res.data.initialEntriesCount > 0) {
+        setResultSummary({
+          createdEntriesCount: res.data.initialEntriesCount,
+          newArtistsCount: res.data.initialNewArtistsCount,
+          festivalSlug: res.data.slug,
+        });
+      }
     } finally {
       setCreatingFestival(false);
     }
@@ -338,8 +360,53 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             />
           </div>
 
+          <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
+            <label
+              htmlFor={`${formId}-lineup-url`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              {dict.manage.autoSync.sourceUrlOptionalLabel}
+            </label>
+            <input
+              id={`${formId}-lineup-url`}
+              name="lineupSourceUrl"
+              type="url"
+              value={newFestLineupUrl}
+              onChange={(event) => setNewFestLineupUrl(event.target.value)}
+              placeholder={dict.manage.autoSync.sourceUrlPlaceholder}
+              className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink outline-none focus-visible:border-acid"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 sm:col-span-2 lg:col-span-2">
+            <label
+              htmlFor={`${formId}-sync-schedule`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              {dict.manage.autoSync.intervalLabel}
+            </label>
+            <select
+              id={`${formId}-sync-schedule`}
+              value={newFestSyncSchedule}
+              disabled={newFestLineupUrl.trim().length === 0}
+              onChange={(event) =>
+                setNewFestSyncSchedule(event.target.value as "once" | "12" | "24" | "168")
+              }
+              className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink outline-none focus-visible:border-acid disabled:opacity-50"
+            >
+              <option value="once">{dict.manage.autoSync.intervalOnce}</option>
+              <option value="12">{dict.manage.autoSync.intervalHours(12)}</option>
+              <option value="24">{dict.manage.autoSync.intervalDays(1)}</option>
+              <option value="168">{dict.manage.autoSync.intervalWeek}</option>
+            </select>
+          </div>
+
           <HairlineButton type="submit" variant="acid" size="md" disabled={creatingFestival}>
-            {creatingFestival ? dict.importer.creating : dict.importer.create}
+            {creatingFestival
+              ? newFestLineupUrl.trim().length > 0
+                ? dict.manage.autoSync.creatingAndImporting
+                : dict.importer.creating
+              : dict.importer.create}
           </HairlineButton>
         </form>
       ) : null}

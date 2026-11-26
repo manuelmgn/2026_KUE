@@ -21,19 +21,48 @@ import {
 } from "@/server/services/lineup-sync";
 import { toFestivalSummary } from "@/server/services/mappers";
 
+export interface CreateFestivalActionResult extends FestivalSummary {
+  initialEntriesCount: number;
+  initialNewArtistsCount: number;
+  initialSyncError: string | null;
+}
+
 export async function createFestivalAction(
   input: CreateFestivalInput,
-): Promise<ActionResult<FestivalSummary>> {
+): Promise<ActionResult<CreateFestivalActionResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
     const created = await createFestival(input);
+
+    let initialEntriesCount = 0;
+    let initialNewArtistsCount = 0;
+    let initialSyncError: string | null = null;
+
+    if (created.lineupSourceUrl) {
+      try {
+        const syncResult = await checkFestivalLineupSync(created.id, {
+          force: true,
+          applyDirectly: true,
+        });
+        initialEntriesCount = syncResult.addedCount;
+        initialNewArtistsCount = syncResult.newArtistsCount;
+      } catch (error: unknown) {
+        initialSyncError = error instanceof Error ? error.message : dict.errors.importLineup;
+      }
+    }
+
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festivals");
     revalidatePath("/manage");
     revalidatePath("/import");
     revalidatePath("/festival-mode");
-    return toFestivalSummary(created);
+    return {
+      ...toFestivalSummary(created),
+      initialEntriesCount,
+      initialNewArtistsCount,
+      initialSyncError,
+    };
   }, dict.errors.createFestival);
 }
 

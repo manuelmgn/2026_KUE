@@ -82,6 +82,7 @@ export const es: Dictionary = {
       description:
         "Conecta la web oficial del festival (o Clashfinder) para detectar nuevas tandas y horarios sin tocar tus valoraciones ni notas.",
       sourceUrlLabel: "URL del cartel",
+      sourceUrlOptionalLabel: "URL del cartel (opcional)",
       sourceUrlPlaceholder: "https://www.rewirefestival.nl/lineup",
       enabledLabel: "Activar comprobación periódica en segundo plano",
       enabledHint:
@@ -89,9 +90,14 @@ export const es: Dictionary = {
       modeLabel: "Modo de aplicación",
       modeReview: "Revisión previa (recomendado)",
       modeAuto: "Aplicar novedades automáticamente",
-      intervalLabel: "Frecuencia",
-      intervalHours: (hours: number) => `Cada ${hours} h`,
+      intervalLabel: "Actualización",
+      intervalOnce: "Solo una vez (importación única)",
+      intervalHours: (hours: number) => `Cada ${hours} horas`,
       intervalDays: (days: number) => (days === 1 ? "Cada día" : `Cada ${days} días`),
+      intervalWeek: "Cada semana",
+      creatingAndImporting: "Creando e importando cartel...",
+      initialImportWarning: (error: string) =>
+        `Festival creado, pero falló la importación inicial del cartel: ${error}`,
       saveConfig: "Guardar configuración",
       configSaved: "Configuración guardada.",
       checkNow: "Comprobar ahora",

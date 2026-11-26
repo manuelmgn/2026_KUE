@@ -79,8 +79,11 @@ export function FestivalsView({
   const [locationInvalid, setLocationInvalid] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [lineupSourceUrl, setLineupSourceUrl] = useState("");
+  const [syncSchedule, setSyncSchedule] = useState<"once" | "12" | "24" | "168">("24");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
 
   const handleStartDateChange = (nextStart: string) => {
     setStartDate(nextStart);
@@ -95,6 +98,7 @@ export function FestivalsView({
 
   const handleCreate = async () => {
     setError(null);
+    setCreateNotice(null);
     if (locationQuery.trim().length > 0 && !selectedPlace) {
       setLocationInvalid(true);
       setError(dict.importer.locationInvalidError);
@@ -104,6 +108,10 @@ export function FestivalsView({
       setError(dict.importer.dateOrderError);
       return;
     }
+
+    const trimmedUrl = lineupSourceUrl.trim();
+    const autoSyncEnabled = trimmedUrl.length > 0 && syncSchedule !== "once";
+    const syncIntervalHours = syncSchedule === "once" ? 24 : Number(syncSchedule);
 
     setCreating(true);
     try {
@@ -120,6 +128,9 @@ export function FestivalsView({
         locationPlaceId: selectedPlace?.placeId ?? null,
         startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`) : undefined,
         endDate: endDate ? new Date(`${endDate}T00:00:00.000Z`) : undefined,
+        lineupSourceUrl: trimmedUrl || null,
+        autoSyncEnabled,
+        syncIntervalHours,
       });
       if (!res.ok) {
         setError(res.error);
@@ -127,10 +138,14 @@ export function FestivalsView({
       }
 
       const createdItem: FestivalArchiveItemDTO = {
-        ...res.data,
+        id: res.data.id,
+        slug: res.data.slug,
+        name: res.data.name,
+        year: res.data.year,
+        location: res.data.location,
         startDate: startDate || null,
         endDate: endDate || null,
-        entriesCount: 0,
+        entriesCount: res.data.initialEntriesCount,
       };
       setFestivals((prev) => [createdItem, ...prev]);
       setShowCreate(false);
@@ -140,6 +155,18 @@ export function FestivalsView({
       setLocationInvalid(false);
       setStartDate("");
       setEndDate("");
+      setLineupSourceUrl("");
+      setSyncSchedule("24");
+      if (res.data.initialSyncError) {
+        setCreateNotice(dict.manage.autoSync.initialImportWarning(res.data.initialSyncError));
+      } else if (res.data.initialEntriesCount > 0) {
+        setCreateNotice(
+          dict.importer.importedSummary(
+            res.data.initialEntriesCount,
+            res.data.initialNewArtistsCount,
+          ),
+        );
+      }
       router.refresh();
     } finally {
       setCreating(false);
@@ -334,6 +361,46 @@ export function FestivalsView({
                 />
               </div>
             </div>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${formId}-lineup-url`}
+                className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+              >
+                {dict.manage.autoSync.sourceUrlOptionalLabel}
+              </label>
+              <input
+                id={`${formId}-lineup-url`}
+                type="url"
+                value={lineupSourceUrl}
+                onChange={(event) => setLineupSourceUrl(event.target.value)}
+                placeholder={dict.manage.autoSync.sourceUrlPlaceholder}
+                className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${formId}-sync-schedule`}
+                className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+              >
+                {dict.manage.autoSync.intervalLabel}
+              </label>
+              <select
+                id={`${formId}-sync-schedule`}
+                value={syncSchedule}
+                disabled={lineupSourceUrl.trim().length === 0}
+                onChange={(event) =>
+                  setSyncSchedule(event.target.value as "once" | "12" | "24" | "168")
+                }
+                className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none disabled:opacity-50"
+              >
+                <option value="once">{dict.manage.autoSync.intervalOnce}</option>
+                <option value="12">{dict.manage.autoSync.intervalHours(12)}</option>
+                <option value="24">{dict.manage.autoSync.intervalDays(1)}</option>
+                <option value="168">{dict.manage.autoSync.intervalWeek}</option>
+              </select>
+            </div>
           </div>
 
           {error ? (
@@ -352,10 +419,23 @@ export function FestivalsView({
               disabled={creating || name.trim().length === 0}
               onClick={() => void handleCreate()}
             >
-              {creating ? dict.importer.creating : dict.festivals.createSubmit}
+              {creating
+                ? lineupSourceUrl.trim().length > 0
+                  ? dict.manage.autoSync.creatingAndImporting
+                  : dict.importer.creating
+                : dict.festivals.createSubmit}
             </HairlineButton>
           </div>
         </section>
+      ) : null}
+
+      {createNotice ? (
+        <div
+          role="status"
+          className="border-b border-acid bg-surface px-5 py-3 font-mono text-xs text-ink sm:px-6"
+        >
+          {createNotice}
+        </div>
       ) : null}
 
       {festivals.length === 0 ? (

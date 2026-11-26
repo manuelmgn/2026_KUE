@@ -260,26 +260,38 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
           />
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={autoSyncEnabled}
-            disabled={sourceUrl.trim().length === 0}
-            onChange={(event) => {
-              setAutoSyncEnabled(event.target.checked);
-              setConfigSaved(false);
-            }}
-            className="mt-0.5 accent-acid"
-          />
-          <span className="flex flex-col">
-            <span className="font-mono text-[0.76rem] uppercase tracking-[0.06em] text-ink">
-              {t.enabledLabel}
-            </span>
-            <span className="font-serif text-[0.92rem] italic text-ink-muted">{t.enabledHint}</span>
-          </span>
-        </label>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor={`${formId}-interval`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+            >
+              {t.intervalLabel}
+            </label>
+            <select
+              id={`${formId}-interval`}
+              value={autoSyncEnabled ? String(syncIntervalHours) : "once"}
+              disabled={sourceUrl.trim().length === 0}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "once") {
+                  setAutoSyncEnabled(false);
+                } else {
+                  setAutoSyncEnabled(true);
+                  setSyncIntervalHours(Number(value));
+                }
+                setConfigSaved(false);
+              }}
+              className="border border-line bg-bg px-3 py-2 font-mono text-[0.8rem] text-ink focus:border-ink focus:outline-none disabled:opacity-50"
+            >
+              <option value="once">{t.intervalOnce}</option>
+              <option value="12">{t.intervalHours(12)}</option>
+              <option value="24">{t.intervalDays(1)}</option>
+              <option value="168">{t.intervalWeek}</option>
+            </select>
+            <span className="font-serif text-[0.88rem] italic text-ink-muted">{t.enabledHint}</span>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor={`${formId}-mode`}
@@ -298,29 +310,6 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
             >
               <option value="REVIEW">{t.modeReview}</option>
               <option value="AUTO">{t.modeAuto}</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor={`${formId}-interval`}
-              className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
-            >
-              {t.intervalLabel}
-            </label>
-            <select
-              id={`${formId}-interval`}
-              value={syncIntervalHours}
-              onChange={(event) => {
-                setSyncIntervalHours(Number(event.target.value));
-                setConfigSaved(false);
-              }}
-              className="border border-line bg-bg px-3 py-2 font-mono text-[0.8rem] text-ink focus:border-ink focus:outline-none"
-            >
-              <option value={12}>{t.intervalHours(12)}</option>
-              <option value={24}>{t.intervalDays(1)}</option>
-              <option value={48}>{t.intervalDays(2)}</option>
-              <option value={168}>{t.intervalDays(7)}</option>
             </select>
           </div>
         </div>
