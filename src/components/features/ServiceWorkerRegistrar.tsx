@@ -9,7 +9,9 @@ export function ServiceWorkerRegistrar() {
     }
 
     const register = () => {
-      void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      void navigator.serviceWorker
+        .register("/sw.js", { scope: "/", updateViaCache: "none" })
+        .catch(() => undefined);
     };
 
     if (document.readyState === "complete") {
