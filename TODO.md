@@ -2,7 +2,7 @@
 
 ## UX / UI y navegación
 
-- [ ] **Cabecera móvil unificada al hacer scroll**: actualmente en móvil el nombre de un festival se coloca en la cabecera al hacer scroll; extender este comportamiento a todos los títulos de la app unificando el código en un componente/hook común.
+- [x] **Cabecera móvil unificada al hacer scroll**: actualmente en móvil el nombre de un festival se coloca en la cabecera al hacer scroll; extender este comportamiento a todos los títulos de la app unificando el código en un componente/hook común.
 - [ ] **Mejorar la votación postconcierto**: revisar y mejorar la experiencia/flujo de valoración tras los conciertos.
 
 ## Plataformas y reproducción
@@ -12,7 +12,7 @@
 
 ## Artistas y búsqueda
 
-- [ ] **Búsqueda de artistas y ficha de artista**: implementar un sistema de búsqueda de artistas con una ficha que muestre a qué festivales van o han ido, destacando de algún modo aquellos festivales que el usuario tiene añadidos en su app.
+- [x] **Búsqueda de artistas y ficha de artista**: implementar un sistema de búsqueda de artistas con una ficha que muestre a qué festivales van o han ido, destacando de algún modo aquellos festivales que el usuario tiene añadidos en su app.
 
 ## Social, amigos y planificación conjunta
 
