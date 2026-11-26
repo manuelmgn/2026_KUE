@@ -24,6 +24,15 @@ import { getSyncQueue, type SyncQueue } from "@/server/sync/queue";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
+const globalForLineupSync = globalThis as typeof globalThis & {
+  kueInFlightLineupSyncs?: Map<string, Promise<CheckFestivalLineupResult>>;
+};
+
+function getInFlightLineupSyncs(): Map<string, Promise<CheckFestivalLineupResult>> {
+  globalForLineupSync.kueInFlightLineupSyncs ??= new Map();
+  return globalForLineupSync.kueInFlightLineupSyncs;
+}
+
 export interface CheckFestivalLineupResult {
   status: "unchanged" | "applied" | "pending_review" | "up_to_date";
   method: PendingLineupDiff["method"] | null;
@@ -196,6 +205,34 @@ export async function checkFestivalLineupSync(
     geminiModel?: string | undefined;
   } = {},
 ): Promise<CheckFestivalLineupResult> {
+  const inFlight = getInFlightLineupSyncs();
+  const existingPromise = inFlight.get(festivalId);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const runPromise = runCheckFestivalLineupSync(festivalId, options).finally(() => {
+    if (inFlight.get(festivalId) === runPromise) {
+      inFlight.delete(festivalId);
+    }
+  });
+  inFlight.set(festivalId, runPromise);
+  return runPromise;
+}
+
+async function runCheckFestivalLineupSync(
+  festivalId: string,
+  options: {
+    force?: boolean | undefined;
+    db?: PrismaClient | undefined;
+    queue?: SyncQueue | undefined;
+    enqueueSync?: boolean | undefined;
+    fetchImpl?: FetchLineupSourceOptions["fetchImpl"];
+    llmExtractor?: FetchLineupSourceOptions["llmExtractor"];
+    geminiApiKey?: string | undefined;
+    geminiModel?: string | undefined;
+  },
+): Promise<CheckFestivalLineupResult> {
   const db = options.db ?? getDb();
   const festival = await db.festival.findUnique({
     where: { id: festivalId },
@@ -243,11 +280,11 @@ export async function checkFestivalLineupSync(
       festivalName: festival.name,
       festivalYear: festival.year,
       previousContentHash: festival.lastLineupContentHash,
-      force: options.force,
-      geminiApiKey: envGeminiApiKey,
-      geminiModel: envGeminiModel,
-      fetchImpl: options.fetchImpl,
-      llmExtractor: options.llmExtractor,
+      ...(options.force !== undefined ? { force: options.force } : {}),
+      ...(envGeminiApiKey !== undefined ? { geminiApiKey: envGeminiApiKey } : {}),
+      ...(envGeminiModel !== undefined ? { geminiModel: envGeminiModel } : {}),
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+      ...(options.llmExtractor !== undefined ? { llmExtractor: options.llmExtractor } : {}),
     });
 
     if (fetched.unchanged) {
@@ -315,7 +352,7 @@ export async function checkFestivalLineupSync(
         {
           db,
           queue: options.queue ?? getSyncQueue(),
-          enqueueSync: options.enqueueSync,
+          ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
         },
       );
 
@@ -422,7 +459,7 @@ export async function applyPendingLineupDiff(
     {
       db,
       queue: options.queue ?? getSyncQueue(),
-      enqueueSync: options.enqueueSync,
+      ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
     },
   );
 
@@ -438,10 +475,13 @@ export async function dismissPendingLineupDiff(
   festivalId: string,
   db: PrismaClient = getDb(),
 ): Promise<void> {
-  await db.festival.update({
+  const result = await db.festival.updateMany({
     where: { id: festivalId },
     data: { pendingLineupDiff: null },
   });
+  if (result.count === 0) {
+    throw new DomainError("Festival no encontrado");
+  }
 }
 
 export async function runScheduledLineupSyncs(
@@ -484,8 +524,8 @@ export async function runScheduledLineupSyncs(
     try {
       await checkFestivalLineupSync(festival.id, {
         db,
-        queue: options.queue,
-        enqueueSync: options.enqueueSync,
+        ...(options.queue !== undefined ? { queue: options.queue } : {}),
+        ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
       });
       checked += 1;
     } catch (error: unknown) {

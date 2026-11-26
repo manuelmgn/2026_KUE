@@ -569,6 +569,9 @@ export async function fetchAndExtractFestivalLineup(
   if (!response.ok) {
     throw new DomainError(`No se pudo descargar la web del cartel (HTTP ${response.status})`);
   }
+  if (response.url) {
+    validateLineupSourceUrl(response.url);
+  }
 
   const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
   const body = await readLimitedText(response);

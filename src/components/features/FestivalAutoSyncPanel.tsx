@@ -254,7 +254,7 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
               setConfigSaved(false);
             }}
             placeholder={t.sourceUrlPlaceholder}
-            className="border border-line bg-bg px-3 py-2 font-mono text-[0.82rem] text-ink placeholder:text-ink-subtle focus:border-ink focus:outline-none"
+            className="border border-line bg-bg px-3 py-2 font-mono text-[0.82rem] text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
           />
         </div>
 
@@ -362,13 +362,19 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
       </div>
 
       {configSaved ? (
-        <p className="border border-acid/40 bg-acid/10 px-3 py-2 font-mono text-[0.74rem] text-acid">
+        <p
+          role="status"
+          className="border border-acid bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
+        >
           {t.configSaved}
         </p>
       ) : null}
 
       {statusMessage ? (
-        <p className="border border-acid/40 bg-acid/10 px-3 py-2 font-mono text-[0.74rem] text-acid">
+        <p
+          role="status"
+          className="border border-acid bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
+        >
           {statusMessage}
         </p>
       ) : null}
@@ -376,7 +382,7 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
       {errorMessage || lastError ? (
         <p
           role="alert"
-          className="border border-danger/50 bg-danger/10 px-3 py-2 font-mono text-[0.74rem] text-danger"
+          className="border border-line-strong bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
         >
           {errorMessage ?? lastError}
         </p>
@@ -387,10 +393,10 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
       (pendingDiff.added.length > 0 ||
         pendingDiff.updated.length > 0 ||
         pendingDiff.missing.length > 0) ? (
-        <div className="flex flex-col gap-4 border border-acid/50 bg-surface p-4">
+        <div className="flex flex-col gap-4 border border-acid bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
             <div>
-              <h3 className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-acid">
+              <h3 className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink">
                 {t.pendingTitle}
               </h3>
               <p className="mt-0.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
@@ -483,7 +489,7 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
                       <p className="font-display text-[0.95rem] font-semibold text-ink">
                         {item.billingName}
                       </p>
-                      <p className="font-mono text-[0.7rem] text-acid">
+                      <p className="font-mono text-[0.7rem] text-ink-muted">
                         {[
                           item.changes.subtitle && `+ ${item.changes.subtitle}`,
                           item.changes.day && `+ ${item.changes.day}`,
