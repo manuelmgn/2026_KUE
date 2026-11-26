@@ -1,6 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
+import { type RefObject, useEffect, useState } from "react";
 import type { RatingFilter, StatusFilter, ViewMode } from "@/domain/schemas";
 import { useI18n } from "@/i18n/context";
 
@@ -28,6 +28,15 @@ export function FilterBar({
   onViewChange,
 }: FilterBarProps) {
   const { dict } = useI18n();
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsCompact(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   return (
     <section
@@ -41,7 +50,7 @@ export function FilterBar({
             type="search"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder={dict.filters.searchPlaceholder}
+            placeholder={isCompact ? dict.nav.search : dict.filters.searchPlaceholder}
             aria-label={dict.filters.searchAria}
             className="w-full min-w-0 bg-transparent font-sans text-[0.92rem] text-ink placeholder:text-ink-muted focus:outline-none"
           />
