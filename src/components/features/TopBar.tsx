@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { FestivalSummary } from "@/components/features/types";
 import { KueLogo } from "@/components/ui/KueLogo";
+import { useI18n } from "@/i18n/context";
 
 interface TopBarProps {
   festivals: FestivalSummary[];
@@ -29,12 +30,14 @@ function applyTheme(next: "dark" | "light") {
   }
   try {
     localStorage.setItem("kue-theme", next);
+    window.dispatchEvent(new Event("kue-theme-change"));
   } catch {
     // Ignore storage errors in restricted contexts
   }
 }
 
 export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
+  const { dict } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,8 +48,11 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const restartPollRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
-    setTheme(current);
+    const syncCurrentTheme = () => {
+      const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+      setTheme(current);
+    };
+    syncCurrentTheme();
 
     const onStorage = (event: StorageEvent) => {
       if (event.key === "kue-theme") {
@@ -56,7 +62,11 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
       }
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("kue-theme-change", syncCurrentTheme);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("kue-theme-change", syncCurrentTheme);
+    };
   }, []);
 
   useEffect(() => {
@@ -118,7 +128,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const handleFestivalChange = (slug: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("festival", slug);
-    const targetPath = pathname === "/import" ? "/" : pathname;
+    const targetPath = pathname === "/import" || pathname === "/settings" ? "/" : pathname;
     router.push(`${targetPath}?${params.toString()}`);
   };
 
@@ -137,15 +147,15 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const doneCount = syncInfo ? syncInfo.synced + syncInfo.failed : 0;
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-stretch justify-between border-b border-line bg-bg">
-      <div className="flex min-w-0 items-stretch">
+    <header className="sticky top-0 z-40 flex h-14 items-stretch justify-between overflow-x-auto border-b border-line bg-bg">
+      <div className="flex min-w-0 shrink-0 items-stretch">
         <KueLogo href={`/${festivalSuffix}`} />
         {festivals.length > 0 ? (
           <select
-            aria-label="Seleccionar festival"
+            aria-label={dict.nav.selectFestivalAria}
             value={activeFestivalSlug ?? festivals[0]?.slug ?? ""}
             onChange={(event) => handleFestivalChange(event.target.value)}
-            className="cursor-pointer border-r border-line bg-bg px-[18px] font-mono text-[0.78rem] uppercase tracking-[0.06em] text-ink outline-none"
+            className="cursor-pointer border-r border-line bg-bg px-3.5 font-mono text-[0.78rem] uppercase tracking-[0.06em] text-ink outline-none sm:px-[18px]"
           >
             {festivals.map((fest) => (
               <option key={fest.id} value={fest.slug} className="bg-bg text-ink">
@@ -156,55 +166,63 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
         ) : null}
       </div>
 
-      <nav aria-label="Navegación principal" className="flex items-stretch">
+      <nav aria-label={dict.nav.mainAria} className="flex shrink-0 items-stretch">
         <Link
           href={`/${festivalSuffix}`}
-          className={`flex items-center border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
+          className={`flex items-center whitespace-nowrap border-l border-line px-3.5 font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors sm:px-[18px] ${
             pathname === "/" ? "bg-ink text-bg" : "text-ink hover:bg-surface-elevated"
           }`}
         >
-          Cartel
+          {dict.nav.lineup}
         </Link>
         <Link
           href={`/festival-mode${festivalSuffix}`}
-          className={`flex items-center border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
+          className={`flex items-center whitespace-nowrap border-l border-line px-3.5 font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors sm:px-[18px] ${
             pathname === "/festival-mode" ? "bg-ink text-bg" : "text-ink hover:bg-surface-elevated"
           }`}
         >
-          Modo Festival
+          {dict.nav.festivalMode}
         </Link>
         <Link
           href={`/import${festivalSuffix}`}
-          className={`flex items-center border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
+          className={`flex items-center whitespace-nowrap border-l border-line px-3.5 font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors sm:px-[18px] ${
             pathname === "/import" ? "bg-ink text-bg" : "text-ink hover:bg-surface-elevated"
           }`}
         >
-          Importar
+          {dict.nav.import}
+        </Link>
+        <Link
+          href={`/settings${festivalSuffix}`}
+          className={`flex items-center whitespace-nowrap border-l border-line px-3.5 font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors sm:px-[18px] ${
+            pathname === "/settings" ? "bg-ink text-bg" : "text-ink hover:bg-surface-elevated"
+          }`}
+        >
+          {dict.nav.settings}
         </Link>
         {isSyncing && syncInfo ? (
           <div
             aria-live="polite"
-            className="hidden items-center border-l border-line px-4 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted md:flex"
+            className="hidden items-center whitespace-nowrap border-l border-line px-4 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted md:flex"
           >
-            SYNC {doneCount}/{syncInfo.total}
+            {dict.nav.syncStatus(doneCount, syncInfo.total)}
           </div>
         ) : failedCount > 0 ? (
           <button
             type="button"
             disabled={retrying}
             onClick={() => void handleRetrySync()}
-            title="Reintentar artistas con error de sincronización"
-            className="hidden cursor-pointer items-center border-l border-line px-4 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-acid hover:text-acid-ink disabled:opacity-40 md:flex"
+            title={dict.nav.retrySyncTitle}
+            className="hidden cursor-pointer items-center whitespace-nowrap border-l border-line px-4 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-acid hover:text-acid-ink disabled:opacity-40 md:flex"
           >
-            {retrying ? "REINTENTANDO..." : `REINTENTAR (${failedCount})`}
+            {retrying ? dict.nav.retryingSync : dict.nav.retrySync(failedCount)}
           </button>
         ) : null}
         <button
           type="button"
           onClick={handleToggleTheme}
-          className="flex cursor-pointer items-center border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-surface-elevated hover:text-ink"
+          className="flex cursor-pointer items-center whitespace-nowrap border-l border-line px-3.5 font-mono text-[0.76rem] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:bg-surface-elevated hover:text-ink sm:px-[18px]"
         >
-          {theme === "dark" ? "Claro" : "Oscuro"}
+          {theme === "dark" ? dict.nav.themeLight : dict.nav.themeDark}
         </button>
       </nav>
     </header>

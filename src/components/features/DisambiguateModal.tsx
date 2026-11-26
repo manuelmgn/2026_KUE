@@ -5,6 +5,7 @@ import { disambiguateArtistAction } from "@/actions/artist-actions";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Modal } from "@/components/ui/Modal";
 import type { MusicBrainzArtistCandidate } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface DisambiguateModalProps {
   open: boolean;
@@ -17,11 +18,12 @@ interface DisambiguateModalProps {
 async function fetchCandidates(
   term: string,
   signal: AbortSignal,
+  fallbackError: string,
 ): Promise<MusicBrainzArtistCandidate[]> {
   const response = await fetch(`/api/disambiguate?q=${encodeURIComponent(term)}`, { signal });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? "No se pudo consultar MusicBrainz");
+    throw new Error(body.error ?? fallbackError);
   }
   const data = (await response.json()) as { candidates: MusicBrainzArtistCandidate[] };
   return data.candidates;
@@ -34,6 +36,7 @@ export function DisambiguateModal({
   artistName,
   onDisambiguated,
 }: DisambiguateModalProps) {
+  const { dict } = useI18n();
   const [query, setQuery] = useState(artistName);
   const [candidates, setCandidates] = useState<MusicBrainzArtistCandidate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,11 @@ export function DisambiguateModal({
     setLoading(true);
     setError(null);
     try {
-      const results = await fetchCandidates(trimmed, controller.signal);
+      const results = await fetchCandidates(
+        trimmed,
+        controller.signal,
+        dict.disambiguate.fetchError,
+      );
       if (!controller.signal.aborted) {
         setCandidates(results);
       }
@@ -62,7 +69,7 @@ export function DisambiguateModal({
       if (controller.signal.aborted) {
         return;
       }
-      setError(err instanceof Error ? err.message : "Error de conexión con MusicBrainz");
+      setError(err instanceof Error ? err.message : dict.disambiguate.connectionError);
       setCandidates([]);
     } finally {
       if (!controller.signal.aborted) {
@@ -85,7 +92,7 @@ export function DisambiguateModal({
     setLoading(true);
     setError(null);
 
-    void fetchCandidates(artistName, controller.signal)
+    void fetchCandidates(artistName, controller.signal, dict.disambiguate.fetchError)
       .then((results) => {
         if (!controller.signal.aborted) {
           setCandidates(results);
@@ -93,7 +100,7 @@ export function DisambiguateModal({
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : "Error de conexión con MusicBrainz");
+          setError(err instanceof Error ? err.message : dict.disambiguate.connectionError);
           setCandidates([]);
         }
       })
@@ -106,7 +113,7 @@ export function DisambiguateModal({
     return () => {
       controller.abort();
     };
-  }, [open, artistName]);
+  }, [open, artistName, dict.disambiguate.fetchError, dict.disambiguate.connectionError]);
 
   const handleSelect = async (candidate: MusicBrainzArtistCandidate) => {
     setSavingId(candidate.id);
@@ -129,11 +136,9 @@ export function DisambiguateModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Desambiguar en MusicBrainz">
+    <Modal open={open} onClose={onClose} title={dict.disambiguate.title}>
       <div className="flex flex-col gap-4">
-        <p className="font-serif text-[1.1rem] text-ink-muted">
-          Selecciona el artista correcto. Tus notas, valoración y festivales se conservan intactos.
-        </p>
+        <p className="font-serif text-[1.1rem] text-ink-muted">{dict.disambiguate.description}</p>
 
         <form
           onSubmit={(event) => {
@@ -146,8 +151,8 @@ export function DisambiguateModal({
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar término alternativo..."
-            aria-label="Término de búsqueda en MusicBrainz"
+            placeholder={dict.disambiguate.searchPlaceholder}
+            aria-label={dict.disambiguate.searchAria}
             className="flex-1 bg-surface px-3 py-2 font-sans text-sm text-ink outline-none"
           />
           <HairlineButton
@@ -157,7 +162,7 @@ export function DisambiguateModal({
             disabled={loading}
             className="border-0 border-l border-line"
           >
-            {loading ? "Buscando..." : "Buscar"}
+            {loading ? dict.common.searching : dict.common.search}
           </HairlineButton>
         </form>
 
@@ -170,7 +175,7 @@ export function DisambiguateModal({
         <div className="flex flex-col border-t border-line">
           {!loading && candidates.length === 0 && !error ? (
             <p className="py-6 font-mono text-xs uppercase text-ink-muted">
-              Sin candidatos para esta búsqueda.
+              {dict.disambiguate.noCandidates}
             </p>
           ) : null}
 
@@ -187,11 +192,11 @@ export function DisambiguateModal({
                 <div className="mt-1 font-mono text-[0.72rem] uppercase text-ink-muted">
                   {[candidate.country, candidate.type, candidate.disambiguation]
                     .filter(Boolean)
-                    .join(" · ") || "Sin descripción adicional"}
+                    .join(" · ") || dict.disambiguate.noAdditionalDescription}
                 </div>
               </div>
               <span className="shrink-0 border border-line px-2.5 py-1 font-mono text-[0.7rem] uppercase">
-                {savingId === candidate.id ? "Guardando..." : "Elegir"}
+                {savingId === candidate.id ? dict.common.saving : dict.common.choose}
               </span>
             </button>
           ))}

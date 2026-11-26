@@ -18,6 +18,7 @@ import { getAlbumExternalLinks, getArtistExternalLinks } from "@/domain/external
 import { toMediaApiUrl } from "@/domain/media-url";
 import { sortAlbumsForShelf } from "@/domain/rating";
 import type { ArtistStatus } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface ArtistDrawerProps {
   entry: LineupEntryDTO | null;
@@ -37,13 +38,6 @@ interface ArtistDrawerProps {
   ) => void;
 }
 
-const STATUS_LABELS: Array<{ value: ArtistStatus; label: string }> = [
-  { value: "PENDING", label: "Pendiente" },
-  { value: "LISTENING", label: "Escuchando" },
-  { value: "RATED", label: "Valorado" },
-  { value: "DISCARDED", label: "Descartado" },
-];
-
 export function ArtistDrawer({
   entry,
   onClose,
@@ -52,6 +46,13 @@ export function ArtistDrawer({
   onNotesSaved,
   onEntryUpdated,
 }: ArtistDrawerProps) {
+  const { dict } = useI18n();
+  const statusLabels: Array<{ value: ArtistStatus; label: string }> = [
+    { value: "PENDING", label: dict.drawer.statusPending },
+    { value: "LISTENING", label: dict.drawer.statusListening },
+    { value: "RATED", label: dict.drawer.statusRated },
+    { value: "DISCARDED", label: dict.drawer.statusDiscarded },
+  ];
   const [activeArtistIdx, setActiveArtistIdx] = useState(0);
   const [detail, setDetail] = useState<ArtistDetailDTO | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -268,8 +269,10 @@ export function ArtistDrawer({
   };
 
   const headerLabel = entry
-    ? [entry.day ?? "TBA", entry.stage ?? "TBA", entry.setTime].filter(Boolean).join(" · ")
-    : "Ficha";
+    ? [entry.day ?? dict.common.tba, entry.stage ?? dict.common.tba, entry.setTime]
+        .filter(Boolean)
+        .join(" · ")
+    : dict.drawer.defaultHeader;
 
   const displayArtist = activeSummary;
   const externalLinks = displayArtist ? getArtistExternalLinks(displayArtist.name) : null;
@@ -281,14 +284,16 @@ export function ArtistDrawer({
         open={entry !== null}
         onClose={onClose}
         headerLabel={headerLabel}
-        ariaLabel={displayArtist ? `Ficha de ${displayArtist.name}` : "Ficha de artista"}
+        ariaLabel={
+          displayArtist ? dict.drawer.artistAria(displayArtist.name) : dict.drawer.defaultAria
+        }
       >
         {entry && displayArtist ? (
           <div>
             {entry.artists.length > 1 ? (
               <div
                 role="tablist"
-                aria-label="Artistas en esta colaboración"
+                aria-label={dict.drawer.collabTablistAria}
                 className="flex border-b border-line"
               >
                 {entry.artists.map((artist, index) => {
@@ -330,7 +335,7 @@ export function ArtistDrawer({
                   <span className="font-mono text-[0.75rem] uppercase text-ink-muted">
                     {[
                       detail?.country ?? displayArtist.country,
-                      entry.subtitle ?? "Ficha de artista",
+                      entry.subtitle ?? dict.drawer.artistCardFallback,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -340,19 +345,19 @@ export function ArtistDrawer({
                     onClick={() => setDisambigOpen(true)}
                     className="cursor-pointer font-mono text-[0.72rem] text-ink-muted underline underline-offset-4 transition-colors hover:text-acid"
                   >
-                    ¿No es este artista? Cambiar
+                    {dict.drawer.notThisArtist}
                   </button>
                 </div>
                 {detail?.syncStatus === "FAILED" && detail.syncError ? (
                   <p className="mt-2 border border-line bg-surface px-2.5 py-1.5 font-mono text-[0.68rem] text-ink-muted">
-                    Error de sincronización: {detail.syncError}
+                    {dict.drawer.syncErrorPrefix} {detail.syncError}
                   </p>
                 ) : null}
               </div>
 
               <div className="grid grid-cols-1 gap-3 border-y border-line py-4 sm:grid-cols-[1fr_auto] sm:items-center">
                 <div className="flex flex-wrap gap-1.5">
-                  {STATUS_LABELS.map((item) => {
+                  {statusLabels.map((item) => {
                     const isActive = displayArtist.status === item.value;
                     return (
                       <HairlineButton
@@ -402,14 +407,14 @@ export function ArtistDrawer({
 
               <div>
                 <div className="mb-2.5 flex items-center justify-between font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  <span>Notas personales</span>
+                  <span>{dict.drawer.personalNotes}</span>
                   <span>
                     {notesSaveState === "saving"
-                      ? "Guardando..."
+                      ? dict.common.saving
                       : notesSaveState === "saved"
-                        ? "Guardado"
+                        ? dict.common.saved
                         : notesSaveState === "error"
-                          ? "Error al guardar"
+                          ? dict.common.saveError
                           : ""}
                   </span>
                 </div>
@@ -423,27 +428,27 @@ export function ArtistDrawer({
                     }
                     void flushNotesSave(displayArtist.id, notesDraft);
                   }}
-                  placeholder="Sensaciones, discos clave, recordatorios para el concierto..."
+                  placeholder={dict.drawer.notesPlaceholder}
                   className="min-h-[84px] w-full resize-y border border-line bg-surface p-3 font-serif text-[1.15rem] text-ink placeholder:text-ink-muted focus:border-acid focus:outline-none"
                 />
               </div>
 
               <div>
                 <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  Biografía
+                  {dict.drawer.biography}
                 </div>
                 <p className="font-serif text-[1.2rem] leading-[1.42] text-ink">
                   {detail?.bio
                     ? detail.bio
                     : loadingDetail
-                      ? "Cargando información..."
-                      : "Sin biografía sincronizada todavía."}
+                      ? dict.drawer.loadingInfo
+                      : dict.drawer.noBioYet}
                 </p>
               </div>
 
               <div>
                 <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  Discografía · Por dónde empezar
+                  {dict.drawer.discographyTitle}
                 </div>
                 {detail && detail.albums.length > 0 ? (
                   <div className="flex gap-4 overflow-x-auto pb-2">
@@ -469,7 +474,7 @@ export function ArtistDrawer({
                                   : "border-[#444] bg-black/85 text-white hover:border-white"
                               }`}
                             >
-                              {album.isPinned ? "PIN ★" : "FIJAR"}
+                              {album.isPinned ? dict.drawer.pinActive : dict.drawer.pinAction}
                             </button>
                           </div>
 
@@ -541,7 +546,7 @@ export function ArtistDrawer({
                                 onClick={() => void handleSaveCustomUrl(album.id)}
                                 className="w-full py-1 text-[0.66rem]"
                               >
-                                Guardar
+                                {dict.common.save}
                               </HairlineButton>
                             </div>
                           ) : null}
@@ -551,16 +556,14 @@ export function ArtistDrawer({
                   </div>
                 ) : (
                   <p className="font-mono text-xs uppercase text-ink-muted">
-                    {loadingDetail
-                      ? "Cargando discografía..."
-                      : "Sin discos sincronizados todavía."}
+                    {loadingDetail ? dict.drawer.loadingDiscography : dict.drawer.noAlbumsYet}
                   </p>
                 )}
               </div>
 
               <div>
                 <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  Pase actual & Valoración de directo
+                  {dict.drawer.currentSetTitle}
                 </div>
                 <div className="flex flex-col gap-3 border border-line bg-surface p-4">
                   <div className="grid grid-cols-3 gap-2">
@@ -571,8 +574,8 @@ export function ArtistDrawer({
                         setDayDraft(event.target.value);
                         setLiveSaveState("idle");
                       }}
-                      placeholder="Día (ej. Viernes 09)"
-                      aria-label="Día del concierto"
+                      placeholder={dict.drawer.dayPlaceholder}
+                      aria-label={dict.drawer.dayAria}
                       className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                     />
                     <input
@@ -582,8 +585,8 @@ export function ArtistDrawer({
                         setStageDraft(event.target.value);
                         setLiveSaveState("idle");
                       }}
-                      placeholder="Escenario"
-                      aria-label="Escenario"
+                      placeholder={dict.drawer.stagePlaceholder}
+                      aria-label={dict.drawer.stageAria}
                       className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                     />
                     <input
@@ -593,15 +596,15 @@ export function ArtistDrawer({
                         setTimeDraft(event.target.value);
                         setLiveSaveState("idle");
                       }}
-                      placeholder="Hora (22:30)"
-                      aria-label="Hora del pase"
+                      placeholder={dict.drawer.timePlaceholder}
+                      aria-label={dict.drawer.timeAria}
                       className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
                     />
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-[0.72rem] uppercase text-ink-muted">
-                      Nota de directo
+                      {dict.drawer.liveRatingLabel}
                     </span>
                     <RatingControl
                       compact
@@ -620,19 +623,19 @@ export function ArtistDrawer({
                       setLiveNotesDraft(event.target.value);
                       setLiveSaveState("idle");
                     }}
-                    placeholder="¿Qué tal estuvo en directo?"
-                    aria-label="Comentario de directo"
+                    placeholder={dict.drawer.liveNotesPlaceholder}
+                    aria-label={dict.drawer.liveNotesAria}
                     className="border border-line bg-bg px-3 py-2 font-serif text-base text-ink outline-none focus:border-acid"
                   />
 
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-[0.7rem] uppercase text-ink-muted">
                       {liveSaveState === "saving"
-                        ? "Guardando..."
+                        ? dict.common.saving
                         : liveSaveState === "saved"
-                          ? "Pase guardado"
+                          ? dict.drawer.setSaved
                           : liveSaveState === "error"
-                            ? (liveSaveError ?? "Error al guardar")
+                            ? (liveSaveError ?? dict.common.saveError)
                             : ""}
                     </span>
                     <HairlineButton
@@ -640,7 +643,7 @@ export function ArtistDrawer({
                       disabled={liveSaveState === "saving"}
                       onClick={() => void handleSaveEntrySchedule()}
                     >
-                      Guardar pase
+                      {dict.drawer.saveSet}
                     </HairlineButton>
                   </div>
                 </div>
@@ -648,7 +651,7 @@ export function ArtistDrawer({
 
               <div>
                 <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  Historial en festivales
+                  {dict.drawer.festivalHistoryTitle}
                 </div>
                 <div className="border-t border-line">
                   {(detail?.festivals ?? []).map((appearance) => (
@@ -663,7 +666,7 @@ export function ArtistDrawer({
                       </span>
                       {appearance.liveRating ? (
                         <span className="border border-acid bg-acid px-2 py-0.5 text-[0.7rem] font-semibold text-acid-ink">
-                          DIRECTO {appearance.liveRating}/5
+                          {dict.drawer.liveBadge(appearance.liveRating)}
                         </span>
                       ) : null}
                     </div>

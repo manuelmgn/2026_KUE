@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { getPlacesApiLanguage, normalizeLocale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { getServerLocale } from "@/i18n/server";
 import { ExternalApiError } from "@/server/clients/musicbrainz";
 import { searchPlaces } from "@/server/clients/places";
 
@@ -10,16 +13,19 @@ const MAX_QUERY_LENGTH = 120;
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const query = url.searchParams.get("q")?.trim() ?? "";
+  const langParam = url.searchParams.get("lang");
+  const locale = langParam ? normalizeLocale(langParam) : await getServerLocale();
+  const dict = getDictionary(locale);
 
   if (query.length < MIN_QUERY_LENGTH) {
     return NextResponse.json({ places: [] }, { headers: { "Cache-Control": "no-store" } });
   }
   if (query.length > MAX_QUERY_LENGTH) {
-    return NextResponse.json({ error: "Búsqueda demasiado larga" }, { status: 400 });
+    return NextResponse.json({ error: dict.errors.queryTooLong }, { status: 400 });
   }
 
   try {
-    const places = await searchPlaces(query, 6);
+    const places = await searchPlaces(query, 6, 8_000, getPlacesApiLanguage(locale));
     return NextResponse.json({ places }, { headers: { "Cache-Control": "private, max-age=300" } });
   } catch (error: unknown) {
     if (error instanceof ExternalApiError) {
@@ -28,9 +34,6 @@ export async function GET(request: Request): Promise<NextResponse> {
         { status: error.status === 429 ? 429 : 502 },
       );
     }
-    return NextResponse.json(
-      { error: "Error consultando el servicio de lugares" },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: dict.errors.placesServiceError }, { status: 502 });
   }
 }

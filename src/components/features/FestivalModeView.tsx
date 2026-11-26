@@ -5,14 +5,18 @@ import { useEffect, useState } from "react";
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getEffectiveEntryRating } from "@/domain/rating";
+import { useI18n } from "@/i18n/context";
 
 interface FestivalModeViewProps {
   festival: FestivalSummary;
   entries: LineupEntryDTO[];
 }
 
+const ALL_DAYS_KEY = "__ALL__";
+
 export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
-  const [selectedDay, setSelectedDay] = useState<string>("TODOS");
+  const { dict } = useI18n();
+  const [selectedDay, setSelectedDay] = useState<string>(ALL_DAYS_KEY);
   const [onlyMustSee, setOnlyMustSee] = useState<boolean>(true);
   const [offlineEntries, setOfflineEntries] = useState<LineupEntryDTO[]>(entries);
 
@@ -52,11 +56,11 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
   const uniqueDays = Array.from(
     new Set(ratingFiltered.map((entry) => entry.day).filter((day): day is string => Boolean(day))),
   );
-  const days = ["TODOS", ...uniqueDays];
+  const days = [ALL_DAYS_KEY, ...uniqueDays];
 
-  const effectiveDay = days.includes(selectedDay) ? selectedDay : "TODOS";
+  const effectiveDay = days.includes(selectedDay) ? selectedDay : ALL_DAYS_KEY;
   const visible =
-    effectiveDay === "TODOS"
+    effectiveDay === ALL_DAYS_KEY
       ? ratingFiltered
       : ratingFiltered.filter((entry) => entry.day === effectiveDay);
 
@@ -82,17 +86,18 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
               : "border-line text-ink-muted hover:border-ink hover:text-ink"
           }`}
         >
-          {onlyMustSee ? "≥4★ Imprescindibles" : "Todos los pases"}
+          {onlyMustSee ? dict.festivalMode.mustSeeLabel : dict.festivalMode.allSetsLabel}
         </button>
       </div>
 
       <div
         role="tablist"
-        aria-label="Filtrar por día"
+        aria-label={dict.festivalMode.filterByDayAria}
         className="flex overflow-x-auto border-b border-line bg-bg"
       >
         {days.map((day) => {
           const isActive = effectiveDay === day;
+          const label = day === ALL_DAYS_KEY ? dict.festivalMode.allDays : day;
           return (
             <button
               key={day}
@@ -106,7 +111,7 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
                   : "text-ink-muted hover:bg-surface hover:text-ink"
               }`}
             >
-              {day}
+              {label}
             </button>
           );
         })}
@@ -114,11 +119,11 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
 
       {visible.length === 0 ? (
         <EmptyState
-          title="Sin pases en esta vista"
+          title={dict.festivalMode.emptyTitle}
           description={
             onlyMustSee
-              ? "Todavía no tienes artistas puntuados con 4★ o 5★ para este filtro."
-              : "No hay entradas cargadas para este día."
+              ? dict.festivalMode.emptyMustSeeDescription
+              : dict.festivalMode.emptyDayDescription
           }
           action={
             onlyMustSee ? (
@@ -127,24 +132,24 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
                 onClick={() => setOnlyMustSee(false)}
                 className="cursor-pointer border border-line px-4 py-2 font-mono text-xs uppercase text-ink hover:border-ink"
               >
-                Ver todos los pases
+                {dict.festivalMode.showAllSets}
               </button>
             ) : (
               <Link
                 href={`/?festival=${encodeURIComponent(festival.slug)}`}
                 className="inline-flex border border-acid bg-acid px-4 py-2 font-mono text-xs font-semibold uppercase text-acid-ink"
               >
-                Volver al cartel
+                {dict.festivalMode.backToLineup}
               </Link>
             )
           }
         />
       ) : (
-        <ul aria-label="Lista de pases en Modo Festival">
+        <ul aria-label={dict.festivalMode.listAria}>
           {visible.map((entry) => {
             const rating = getEffectiveEntryRating(entry.artists);
             const noteText = entry.artists.find((a) => a.notes.trim().length > 0)?.notes ?? "";
-            const metaLine = [entry.day ?? "TBA", entry.setTime, entry.stage]
+            const metaLine = [entry.day ?? dict.common.tba, entry.setTime, entry.stage]
               .filter(Boolean)
               .join(" · ");
 

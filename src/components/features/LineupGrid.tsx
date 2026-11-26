@@ -4,6 +4,7 @@ import type { LineupEntryDTO } from "@/components/features/types";
 import { Artwork } from "@/components/ui/Artwork";
 import { toMediaApiUrl } from "@/domain/media-url";
 import { getEffectiveEntryRating, getEffectiveEntryStatus } from "@/domain/rating";
+import { useI18n } from "@/i18n/context";
 
 interface LineupGridProps {
   entries: LineupEntryDTO[];
@@ -11,9 +12,11 @@ interface LineupGridProps {
 }
 
 export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
+  const { dict } = useI18n();
+
   return (
     <section
-      aria-label="Cartel en cuadrícula"
+      aria-label={dict.workspace.gridAria}
       className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       {entries.map((entry, idx) => {
@@ -45,7 +48,7 @@ export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
             >
               <div className="flex items-center justify-between font-mono text-[0.72rem] tracking-[0.05em] text-ink-muted">
                 <span className="truncate uppercase">
-                  {String(idx + 1).padStart(2, "0")} · {entry.day ?? "TBA"}
+                  {String(idx + 1).padStart(2, "0")} · {entry.day ?? dict.common.tba}
                   {entry.stage ? ` · ${entry.stage}` : ""}
                 </span>
                 <span
@@ -65,7 +68,7 @@ export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
                 />
                 {entry.artists.length > 1 ? (
                   <span className="absolute bottom-0 left-0 border-t border-r border-line bg-bg px-1.5 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.08em] text-ink">
-                    {entry.artists.length} ARTISTAS
+                    {dict.workspace.artistsBadge(entry.artists.length)}
                   </span>
                 ) : null}
               </div>

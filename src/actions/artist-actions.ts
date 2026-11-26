@@ -12,6 +12,7 @@ import type {
   UpdateArtistRatingInput,
   UpdateArtistStatusInput,
 } from "@/domain/schemas";
+import { getServerDictionary } from "@/i18n/server";
 import {
   disambiguateArtist,
   getArtistDetail,
@@ -29,54 +30,59 @@ export async function getArtistDetailAction(artistId: string) {
 export async function setArtistRatingAction(
   input: UpdateArtistRatingInput,
 ): Promise<ActionResult<{ id: string; rating: number | null; status: ArtistStatus }>> {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateArtistRating(input);
     revalidatePath("/");
     revalidatePath("/festival-mode");
     return { id: updated.id, rating: updated.rating, status: updated.status };
-  }, "No se pudo guardar la valoración");
+  }, dict.errors.saveRating);
 }
 
 export async function setArtistStatusAction(
   input: UpdateArtistStatusInput,
 ): Promise<ActionResult<{ id: string; status: ArtistStatus }>> {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateArtistStatus(input);
     revalidatePath("/");
     revalidatePath("/festival-mode");
     return { id: updated.id, status: updated.status };
-  }, "No se pudo cambiar el estado");
+  }, dict.errors.changeStatus);
 }
 
 export async function saveArtistNotesAction(
   input: UpdateArtistNotesInput,
 ): Promise<ActionResult<{ id: string; notes: string }>> {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateArtistNotes(input);
     revalidatePath("/");
     revalidatePath("/festival-mode");
     return { id: updated.id, notes: updated.notes };
-  }, "No se pudieron guardar las notas");
+  }, dict.errors.saveNotes);
 }
 
 export async function toggleAlbumPinAction(
   input: UpdateAlbumPinInput,
 ): Promise<ActionResult<{ id: string; isPinned: boolean }>> {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateAlbumPin(input);
     revalidatePath("/");
     return { id: updated.id, isPinned: updated.isPinned };
-  }, "No se pudo actualizar el disco fijado");
+  }, dict.errors.togglePin);
 }
 
 export async function saveAlbumCustomUrlAction(
   input: UpdateAlbumCustomUrlInput,
 ): Promise<ActionResult<{ id: string; customUrl: string | null }>> {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateAlbumCustomUrl(input);
     revalidatePath("/");
     return { id: updated.id, customUrl: updated.customUrl };
-  }, "No se pudo guardar el enlace del álbum");
+  }, dict.errors.saveAlbumUrl);
 }
 
 export async function disambiguateArtistAction(
@@ -84,6 +90,7 @@ export async function disambiguateArtistAction(
 ): Promise<
   ActionResult<{ id: string; mbid: string | null; country: string | null; syncStatus: SyncStatus }>
 > {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await disambiguateArtist(input);
     revalidatePath("/");
@@ -93,5 +100,5 @@ export async function disambiguateArtistAction(
       country: updated.country,
       syncStatus: updated.syncStatus,
     };
-  }, "No se pudo actualizar el artista");
+  }, dict.errors.disambiguateArtist);
 }

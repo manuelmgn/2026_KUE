@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useDialog } from "@/components/ui/useDialog";
+import { useI18n } from "@/i18n/context";
 
 interface DrawerProps {
   open: boolean;
@@ -12,6 +13,7 @@ interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, headerLabel, ariaLabel, children }: DrawerProps) {
+  const { dict } = useI18n();
   const dialogRef = useDialog(open, onClose);
   const closedByProps = { closedby: "any" } as Record<string, string>;
 
@@ -26,7 +28,7 @@ export function Drawer({ open, onClose, headerLabel, ariaLabel, children }: Draw
           onClick={() => dialogRef.current?.close()}
           className="cursor-pointer border-l border-line px-5 font-mono text-[0.76rem] uppercase transition-colors hover:bg-acid hover:text-acid-ink"
         >
-          Cerrar [ESC]
+          {dict.common.closeEsc}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">{children}</div>

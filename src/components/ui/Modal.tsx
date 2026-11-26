@@ -2,6 +2,7 @@
 
 import { type ReactNode, useId } from "react";
 import { useDialog } from "@/components/ui/useDialog";
+import { useI18n } from "@/i18n/context";
 
 interface ModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children }: ModalProps) {
+  const { dict } = useI18n();
   const dialogRef = useDialog(open, onClose);
   const titleId = useId();
   const closedByProps = { closedby: "any" } as Record<string, string>;
@@ -29,7 +31,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
           onClick={() => dialogRef.current?.close()}
           className="cursor-pointer border-l border-line px-5 font-mono text-[0.74rem] uppercase transition-colors hover:bg-acid hover:text-acid-ink"
         >
-          Cerrar
+          {dict.common.close}
         </button>
       </div>
       <div className="overflow-y-auto p-5">{children}</div>

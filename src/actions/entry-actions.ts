@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { type ActionResult, runAction } from "@/actions/result";
 import type { UpdateEntryScheduleInput } from "@/domain/schemas";
+import { getServerDictionary } from "@/i18n/server";
 import { updateEntrySchedule } from "@/server/services/entries";
 
 export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput): Promise<
@@ -15,6 +16,7 @@ export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput)
     liveNotes: string;
   }>
 > {
+  const { dict } = await getServerDictionary();
   return runAction(async () => {
     const updated = await updateEntrySchedule(input);
     revalidatePath("/");
@@ -27,5 +29,5 @@ export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput)
       liveRating: updated.liveRating,
       liveNotes: updated.liveNotes,
     };
-  }, "No se pudo guardar el pase");
+  }, dict.errors.saveSchedule);
 }

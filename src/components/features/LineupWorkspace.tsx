@@ -12,6 +12,7 @@ import type { FestivalSummary, LineupEntryDTO } from "@/components/features/type
 import { EmptyState } from "@/components/ui/EmptyState";
 import { matchesEntryFilters, resolveStatusOnRating } from "@/domain/rating";
 import type { ArtistStatus, RatingFilter, StatusFilter, ViewMode } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface LineupWorkspaceProps {
   festival: FestivalSummary;
@@ -74,6 +75,7 @@ export function LineupWorkspace({
   initialRating,
   initialView,
 }: LineupWorkspaceProps) {
+  const { dict } = useI18n();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -323,18 +325,22 @@ export function LineupWorkspace({
             onClick={() => setActionError(null)}
             className="cursor-pointer font-mono text-xs uppercase text-ink-muted hover:text-ink"
           >
-            Cerrar
+            {dict.common.close}
           </button>
         </div>
       ) : null}
 
       {visibleEntries.length === 0 ? (
         <EmptyState
-          title={baseEntries.length === 0 ? "Cartel vacío" : "Sin coincidencias"}
+          title={
+            baseEntries.length === 0
+              ? dict.workspace.emptyLineupTitle
+              : dict.workspace.noMatchesTitle
+          }
           description={
             baseEntries.length === 0
-              ? "Pega un anuncio o lista de artistas en el importador para poblar este festival."
-              : "Prueba ajustando la búsqueda, el estado o el filtro de nota."
+              ? dict.workspace.emptyLineupDescription
+              : dict.workspace.noMatchesDescription
           }
           action={
             baseEntries.length === 0 ? (
@@ -342,7 +348,7 @@ export function LineupWorkspace({
                 href={`/import?festival=${encodeURIComponent(festival.slug)}`}
                 className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
               >
-                Importar cartel →
+                {dict.workspace.emptyLineupAction}
               </Link>
             ) : undefined
           }

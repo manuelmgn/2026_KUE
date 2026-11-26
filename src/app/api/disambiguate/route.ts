@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getServerDictionary } from "@/i18n/server";
 import { ExternalApiError, searchMusicBrainzArtists } from "@/server/clients/musicbrainz";
 
 export const dynamic = "force-dynamic";
@@ -6,14 +7,15 @@ export const dynamic = "force-dynamic";
 const MAX_QUERY_LENGTH = 200;
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const { dict } = await getServerDictionary();
   const url = new URL(request.url);
   const query = url.searchParams.get("q")?.trim() ?? "";
 
   if (!query) {
-    return NextResponse.json({ error: "Parámetro q obligatorio" }, { status: 400 });
+    return NextResponse.json({ error: dict.errors.missingQueryParam }, { status: 400 });
   }
   if (query.length > MAX_QUERY_LENGTH) {
-    return NextResponse.json({ error: "Búsqueda demasiado larga" }, { status: 400 });
+    return NextResponse.json({ error: dict.errors.queryTooLong }, { status: 400 });
   }
 
   try {
@@ -26,6 +28,6 @@ export async function GET(request: Request): Promise<NextResponse> {
         { status: error.status === 429 ? 429 : 502 },
       );
     }
-    return NextResponse.json({ error: "Error consultando MusicBrainz" }, { status: 502 });
+    return NextResponse.json({ error: dict.errors.musicBrainzServiceError }, { status: 502 });
   }
 }

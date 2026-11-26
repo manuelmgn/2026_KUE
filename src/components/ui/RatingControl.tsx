@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/i18n/context";
+
 interface RatingControlProps {
   value: number | null;
   onRate: (rating: number) => void;
@@ -17,6 +19,7 @@ export function RatingControl({
   isDiscarded = false,
   compact = false,
 }: RatingControlProps) {
+  const { dict } = useI18n();
   const sizeClass = compact ? "h-7 w-7 text-[0.74rem]" : "h-8 min-w-8 px-2.5 text-[0.74rem]";
 
   return (
@@ -33,7 +36,7 @@ export function RatingControl({
           <button
             key={step}
             type="button"
-            aria-label={`Puntuar ${step} de 5`}
+            aria-label={dict.ratingControl.rateAria(step)}
             aria-pressed={isActive}
             onClick={(event) => {
               event.stopPropagation();
@@ -48,7 +51,7 @@ export function RatingControl({
       {onDiscard ? (
         <button
           type="button"
-          aria-label="Descartar artista"
+          aria-label={dict.ratingControl.discardAria}
           aria-pressed={isDiscarded}
           onClick={(event) => {
             event.stopPropagation();

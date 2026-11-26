@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { PlaceCandidate } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface PlaceAutocompleteProps {
   id: string;
@@ -32,6 +33,7 @@ export function PlaceAutocomplete({
   invalid = false,
   describedBy,
 }: PlaceAutocompleteProps) {
+  const { locale, dict } = useI18n();
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [results, setResults] = useState<PlaceCandidate[]>([]);
@@ -57,13 +59,16 @@ export function PlaceAutocomplete({
       setFetchError(null);
       setIsOpen(true);
       try {
-        const res = await fetch(`/api/places?q=${encodeURIComponent(trimmed)}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/places?q=${encodeURIComponent(trimmed)}&lang=${encodeURIComponent(locale)}`,
+          {
+            signal: controller.signal,
+          },
+        );
         const data = (await res.json()) as { places?: PlaceCandidate[]; error?: string };
         if (!res.ok) {
           setResults([]);
-          setFetchError(data.error ?? "No se pudieron buscar lugares");
+          setFetchError(data.error ?? dict.places.fetchError);
           setIsOpen(true);
           return;
         }
@@ -76,7 +81,7 @@ export function PlaceAutocomplete({
           return;
         }
         setResults([]);
-        setFetchError("Error de conexión buscando lugares");
+        setFetchError(dict.places.connectionError);
         setIsOpen(true);
       } finally {
         setLoading(false);
@@ -87,7 +92,7 @@ export function PlaceAutocomplete({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [value, selectedPlace]);
+  }, [value, selectedPlace, locale, dict.places.fetchError, dict.places.connectionError]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -168,7 +173,7 @@ export function PlaceAutocomplete({
             }
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Buscar ciudad (ej. La Haya)"
+          placeholder={dict.places.placeholder}
           className={`w-full border bg-bg px-3 py-2 pr-8 font-sans text-sm text-ink outline-none focus-visible:border-acid ${
             invalid ? "border-acid" : "border-line"
           }`}
@@ -176,7 +181,7 @@ export function PlaceAutocomplete({
         {value.length > 0 ? (
           <button
             type="button"
-            aria-label="Limpiar ubicación"
+            aria-label={dict.places.clearAria}
             onClick={() => {
               onSelectPlace(null);
               onInputChange("");
@@ -194,16 +199,18 @@ export function PlaceAutocomplete({
         <div
           id={listboxId}
           role="listbox"
-          aria-label="Sugerencias de ubicación"
+          aria-label={dict.places.suggestionsAria}
           className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto border border-line-strong bg-bg shadow-lg"
         >
           {loading ? (
-            <div className="px-3 py-2 font-mono text-xs text-ink-muted">Buscando lugares...</div>
+            <div className="px-3 py-2 font-mono text-xs text-ink-muted">
+              {dict.places.searching}
+            </div>
           ) : fetchError ? (
             <div className="px-3 py-2 font-mono text-xs text-ink-muted">{fetchError}</div>
           ) : results.length === 0 ? (
             <div className="px-3 py-2 font-mono text-xs text-ink-muted">
-              Sin resultados para &ldquo;{value.trim()}&rdquo;
+              {dict.places.noResults(value.trim())}
             </div>
           ) : (
             results.map((place, index) => {

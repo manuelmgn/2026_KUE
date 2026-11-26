@@ -1,15 +1,18 @@
 import type { MetadataRoute } from "next";
+import { DEFAULT_LOCALE } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
 
 export default function manifest(): MetadataRoute.Manifest {
+  const dict = getDictionary(DEFAULT_LOCALE);
   return {
     name: "KUE",
     short_name: "KUE",
-    description: "Archivo personal y preparación editorial de festivales de música",
+    description: dict.meta.description,
     start_url: "/festival-mode",
     display: "standalone",
     background_color: "#000000",
     theme_color: "#000000",
-    lang: "es",
+    lang: DEFAULT_LOCALE,
     icons: [
       {
         src: "/icons/icon-192.png",

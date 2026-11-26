@@ -9,6 +9,7 @@ import type { FestivalSummary } from "@/components/features/types";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { parseRawLineup } from "@/domain/lineup-parser";
 import type { PlaceCandidate } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface RawImporterProps {
   festivals: FestivalSummary[];
@@ -27,6 +28,7 @@ interface EditableRow {
 }
 
 export function RawImporter({ festivals: initialFestivals, initialFestivalId }: RawImporterProps) {
+  const { dict } = useI18n();
   const formId = useId();
   const [festivals, setFestivals] = useState<FestivalSummary[]>(initialFestivals);
   const [selectedFestivalId, setSelectedFestivalId] = useState<string>(
@@ -69,12 +71,12 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
 
     if (newFestLocationQuery.trim().length > 0 && !selectedPlace) {
       setLocationInvalid(true);
-      setError("Selecciona una ubicación de la lista de resultados o deja el campo vacío.");
+      setError(dict.importer.locationInvalidError);
       return;
     }
 
     if (newFestStartDate && newFestEndDate && newFestEndDate < newFestStartDate) {
-      setError("La fecha de fin no puede ser anterior a la de inicio.");
+      setError(dict.importer.dateOrderError);
       return;
     }
 
@@ -136,7 +138,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
 
   const handleConfirmImport = async () => {
     if (!selectedFestivalId) {
-      setError("Selecciona o crea un festival antes de importar.");
+      setError(dict.importer.selectFestivalError);
       return;
     }
 
@@ -157,7 +159,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       .filter((row) => row.artistNames.length > 0);
 
     if (includedRows.length === 0) {
-      setError("No hay filas válidas seleccionadas para importar.");
+      setError(dict.importer.noValidRowsError);
       return;
     }
 
@@ -193,18 +195,17 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
         <div>
           <h1 className="font-display text-[clamp(2rem,5vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
-            Importador en bruto
+            {dict.importer.title}
           </h1>
           <p className="mt-2 font-serif text-[1.25rem] italic text-ink-muted">
-            Pega la lista de artistas del cartel. Separa colaboraciones y subtítulos al instante;
-            días y escenarios se pueden añadir opcionalmente después.
+            {dict.importer.subtitle}
           </p>
         </div>
 
         <div className="flex items-stretch border border-line">
           {festivals.length > 0 ? (
             <select
-              aria-label="Festival de destino"
+              aria-label={dict.importer.targetFestivalAria}
               value={selectedFestivalId}
               onChange={(event) => setSelectedFestivalId(event.target.value)}
               className="cursor-pointer bg-bg px-4 py-2.5 font-mono text-xs uppercase tracking-[0.06em] text-ink outline-none"
@@ -223,14 +224,14 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             onClick={() => setShowNewFestival((prev) => !prev)}
             className="border-0 border-l border-line"
           >
-            + Nuevo festival
+            {dict.importer.newFestivalButton}
           </HairlineButton>
         </div>
       </div>
 
       {showNewFestival ? (
         <form
-          aria-label="Crear nuevo festival"
+          aria-label={dict.importer.createFestivalAria}
           onSubmit={(event) => {
             event.preventDefault();
             void handleCreateFestival();
@@ -242,7 +243,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               htmlFor={`${formId}-name`}
               className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
             >
-              Nombre del festival
+              {dict.importer.nameLabel}
             </label>
             <input
               id={`${formId}-name`}
@@ -251,7 +252,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               required
               value={newFestName}
               onChange={(event) => setNewFestName(event.target.value)}
-              placeholder="ej. Rewire"
+              placeholder={dict.importer.namePlaceholder}
               className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus-visible:border-acid"
             />
           </div>
@@ -261,7 +262,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               htmlFor={`${formId}-year`}
               className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
             >
-              Año del festival
+              {dict.importer.yearLabel}
             </label>
             <input
               id={`${formId}-year`}
@@ -282,7 +283,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               htmlFor={`${formId}-location`}
               className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
             >
-              Ubicación del festival
+              {dict.importer.locationLabel}
             </label>
             <PlaceAutocomplete
               id={`${formId}-location`}
@@ -307,7 +308,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               htmlFor={`${formId}-start-date`}
               className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
             >
-              Fecha de inicio
+              {dict.importer.startDateLabel}
             </label>
             <input
               id={`${formId}-start-date`}
@@ -324,7 +325,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               htmlFor={`${formId}-end-date`}
               className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
             >
-              Fecha de fin
+              {dict.importer.endDateLabel}
             </label>
             <input
               id={`${formId}-end-date`}
@@ -338,7 +339,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
           </div>
 
           <HairlineButton type="submit" variant="acid" size="md" disabled={creatingFestival}>
-            {creatingFestival ? "Creando..." : "Crear"}
+            {creatingFestival ? dict.importer.creating : dict.importer.create}
           </HairlineButton>
         </form>
       ) : null}
@@ -348,7 +349,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
           htmlFor={`${formId}-raw-lineup`}
           className="font-mono text-[0.72rem] uppercase tracking-[0.06em] text-ink-muted"
         >
-          Texto del cartel en bruto
+          {dict.importer.rawLineupLabel}
         </label>
         <textarea
           id={`${formId}-raw-lineup`}
@@ -369,11 +370,11 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             disabled={rawText.trim().length === 0}
             onClick={handleParse}
           >
-            Analizar texto →
+            {dict.importer.analyzeButton}
           </HairlineButton>
           {rows.length > 0 ? (
             <span className="font-mono text-xs uppercase text-ink-muted">
-              {includedCount} de {rows.length} filas listas
+              {dict.importer.rowsReady(includedCount, rows.length)}
             </span>
           ) : null}
         </div>
@@ -391,8 +392,10 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
           className="flex flex-wrap items-center justify-between gap-4 border border-acid bg-surface p-4"
         >
           <div className="font-mono text-xs uppercase">
-            Importadas {resultSummary.createdEntriesCount} entradas ({resultSummary.newArtistsCount}{" "}
-            artistas nuevos en cola de enriquecimiento).
+            {dict.importer.importedSummary(
+              resultSummary.createdEntriesCount,
+              resultSummary.newArtistsCount,
+            )}
           </div>
           <Link
             href={
@@ -402,7 +405,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             }
             className="border border-acid bg-acid px-4 py-2 font-mono text-xs font-semibold uppercase text-acid-ink"
           >
-            Ver cartel →
+            {dict.importer.viewLineup}
           </Link>
         </div>
       ) : null}
@@ -421,7 +424,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                 onChange={(event) => setShowScheduleColumns(event.target.checked)}
                 className="h-4 w-4 cursor-pointer accent-acid"
               />
-              <span>Añadir días y escenarios ahora (opcional)</span>
+              <span>{dict.importer.scheduleToggle}</span>
             </label>
           </div>
 
@@ -429,15 +432,25 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="font-mono text-[0.72rem] uppercase text-ink-muted">
-                  <th className="w-10 border border-line p-2.5 text-center">Inc.</th>
-                  <th className="border border-line p-2.5 text-left">Nombre en cartel</th>
-                  <th className="border border-line p-2.5 text-left">Artistas a vincular</th>
-                  <th className="border border-line p-2.5 text-left">Subtítulo</th>
+                  <th className="w-10 border border-line p-2.5 text-center">
+                    {dict.importer.colInclude}
+                  </th>
+                  <th className="border border-line p-2.5 text-left">
+                    {dict.importer.colBillingName}
+                  </th>
+                  <th className="border border-line p-2.5 text-left">{dict.importer.colArtists}</th>
+                  <th className="border border-line p-2.5 text-left">
+                    {dict.importer.colSubtitle}
+                  </th>
                   {showScheduleColumns ? (
                     <>
-                      <th className="border border-line p-2.5 text-left">Día</th>
-                      <th className="border border-line p-2.5 text-left">Escenario</th>
-                      <th className="border border-line p-2.5 text-left">Hora</th>
+                      <th className="border border-line p-2.5 text-left">{dict.importer.colDay}</th>
+                      <th className="border border-line p-2.5 text-left">
+                        {dict.importer.colStage}
+                      </th>
+                      <th className="border border-line p-2.5 text-left">
+                        {dict.importer.colTime}
+                      </th>
                     </>
                   ) : null}
                 </tr>
@@ -449,7 +462,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                       <input
                         type="checkbox"
                         checked={row.included}
-                        aria-label={`Incluir ${row.billingName}`}
+                        aria-label={dict.importer.includeAria(row.billingName)}
                         onChange={(event) => updateRow(idx, { included: event.target.checked })}
                         className="h-4 w-4 cursor-pointer accent-acid"
                       />
@@ -457,7 +470,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
-                        aria-label={`Nombre en cartel fila ${idx + 1}`}
+                        aria-label={dict.importer.billingNameRowAria(idx + 1)}
                         value={row.billingName}
                         onChange={(event) => updateRow(idx, { billingName: event.target.value })}
                         className="w-full bg-transparent px-1.5 py-1 font-sans font-semibold text-ink outline-none focus:bg-surface"
@@ -466,7 +479,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
-                        aria-label={`Artistas a vincular fila ${idx + 1}`}
+                        aria-label={dict.importer.artistsRowAria(idx + 1)}
                         value={row.artistsCsv}
                         onChange={(event) => updateRow(idx, { artistsCsv: event.target.value })}
                         className="w-full bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
@@ -475,7 +488,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
-                        aria-label={`Subtítulo fila ${idx + 1}`}
+                        aria-label={dict.importer.subtitleRowAria(idx + 1)}
                         value={row.subtitle}
                         onChange={(event) => updateRow(idx, { subtitle: event.target.value })}
                         placeholder="—"
@@ -487,7 +500,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                         <td className="border border-line p-1.5">
                           <input
                             type="text"
-                            aria-label={`Día fila ${idx + 1}`}
+                            aria-label={dict.importer.dayRowAria(idx + 1)}
                             value={row.day}
                             onChange={(event) => updateRow(idx, { day: event.target.value })}
                             placeholder="—"
@@ -497,7 +510,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                         <td className="border border-line p-1.5">
                           <input
                             type="text"
-                            aria-label={`Escenario fila ${idx + 1}`}
+                            aria-label={dict.importer.stageRowAria(idx + 1)}
                             value={row.stage}
                             onChange={(event) => updateRow(idx, { stage: event.target.value })}
                             placeholder="—"
@@ -507,7 +520,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                         <td className="border border-line p-1.5">
                           <input
                             type="text"
-                            aria-label={`Hora fila ${idx + 1}`}
+                            aria-label={dict.importer.timeRowAria(idx + 1)}
                             value={row.setTime}
                             onChange={(event) => updateRow(idx, { setTime: event.target.value })}
                             placeholder="—"
@@ -530,7 +543,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               disabled={submitting || includedCount === 0}
               onClick={() => void handleConfirmImport()}
             >
-              {submitting ? "Importando..." : `Importar ${includedCount} entradas`}
+              {submitting ? dict.importer.importing : dict.importer.importEntries(includedCount)}
             </HairlineButton>
           </div>
         </section>

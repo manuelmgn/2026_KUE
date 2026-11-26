@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { LineupEntryDTO } from "@/components/features/types";
 import { RatingControl } from "@/components/ui/RatingControl";
 import { getEffectiveEntryRating, getEffectiveEntryStatus } from "@/domain/rating";
+import { useI18n } from "@/i18n/context";
 
 interface LineupIndexProps {
   entries: LineupEntryDTO[];
@@ -22,6 +23,7 @@ export function LineupIndex({
   onQuickRate,
   onQuickDiscard,
 }: LineupIndexProps) {
+  const { dict } = useI18n();
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function LineupIndex({
   }, [focusedIndex]);
 
   return (
-    <section aria-label="Cartel en índice de triaje" className="w-full">
+    <section aria-label={dict.workspace.indexAria} className="w-full">
       {entries.map((entry, idx) => {
         const lead = entry.artists[0];
         if (!lead) {
@@ -84,13 +86,13 @@ export function LineupIndex({
               ) : null}
               {entry.artists.length > 1 ? (
                 <span className="border border-line px-1.5 py-0.5 font-mono text-[0.65rem] uppercase text-ink-muted">
-                  {entry.artists.length} ART
+                  {dict.workspace.artistsBadgeShort(entry.artists.length)}
                 </span>
               ) : null}
             </button>
 
             <div className="truncate font-mono text-[0.74rem] uppercase text-ink-muted max-md:hidden">
-              {entry.day ?? "TBA"}
+              {entry.day ?? dict.common.tba}
               {entry.stage ? ` · ${entry.stage}` : ""}
             </div>
 

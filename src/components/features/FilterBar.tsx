@@ -2,6 +2,7 @@
 
 import type { RefObject } from "react";
 import type { RatingFilter, StatusFilter, ViewMode } from "@/domain/schemas";
+import { useI18n } from "@/i18n/context";
 
 interface FilterBarProps {
   searchInputRef: RefObject<HTMLInputElement | null>;
@@ -26,9 +27,11 @@ export function FilterBar({
   onRatingChange,
   onViewChange,
 }: FilterBarProps) {
+  const { dict } = useI18n();
+
   return (
     <section
-      aria-label="Filtros del cartel"
+      aria-label={dict.filters.sectionAria}
       className="sticky top-14 z-30 flex h-[50px] items-stretch overflow-x-auto border-y border-line bg-bg"
     >
       <div className="flex min-w-[180px] flex-1 items-center gap-3 border-r border-line px-[18px]">
@@ -37,8 +40,8 @@ export function FilterBar({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Buscar artista, proyecto o nota..."
-          aria-label="Buscar artista, proyecto o nota"
+          placeholder={dict.filters.searchPlaceholder}
+          aria-label={dict.filters.searchAria}
           className="w-full bg-transparent font-sans text-[0.92rem] text-ink placeholder:text-ink-muted focus:outline-none"
         />
         <span
@@ -51,41 +54,41 @@ export function FilterBar({
 
       <div className="flex shrink-0 items-center border-r border-line px-3.5">
         <select
-          aria-label="Filtrar por estado"
+          aria-label={dict.filters.statusAria}
           value={status}
           onChange={(event) => onStatusChange(event.target.value as StatusFilter)}
           className="cursor-pointer bg-bg pr-1.5 font-mono text-[0.74rem] uppercase tracking-[0.06em] text-ink outline-none"
         >
           <option value="ALL" className="bg-bg text-ink">
-            Estado: Todos
+            {dict.filters.statusAll}
           </option>
           <option value="PENDING" className="bg-bg text-ink">
-            Pendientes
+            {dict.filters.statusPending}
           </option>
           <option value="LISTENING" className="bg-bg text-ink">
-            En escucha
+            {dict.filters.statusListening}
           </option>
           <option value="RATED" className="bg-bg text-ink">
-            Valorados
+            {dict.filters.statusRated}
           </option>
           <option value="DISCARDED" className="bg-bg text-ink">
-            Descartados
+            {dict.filters.statusDiscarded}
           </option>
         </select>
       </div>
 
       <div className="flex shrink-0 items-center border-r border-line px-3.5">
         <select
-          aria-label="Filtrar por nota"
+          aria-label={dict.filters.ratingAria}
           value={rating}
           onChange={(event) => onRatingChange(event.target.value as RatingFilter)}
           className="cursor-pointer bg-bg pr-1.5 font-mono text-[0.74rem] uppercase tracking-[0.06em] text-ink outline-none"
         >
           <option value="ALL" className="bg-bg text-ink">
-            Nota: Todas
+            {dict.filters.ratingAll}
           </option>
           <option value="MUST" className="bg-bg text-ink">
-            Imprescindibles (≥4)
+            {dict.filters.ratingMust}
           </option>
           <option value="5" className="bg-bg text-ink">
             5 / 5
@@ -97,10 +100,10 @@ export function FilterBar({
             3 / 5
           </option>
           <option value="LOW" className="bg-bg text-ink">
-            ≤ 2 / 5
+            {dict.filters.ratingLow}
           </option>
           <option value="UNRATED" className="bg-bg text-ink">
-            Sin nota
+            {dict.filters.ratingUnrated}
           </option>
         </select>
       </div>
@@ -116,7 +119,7 @@ export function FilterBar({
               : "text-ink-muted hover:bg-surface-elevated hover:text-ink"
           }`}
         >
-          GRID
+          {dict.filters.viewGrid}
         </button>
         <button
           type="button"
@@ -128,7 +131,7 @@ export function FilterBar({
               : "text-ink-muted hover:bg-surface-elevated hover:text-ink"
           }`}
         >
-          ÍNDICE
+          {dict.filters.viewIndex}
         </button>
       </div>
     </section>

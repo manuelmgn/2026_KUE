@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { FestivalModeView } from "@/components/features/FestivalModeView";
 import { TopBar } from "@/components/features/TopBar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getServerDictionary } from "@/i18n/server";
 import { listFestivalEntries } from "@/server/services/entries";
 import { listFestivals } from "@/server/services/festivals";
 import {
@@ -18,7 +19,7 @@ interface FestivalModePageProps {
 }
 
 export default async function FestivalModePage({ searchParams }: FestivalModePageProps) {
-  const params = await searchParams;
+  const [params, { dict }] = await Promise.all([searchParams, getServerDictionary()]);
   const summaries = (await listFestivals()).map(toFestivalSummary);
   const activeFestival = resolveActiveFestival(summaries, params.festival);
 
@@ -36,14 +37,14 @@ export default async function FestivalModePage({ searchParams }: FestivalModePag
         <FestivalModeView festival={activeFestival} entries={entries} />
       ) : (
         <EmptyState
-          title="Sin festival activo"
-          description="Importa primero un cartel para usar Modo Festival."
+          title={dict.festivalMode.noFestivalTitle}
+          description={dict.festivalMode.noFestivalDescription}
           action={
             <Link
               href="/import"
               className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-xs font-semibold uppercase text-acid-ink"
             >
-              Ir al importador →
+              {dict.festivalMode.noFestivalAction}
             </Link>
           }
         />

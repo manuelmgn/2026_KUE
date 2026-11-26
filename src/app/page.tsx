@@ -4,6 +4,7 @@ import { LineupWorkspace } from "@/components/features/LineupWorkspace";
 import { TopBar } from "@/components/features/TopBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ratingFilterSchema, statusFilterSchema, viewModeSchema } from "@/domain/schemas";
+import { getServerDictionary } from "@/i18n/server";
 import { listFestivalEntries } from "@/server/services/entries";
 import { listFestivals } from "@/server/services/festivals";
 import {
@@ -25,7 +26,7 @@ interface HomePageProps {
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const params = await searchParams;
+  const [params, { dict }] = await Promise.all([searchParams, getServerDictionary()]);
   const festivalSummaries = (await listFestivals()).map(toFestivalSummary);
   const activeFestival = resolveActiveFestival(festivalSummaries, params.festival);
 
@@ -60,14 +61,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </Suspense>
       ) : (
         <EmptyState
-          title="Empieza tu archivo"
-          description="Crea tu primer festival y pega el cartel en bruto para empezar a escuchar y valorar."
+          title={dict.home.emptyTitle}
+          description={dict.home.emptyDescription}
           action={
             <Link
               href="/import"
               className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
             >
-              Ir al importador →
+              {dict.home.emptyAction}
             </Link>
           }
         />

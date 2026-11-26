@@ -7,6 +7,7 @@ export async function searchPlaces(
   query: string,
   limit = 6,
   timeoutMs = 8_000,
+  language: "pt" | "es" = "pt",
 ): Promise<PlaceCandidate[]> {
   const cleaned = query.trim();
   if (cleaned.length < 2) {
@@ -16,7 +17,7 @@ export async function searchPlaces(
   const params = new URLSearchParams({
     name: cleaned,
     count: String(Math.min(Math.max(limit, 1), 10)),
-    language: "es",
+    language,
     format: "json",
   });
 
