@@ -68,7 +68,10 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
     <main className="mx-auto w-full max-w-[640px] border-x border-line min-h-[calc(100dvh-56px)]">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4">
         <div>
-          <h1 className="font-display text-xl font-extrabold uppercase leading-none tracking-[-0.03em]">
+          <h1
+            data-festival-heading
+            className="font-display text-xl font-extrabold uppercase leading-none tracking-[-0.03em]"
+          >
             {festival.name} {festival.year}
           </h1>
           {festival.location ? (

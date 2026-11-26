@@ -258,7 +258,10 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
           <p className="font-mono text-[0.7rem] uppercase tracking-[0.1em] text-ink-muted">
             {dict.nav.manage}
           </p>
-          <h1 className="mt-1 font-display text-[clamp(1.85rem,5vw,3rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
+          <h1
+            data-festival-heading
+            className="mt-1 font-display text-[clamp(1.85rem,5vw,3rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]"
+          >
             {name || festival.name} {year || festival.year}
           </h1>
         </div>

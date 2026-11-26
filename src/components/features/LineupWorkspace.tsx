@@ -277,7 +277,10 @@ export function LineupWorkspace({
   return (
     <main>
       <section className="flex flex-wrap items-end justify-between gap-4 px-6 pt-10 pb-8">
-        <h1 className="font-display text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold uppercase leading-[0.9] tracking-[-0.04em]">
+        <h1
+          data-festival-heading
+          className="font-display text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold uppercase leading-[0.9] tracking-[-0.04em]"
+        >
           {festival.name} {festival.year}
         </h1>
         {festival.location ? (

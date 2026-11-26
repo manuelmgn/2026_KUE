@@ -29,8 +29,47 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const searchParams = useSearchParams();
   const [syncInfo, setSyncInfo] = useState<SyncApiSnapshot["counts"] | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [showMobileTitle, setShowMobileTitle] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const wasSyncingRef = useRef(false);
   const restartPollRef = useRef<(() => void) | null>(null);
+
+  const activeFestival =
+    (activeFestivalSlug ? festivals.find((fest) => fest.slug === activeFestivalSlug) : undefined) ??
+    festivals[0] ??
+    null;
+
+  useEffect(() => {
+    void pathname;
+    void activeFestivalSlug;
+    setShowMobileTitle(false);
+
+    const heading = document.querySelector<HTMLElement>("[data-festival-heading]");
+    if (!heading) {
+      return;
+    }
+
+    const headerHeight = Math.round(headerRef.current?.getBoundingClientRect().height ?? 56);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries.at(-1);
+        if (!entry) {
+          return;
+        }
+        const scrolledPastHeader =
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= headerHeight + 2;
+        setShowMobileTitle(scrolledPastHeader);
+      },
+      {
+        rootMargin: `-${headerHeight}px 0px 0px 0px`,
+        threshold: 0,
+      },
+    );
+
+    observer.observe(heading);
+    return () => observer.disconnect();
+  }, [pathname, activeFestivalSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,10 +146,27 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
   const doneCount = syncInfo ? syncInfo.synced + syncInfo.failed : 0;
 
   return (
-    <header className="kue-top-bar sticky top-0 z-40 border-b border-line bg-bg">
+    <header ref={headerRef} className="kue-top-bar sticky top-0 z-40 border-b border-line bg-bg">
       <div className="flex h-14 items-stretch justify-between">
-        <div className="flex min-w-0 shrink-0 items-stretch">
+        <div className="flex min-w-0 flex-1 items-stretch md:flex-none">
           <KueLogo href={`/${festivalSuffix}`} />
+          {activeFestival ? (
+            <div
+              aria-hidden="true"
+              className={`flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-3.5 transition-all duration-200 motion-reduce:transition-none md:hidden ${
+                showMobileTitle
+                  ? "translate-y-0 opacity-100"
+                  : "pointer-events-none translate-y-1.5 opacity-0"
+              }`}
+            >
+              <span className="truncate font-display text-[0.95rem] font-extrabold uppercase leading-none tracking-[-0.02em] text-ink">
+                {activeFestival.name}
+              </span>
+              <span className="shrink-0 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
+                {activeFestival.year}
+              </span>
+            </div>
+          ) : null}
           {festivals.length > 0 ? (
             <div className="relative hidden min-w-0 items-stretch border-r border-line md:flex">
               <select
