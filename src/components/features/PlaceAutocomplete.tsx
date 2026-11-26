@@ -55,6 +55,7 @@ export function PlaceAutocomplete({
     const timer = setTimeout(async () => {
       setLoading(true);
       setFetchError(null);
+      setIsOpen(true);
       try {
         const res = await fetch(`/api/places?q=${encodeURIComponent(trimmed)}`, {
           signal: controller.signal,
