@@ -28,7 +28,7 @@ export const ptPT: Dictionary = {
     search: "Buscar",
     searchPendingTitle: "Pesquisar artistas (em breve)",
     lineup: "Cartaz",
-    festivalMode: "Modo Festival",
+    festivalMode: "Agenda",
     import: "Importar",
     settings: "Definições",
     syncStatus: (done: number, total: number) => `SYNC ${done}/${total}`,
@@ -193,7 +193,7 @@ export const ptPT: Dictionary = {
   },
   festivalMode: {
     noFestivalTitle: "Sem festival ativo",
-    noFestivalDescription: "Importa primeiro um cartaz para usar o Modo Festival.",
+    noFestivalDescription: "Importa primeiro um cartaz para usar a agenda.",
     noFestivalAction: "Ir para o importador →",
     mustSeeLabel: "≥4★ Imprescindíveis",
     allSetsLabel: "Todas as atuações",
@@ -204,7 +204,7 @@ export const ptPT: Dictionary = {
     emptyDayDescription: "Não há entradas carregadas para este dia.",
     showAllSets: "Ver todas as atuações",
     backToLineup: "Voltar ao cartaz",
-    listAria: "Lista de atuações no Modo Festival",
+    listAria: "Lista de atuações na agenda",
   },
   settings: {
     title: "Definições",

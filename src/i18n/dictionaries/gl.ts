@@ -28,7 +28,7 @@ export const gl: Dictionary = {
     search: "Buscar",
     searchPendingTitle: "Buscar artistas (próximamente)",
     lineup: "Cartaz",
-    festivalMode: "Modo Festival",
+    festivalMode: "Axenda",
     import: "Importar",
     settings: "Axustes",
     syncStatus: (done: number, total: number) => `SYNC ${done}/${total}`,
@@ -193,7 +193,7 @@ export const gl: Dictionary = {
   },
   festivalMode: {
     noFestivalTitle: "Sen festival activo",
-    noFestivalDescription: "Importa primeiro un cartaz para usar Modo Festival.",
+    noFestivalDescription: "Importa primeiro un cartaz para usar a axenda.",
     noFestivalAction: "Ir ao importador →",
     mustSeeLabel: "≥4★ Imprescindibles",
     allSetsLabel: "Todas as actuacións",
@@ -204,7 +204,7 @@ export const gl: Dictionary = {
     emptyDayDescription: "Non hai entradas cargadas para este día.",
     showAllSets: "Ver todas as actuacións",
     backToLineup: "Volver ao cartaz",
-    listAria: "Lista de actuacións en Modo Festival",
+    listAria: "Lista de actuacións na axenda",
   },
   settings: {
     title: "Axustes",

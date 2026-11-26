@@ -28,7 +28,7 @@ export const es: Dictionary = {
     search: "Buscar",
     searchPendingTitle: "Buscar artistas (próximamente)",
     lineup: "Cartel",
-    festivalMode: "Modo Festival",
+    festivalMode: "Agenda",
     import: "Importar",
     settings: "Ajustes",
     syncStatus: (done: number, total: number) => `SYNC ${done}/${total}`,
@@ -193,7 +193,7 @@ export const es: Dictionary = {
   },
   festivalMode: {
     noFestivalTitle: "Sin festival activo",
-    noFestivalDescription: "Importa primero un cartel para usar Modo Festival.",
+    noFestivalDescription: "Importa primero un cartel para usar la agenda.",
     noFestivalAction: "Ir al importador →",
     mustSeeLabel: "≥4★ Imprescindibles",
     allSetsLabel: "Todos los pases",
@@ -204,7 +204,7 @@ export const es: Dictionary = {
     emptyDayDescription: "No hay entradas cargadas para este día.",
     showAllSets: "Ver todos los pases",
     backToLineup: "Volver al cartel",
-    listAria: "Lista de pases en Modo Festival",
+    listAria: "Lista de pases en la agenda",
   },
   settings: {
     title: "Ajustes",

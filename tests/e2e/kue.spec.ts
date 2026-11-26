@@ -156,7 +156,7 @@ test.describe("KUE E2E flows", () => {
     await page.goto("/festival-mode?festival=rewire-2027");
 
     // Must-see is active by default: Mabe Fratti & Bill Orcutt (5/5) + William Basinski (4/5), NOT BIG|BRAVE (unrated)
-    const listItems = page.locator("ul[aria-label='Lista de actuacións en Modo Festival'] li");
+    const listItems = page.locator("ul[aria-label='Lista de actuacións na axenda'] li");
     await expect(listItems).toHaveCount(2);
     await expect(page.getByText("Mabe Fratti & Bill Orcutt")).toBeVisible();
     await expect(page.getByText("William Basinski 'Passing the Cup of Sorrows'")).toBeVisible();
