@@ -166,6 +166,19 @@ dialog.kue-modal[open] {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.kue-bottom-nav a:focus-visible,
+.kue-bottom-nav button:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+  .kue-bottom-nav [aria-current="page"] {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+}
+
 @media (max-width: 767px) {
   body {
     padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));

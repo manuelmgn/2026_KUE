@@ -13,6 +13,7 @@ export async function importLineupAction(
   return runAction(async () => {
     const result = await importFestivalLineup(input);
     revalidatePath("/");
+    revalidatePath("/festivals");
     revalidatePath("/festival-mode");
     revalidatePath("/import");
     return result;
