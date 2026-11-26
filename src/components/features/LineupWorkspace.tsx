@@ -276,7 +276,7 @@ export function LineupWorkspace({
 
   return (
     <main>
-      <section className="flex flex-wrap items-end justify-between gap-4 px-6 pt-10 pb-8">
+      <section className="flex flex-wrap items-end justify-between gap-2 px-4 pt-6 pb-5 sm:gap-4 sm:px-6 sm:pt-10 sm:pb-8">
         <h1
           data-festival-heading
           className="font-display text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold uppercase leading-[0.9] tracking-[-0.04em]"

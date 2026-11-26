@@ -318,7 +318,7 @@ export function ArtistDrawer({
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-6 p-6">
+            <div className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-6">
               <Artwork
                 src={imageSrc}
                 alt={displayArtist.name}
@@ -382,7 +382,7 @@ export function ArtistDrawer({
                     href={externalLinks.appleMusic}
                     target="_blank"
                     rel="noreferrer"
-                    className="border-r border-line p-3 text-center font-mono text-[0.74rem] uppercase tracking-[0.06em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+                    className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
                   >
                     Apple Music ↗
                   </a>
@@ -390,7 +390,7 @@ export function ArtistDrawer({
                     href={externalLinks.youtube}
                     target="_blank"
                     rel="noreferrer"
-                    className="border-r border-line p-3 text-center font-mono text-[0.74rem] uppercase tracking-[0.06em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+                    className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
                   >
                     YouTube ↗
                   </a>
@@ -398,7 +398,7 @@ export function ArtistDrawer({
                     href={externalLinks.youtubeLive}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-3 text-center font-mono text-[0.74rem] uppercase tracking-[0.06em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink"
+                    className="flex items-center justify-center px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
                   >
                     YouTube Live ↗
                   </a>

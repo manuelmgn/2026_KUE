@@ -20,10 +20,12 @@ export function RatingControl({
   compact = false,
 }: RatingControlProps) {
   const { dict } = useI18n();
-  const sizeClass = compact ? "h-7 w-7 text-[0.74rem]" : "h-8 min-w-8 px-2.5 text-[0.74rem]";
+  const sizeClass = compact
+    ? "h-9 flex-1 text-[0.76rem] md:h-7 md:w-7 md:flex-none md:text-[0.74rem]"
+    : "h-10 min-w-10 px-2.5 text-[0.78rem] sm:h-8 sm:min-w-8 sm:text-[0.74rem]";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5 md:gap-1">
       {STEPS.map((step) => {
         const isActive = value === step;
         const activeClass = isActive

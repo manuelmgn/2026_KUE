@@ -251,7 +251,7 @@ export function FestivalManageView({ festival, initialEntries }: FestivalManageV
   const includedCount = rows.filter((row) => row.included).length;
 
   return (
-    <main className="mx-auto w-full max-w-[880px] border-x border-line min-h-[calc(100dvh-56px)]">
+    <main className="mx-auto w-full max-w-[880px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
       {/* Editorial festival header */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-5 py-6 sm:px-6">
         <div>

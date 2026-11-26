@@ -65,7 +65,7 @@ export function FestivalModeView({ festival, entries }: FestivalModeViewProps) {
       : ratingFiltered.filter((entry) => entry.day === effectiveDay);
 
   return (
-    <main className="mx-auto w-full max-w-[640px] border-x border-line min-h-[calc(100dvh-56px)]">
+    <main className="mx-auto w-full max-w-[640px] min-h-[calc(100dvh-56px)] sm:border-x sm:border-line">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4">
         <div>
           <h1

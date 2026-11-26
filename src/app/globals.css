@@ -131,14 +131,21 @@ dialog.kue-drawer[open] {
   inset: 0 0 0 auto;
   margin: 0;
   margin-left: auto;
-  width: min(680px, 94vw);
+  width: min(680px, 100dvw);
   height: 100dvh;
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-  border-left: 1px solid var(--line);
+  border-left: 0;
+}
+
+@media (min-width: 640px) {
+  dialog.kue-drawer[open] {
+    width: min(680px, 94vw);
+    border-left: 1px solid var(--line);
+  }
 }
 
 dialog.kue-modal[open] {

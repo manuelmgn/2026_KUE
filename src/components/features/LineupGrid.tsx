@@ -37,7 +37,7 @@ export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
         return (
           <article
             key={entry.id}
-            className={`group flex cursor-pointer flex-col gap-3.5 border-r border-b border-line p-4 transition-colors hover:bg-surface ${
+            className={`group flex cursor-pointer flex-col gap-3.5 border-b border-line p-4 transition-colors hover:bg-surface sm:border-r ${
               isDiscarded ? "opacity-[0.38]" : ""
             }`}
           >

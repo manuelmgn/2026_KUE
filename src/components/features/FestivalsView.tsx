@@ -213,7 +213,7 @@ export function FestivalsView({
   );
 
   return (
-    <main className="mx-auto w-full max-w-[820px] border-x border-line min-h-[calc(100dvh-56px)]">
+    <main className="mx-auto w-full max-w-[820px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
       <div className="flex items-end justify-between gap-4 border-b border-line px-5 py-6 sm:px-6">
         <div>
           <h1 className="font-display text-[clamp(2rem,6vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
