@@ -32,6 +32,7 @@ export interface Dictionary {
     searchPendingTitle: string;
     lineup: string;
     festivalMode: string;
+    manage: string;
     import: string;
     settings: string;
     syncStatus: (done: number, total: number) => string;
@@ -52,6 +53,28 @@ export interface Dictionary {
     emptyTitle: string;
     emptyDescription: string;
     createSubmit: string;
+  };
+  manage: {
+    tabDetails: string;
+    tabArtists: (count: number) => string;
+    tabImport: string;
+    detailsTitle: string;
+    detailsDescription: string;
+    saveDetails: string;
+    detailsSaved: string;
+    artistsTitle: string;
+    artistsDescription: string;
+    filterPlaceholder: string;
+    filterAria: string;
+    removeArtist: string;
+    removingArtist: string;
+    noArtists: string;
+    noFilterMatches: string;
+    importTitle: string;
+    importDescription: string;
+    noFestivalTitle: string;
+    noFestivalDescription: string;
+    goToFestivals: string;
   };
   home: {
     emptyTitle: string;
@@ -233,6 +256,8 @@ export interface Dictionary {
     saveAlbumUrl: string;
     disambiguateArtist: string;
     createFestival: string;
+    updateFestival: string;
+    deleteEntry: string;
     saveSchedule: string;
     importLineup: string;
     queryTooLong: string;

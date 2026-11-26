@@ -1,5 +1,10 @@
 import { slugifyFestival } from "@/domain/artist-matching";
-import { type CreateFestivalInput, createFestivalSchema } from "@/domain/schemas";
+import {
+  type CreateFestivalInput,
+  createFestivalSchema,
+  type UpdateFestivalInput,
+  updateFestivalSchema,
+} from "@/domain/schemas";
 import type { Festival, PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
 
@@ -50,6 +55,31 @@ export async function createFestival(
   return db.festival.create({
     data: {
       slug,
+      name: input.name,
+      year: input.year,
+      location: input.location || null,
+      locationProvince: input.locationProvince ?? null,
+      locationRegion: input.locationRegion ?? null,
+      locationCountry: input.locationCountry ?? null,
+      locationCountryCode: input.locationCountryCode ?? null,
+      locationLatitude: input.locationLatitude ?? null,
+      locationLongitude: input.locationLongitude ?? null,
+      locationPlaceId: input.locationPlaceId ?? null,
+      startDate: input.startDate ?? null,
+      endDate: input.endDate ?? null,
+    },
+  });
+}
+
+export async function updateFestival(
+  rawInput: UpdateFestivalInput,
+  db: PrismaClient = getDb(),
+): Promise<Festival> {
+  const input = updateFestivalSchema.parse(rawInput);
+
+  return db.festival.update({
+    where: { id: input.festivalId },
+    data: {
       name: input.name,
       year: input.year,
       location: input.location || null,

@@ -12,7 +12,11 @@ export function BottomNav() {
   const activeFestival = searchParams.get("festival");
   const festivalSuffix = activeFestival ? `?festival=${encodeURIComponent(activeFestival)}` : "";
 
-  const isHomeSection = pathname === "/" || pathname === "/festival-mode" || pathname === "/import";
+  const isHomeSection =
+    pathname === "/" ||
+    pathname === "/festival-mode" ||
+    pathname === "/manage" ||
+    pathname === "/import";
   const isFestivals = pathname === "/festivals";
   const isSettings = pathname === "/settings";
 

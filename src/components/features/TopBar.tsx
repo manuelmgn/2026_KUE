@@ -157,7 +157,7 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
         <Link
           href={`/festival-mode${festivalSuffix}`}
           aria-current={pathname === "/festival-mode" ? "page" : undefined}
-          className={`flex flex-[1.35] items-center justify-center whitespace-nowrap border-r border-line px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-r-0 md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
+          className={`flex flex-1 items-center justify-center whitespace-nowrap border-r border-line px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-r-0 md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
             pathname === "/festival-mode"
               ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
               : "text-ink hover:bg-surface-elevated"
@@ -167,15 +167,15 @@ export function TopBar({ festivals, activeFestivalSlug }: TopBarProps) {
         </Link>
 
         <Link
-          href={`/import${festivalSuffix}`}
-          aria-current={pathname === "/import" ? "page" : undefined}
+          href={`/manage${festivalSuffix}`}
+          aria-current={pathname === "/manage" || pathname === "/import" ? "page" : undefined}
           className={`flex flex-1 items-center justify-center whitespace-nowrap px-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors md:flex-none md:border-l md:border-line md:px-[18px] md:text-[0.76rem] md:tracking-[0.08em] ${
-            pathname === "/import"
+            pathname === "/manage" || pathname === "/import"
               ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
               : "text-ink hover:bg-surface-elevated"
           }`}
         >
-          {dict.nav.import}
+          {dict.nav.manage}
         </Link>
 
         <Link

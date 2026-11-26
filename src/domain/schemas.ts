@@ -50,6 +50,37 @@ export const createFestivalSchema = z
   });
 export type CreateFestivalInput = z.infer<typeof createFestivalSchema>;
 
+export const updateFestivalSchema = z
+  .object({
+    festivalId: z.string().min(1),
+    name: z.string().trim().min(1, "El nombre del festival es obligatorio").max(120),
+    year: z.coerce
+      .number({ error: "El año debe ser un número" })
+      .int("El año debe ser un número entero")
+      .min(1950, "El año debe estar entre 1950 y 2100")
+      .max(2100, "El año debe estar entre 1950 y 2100"),
+    location: z.string().trim().max(120).nullable().optional(),
+    locationProvince: z.string().trim().max(120).nullable().optional(),
+    locationRegion: z.string().trim().max(120).nullable().optional(),
+    locationCountry: z.string().trim().max(120).nullable().optional(),
+    locationCountryCode: z.string().trim().max(10).nullable().optional(),
+    locationLatitude: z.number().min(-90).max(90).nullable().optional(),
+    locationLongitude: z.number().min(-180).max(180).nullable().optional(),
+    locationPlaceId: z.string().trim().max(64).nullable().optional(),
+    startDate: z.coerce.date().nullable().optional(),
+    endDate: z.coerce.date().nullable().optional(),
+  })
+  .refine((value) => !value.startDate || !value.endDate || value.endDate >= value.startDate, {
+    error: "La fecha de fin no puede ser anterior a la de inicio",
+    path: ["endDate"],
+  });
+export type UpdateFestivalInput = z.infer<typeof updateFestivalSchema>;
+
+export const deleteEntrySchema = z.object({
+  entryId: z.string().min(1),
+});
+export type DeleteEntryInput = z.infer<typeof deleteEntrySchema>;
+
 export const updateArtistRatingSchema = z.object({
   artistId: z.string().min(1),
   rating: nullableRatingSchema,

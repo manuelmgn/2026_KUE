@@ -14,6 +14,18 @@ export interface FestivalArchiveItemDTO extends FestivalSummary {
   entriesCount: number;
 }
 
+export interface FestivalEditDTO extends FestivalSummary {
+  locationProvince: string | null;
+  locationRegion: string | null;
+  locationCountry: string | null;
+  locationCountryCode: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
+  locationPlaceId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
 export interface LineupArtistSummary {
   id: string;
   name: string;

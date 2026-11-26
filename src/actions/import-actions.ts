@@ -15,6 +15,7 @@ export async function importLineupAction(
     revalidatePath("/");
     revalidatePath("/festivals");
     revalidatePath("/festival-mode");
+    revalidatePath("/manage");
     revalidatePath("/import");
     return result;
   }, dict.errors.importLineup);

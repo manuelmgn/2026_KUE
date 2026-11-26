@@ -1,5 +1,10 @@
 import { type EntryFilterCriteria, matchesEntryFilters } from "@/domain/rating";
-import { type UpdateEntryScheduleInput, updateEntryScheduleSchema } from "@/domain/schemas";
+import {
+  type DeleteEntryInput,
+  deleteEntrySchema,
+  type UpdateEntryScheduleInput,
+  updateEntryScheduleSchema,
+} from "@/domain/schemas";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
 
@@ -95,5 +100,12 @@ export async function updateEntrySchedule(
   return db.festivalEntry.update({
     where: { id: input.entryId },
     data,
+  });
+}
+
+export async function deleteFestivalEntry(rawInput: DeleteEntryInput, db: PrismaClient = getDb()) {
+  const input = deleteEntrySchema.parse(rawInput);
+  return db.festivalEntry.delete({
+    where: { id: input.entryId },
   });
 }
