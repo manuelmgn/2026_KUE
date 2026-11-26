@@ -7,8 +7,7 @@ try {
 }
 
 const databaseUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
-const isPostgres =
-  databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://");
+const isPostgres = databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://");
 
 export default defineConfig({
   schema: isPostgres ? "prisma/schema.postgresql.prisma" : "prisma/schema.prisma",
