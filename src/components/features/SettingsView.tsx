@@ -71,6 +71,7 @@ export function SettingsView() {
       if (meta) {
         meta.setAttribute("content", pref === "system" ? "light dark" : pref);
       }
+      syncThemeColorMetas(pref);
     };
     syncTheme();
 
