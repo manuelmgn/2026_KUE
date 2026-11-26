@@ -1,6 +1,8 @@
 import type {
   FestivalArchiveItemDTO,
   FestivalSummary,
+  FriendRadarPickDTO,
+  SharedFestivalMatchDTO,
   SocialPostItemDTO,
   UserPrivacySettingsDTO,
   UserProfileSummaryDTO,
@@ -232,18 +234,14 @@ async function collectPostsForAuthors(
   const { viewerId, limit, db } = options;
   const authorById = new Map(authors.map((a) => [a.id, a]));
 
-  // Personal artist notes are ALWAYS strictly private (self-only).
-  // Friends only see artist states when the author shares ratings and has a numeric rating.
+  // Personal artist notes and live comments are ALWAYS strictly private.
+  // Social feed only exposes numeric ratings (both studio and live).
   const artistReviewAuthorIds = authors
     .filter((a) => a.id === viewerId || a.ratingsVisibility === "FRIENDS")
     .map((a) => a.id);
 
-  // Live concert reviews can include liveRating (ratingsVisibility) or liveNotes (notesVisibility).
   const liveReviewAuthorIds = authors
-    .filter(
-      (a) =>
-        a.id === viewerId || a.ratingsVisibility === "FRIENDS" || a.notesVisibility === "FRIENDS",
-    )
+    .filter((a) => a.id === viewerId || a.ratingsVisibility === "FRIENDS")
     .map((a) => a.id);
 
   // Determine which authors allow festivals
@@ -256,7 +254,7 @@ async function collectPostsForAuthors(
       ? db.userArtistState.findMany({
           where: {
             userId: { in: artistReviewAuthorIds },
-            OR: [{ rating: { not: null } }, { userId: viewerId, notes: { not: "" } }],
+            rating: { not: null },
           },
           orderBy: [{ ratedAt: "desc" }, { updatedAt: "desc" }],
           take: limit * 2,
@@ -273,7 +271,7 @@ async function collectPostsForAuthors(
                       include: {
                         edition: {
                           include: {
-                            festival: { select: { name: true } },
+                            festival: { select: { slug: true, name: true } },
                           },
                         },
                       },
@@ -289,7 +287,7 @@ async function collectPostsForAuthors(
       ? db.userEntryState.findMany({
           where: {
             userId: { in: liveReviewAuthorIds },
-            OR: [{ liveRating: { not: null } }, { liveNotes: { not: "" } }],
+            liveRating: { not: null },
           },
           orderBy: [{ updatedAt: "desc" }],
           take: limit * 2,
@@ -313,7 +311,7 @@ async function collectPostsForAuthors(
                     slug: true,
                     year: true,
                     location: true,
-                    festival: { select: { name: true } },
+                    festival: { select: { slug: true, name: true } },
                   },
                 },
               },
@@ -333,7 +331,7 @@ async function collectPostsForAuthors(
                 slug: true,
                 year: true,
                 location: true,
-                festival: { select: { name: true } },
+                festival: { select: { slug: true, name: true } },
               },
             },
           },
@@ -346,6 +344,31 @@ async function collectPostsForAuthors(
         })
       : Promise.resolve([]),
   ]);
+
+  // Fetch pre-concert studio ratings for live reviews so the feed can show pre → post evolution
+  const liveArtistIds = Array.from(
+    new Set(
+      entryStates
+        .map((s) => s.entry.artists[0]?.artist.id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const preRatingByUserArtist = new Map<string, number>();
+  if (liveArtistIds.length > 0 && liveReviewAuthorIds.length > 0) {
+    const preStates = await db.userArtistState.findMany({
+      where: {
+        userId: { in: liveReviewAuthorIds },
+        artistId: { in: liveArtistIds },
+        rating: { not: null },
+      },
+      select: { userId: true, artistId: true, rating: true },
+    });
+    for (const ps of preStates) {
+      if (ps.rating !== null) {
+        preRatingByUserArtist.set(`${ps.userId}:${ps.artistId}`, ps.rating);
+      }
+    }
+  }
 
   const followedEditionsByUser = new Map<string, Set<string>>();
   for (const m of authorMemberships) {
@@ -366,11 +389,7 @@ async function collectPostsForAuthors(
     const canSeeRatings = isSelf || author.ratingsVisibility === "FRIENDS";
 
     const visibleRating = canSeeRatings ? state.rating : null;
-    const trimmedNotes = state.notes.trim();
-    // Personal artist notes are strictly private and never shared with other users.
-    const visibleNotes = isSelf && trimmedNotes.length > 0 ? trimmedNotes : null;
-
-    if (visibleRating === null && visibleNotes === null) {
+    if (visibleRating === null) {
       continue;
     }
 
@@ -400,6 +419,7 @@ async function collectPostsForAuthors(
         ? {
             id: linkedEdition.id,
             slug: linkedEdition.slug,
+            brandSlug: linkedEdition.festival.slug,
             name: linkedEdition.festival.name,
             year: linkedEdition.year,
             location: linkedEdition.location,
@@ -407,7 +427,7 @@ async function collectPostsForAuthors(
         : null,
       entry: null,
       rating: visibleRating,
-      notes: visibleNotes,
+      notes: null,
     });
   }
 
@@ -416,19 +436,19 @@ async function collectPostsForAuthors(
     if (!author) continue;
     const isSelf = author.id === viewerId;
     const canSeeRatings = isSelf || author.ratingsVisibility === "FRIENDS";
-    const canSeeNotes = isSelf || author.notesVisibility === "FRIENDS";
 
     const visibleRating = canSeeRatings ? state.liveRating : null;
-    const trimmedNotes = state.liveNotes.trim();
-    const visibleNotes = canSeeNotes && trimmedNotes.length > 0 ? trimmedNotes : null;
-
-    if (visibleRating === null && visibleNotes === null) {
+    if (visibleRating === null) {
       continue;
     }
 
     const canSeeFestivals = isSelf || author.festivalsVisibility === "FRIENDS";
     const firstArtist = state.entry.artists[0]?.artist ?? null;
     const ed = state.entry.edition;
+    const preRating =
+      firstArtist && canSeeRatings
+        ? (preRatingByUserArtist.get(`${state.userId}:${firstArtist.id}`) ?? null)
+        : null;
 
     posts.push({
       id: `live:${state.userId}:${state.entryId}`,
@@ -451,6 +471,7 @@ async function collectPostsForAuthors(
         ? {
             id: ed.id,
             slug: ed.slug,
+            brandSlug: ed.festival.slug,
             name: ed.festival.name,
             year: ed.year,
             location: ed.location,
@@ -463,7 +484,8 @@ async function collectPostsForAuthors(
         stage: canSeeFestivals ? state.entry.stage : null,
       },
       rating: visibleRating,
-      notes: visibleNotes,
+      preRating,
+      notes: null,
     });
   }
 
@@ -485,6 +507,7 @@ async function collectPostsForAuthors(
       festival: {
         id: ed.id,
         slug: ed.slug,
+        brandSlug: ed.festival.slug,
         name: ed.festival.name,
         year: ed.year,
         location: ed.location,
@@ -641,4 +664,201 @@ export async function listFriendsActivityFeed(
   });
 
   return collectPostsForAuthors(friends, { viewerId, limit, db });
+}
+
+export async function getSocialInsights(
+  viewerId: string,
+  db: PrismaClient = getDb(),
+): Promise<{
+  sharedFestivals: SharedFestivalMatchDTO[];
+  radarPicks: FriendRadarPickDTO[];
+  myEditionIds: string[];
+}> {
+  const [myMemberships, friendIds] = await Promise.all([
+    db.userFestivalEdition.findMany({
+      where: { userId: viewerId },
+      include: {
+        edition: {
+          include: {
+            festival: { select: { slug: true, name: true } },
+            entries: {
+              include: {
+                artists: {
+                  include: {
+                    artist: { select: { id: true, name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    getAcceptedFriendIds(viewerId, db),
+  ]);
+
+  const myEditionIds = myMemberships.map((m) => m.editionId);
+  if (myEditionIds.length === 0 || friendIds.length === 0) {
+    return { sharedFestivals: [], radarPicks: [], myEditionIds };
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcomingMemberships = myMemberships.filter((m) => {
+    const ed = m.edition;
+    const endIso = ed.endDate ? ed.endDate.toISOString().slice(0, 10) : null;
+    const startIso = ed.startDate ? ed.startDate.toISOString().slice(0, 10) : null;
+    if (endIso) return endIso >= todayIso;
+    if (startIso) return startIso >= todayIso;
+    return ed.year >= Number(todayIso.slice(0, 4));
+  });
+  const targetMemberships = upcomingMemberships.length > 0 ? upcomingMemberships : myMemberships;
+  const targetEditionIds = targetMemberships.map((m) => m.editionId);
+
+  const [friends, friendMemberships, myArtistStates] = await Promise.all([
+    db.user.findMany({
+      where: { id: { in: friendIds }, isActive: true },
+      select: {
+        id: true,
+        username: true,
+        festivalsVisibility: true,
+        ratingsVisibility: true,
+      },
+    }),
+    db.userFestivalEdition.findMany({
+      where: {
+        userId: { in: friendIds },
+        editionId: { in: targetEditionIds },
+      },
+      select: { userId: true, editionId: true },
+    }),
+    db.userArtistState.findMany({
+      where: { userId: viewerId },
+      select: { artistId: true, rating: true, status: true },
+    }),
+  ]);
+
+  const friendById = new Map(friends.map((f) => [f.id, f]));
+  const myStateByArtist = new Map(myArtistStates.map((s) => [s.artistId, s]));
+
+  // Collect all artist IDs across target editions
+  const artistEditionMap = new Map<
+    string,
+    { artistName: string; edition: (typeof targetMemberships)[number]["edition"] }
+  >();
+  for (const m of targetMemberships) {
+    for (const entry of m.edition.entries) {
+      for (const link of entry.artists) {
+        if (!artistEditionMap.has(link.artist.id)) {
+          artistEditionMap.set(link.artist.id, {
+            artistName: link.artist.name,
+            edition: m.edition,
+          });
+        }
+      }
+    }
+  }
+
+  const allArtistIds = Array.from(artistEditionMap.keys());
+  const ratingFriendlyIds = friends
+    .filter((f) => f.ratingsVisibility === "FRIENDS")
+    .map((f) => f.id);
+
+  const friendRatings =
+    allArtistIds.length > 0 && ratingFriendlyIds.length > 0
+      ? await db.userArtistState.findMany({
+          where: {
+            userId: { in: ratingFriendlyIds },
+            artistId: { in: allArtistIds },
+            rating: { not: null },
+          },
+          select: { userId: true, artistId: true, rating: true },
+        })
+      : [];
+
+  // 1. Shared Festivals
+  const sharedFestivals: SharedFestivalMatchDTO[] = [];
+  for (const m of targetMemberships) {
+    const ed = m.edition;
+    const sharedFriendIds = friendMemberships
+      .filter((fm) => fm.editionId === ed.id)
+      .map((fm) => fm.userId)
+      .filter((fid) => friendById.get(fid)?.festivalsVisibility === "FRIENDS");
+
+    if (sharedFriendIds.length === 0) continue;
+
+    const edArtistIds = new Set<string>();
+    for (const entry of ed.entries) {
+      for (const link of entry.artists) {
+        edArtistIds.add(link.artist.id);
+      }
+    }
+
+    const participantIds = new Set([viewerId, ...sharedFriendIds]);
+    const scores: number[] = [];
+    for (const aId of edArtistIds) {
+      const myR = myStateByArtist.get(aId)?.rating;
+      if (myR != null) scores.push(myR);
+    }
+    for (const fr of friendRatings) {
+      if (fr.rating !== null && participantIds.has(fr.userId) && edArtistIds.has(fr.artistId)) {
+        scores.push(fr.rating);
+      }
+    }
+
+    const averageRating =
+      scores.length > 0
+        ? Math.round((scores.reduce((acc, s) => acc + s, 0) / scores.length) * 10) / 10
+        : null;
+
+    sharedFestivals.push({
+      editionId: ed.id,
+      slug: ed.slug,
+      brandSlug: ed.festival.slug,
+      name: ed.festival.name,
+      year: ed.year,
+      location: ed.location,
+      friendUsernames: sharedFriendIds
+        .map((fid) => friendById.get(fid)?.username)
+        .filter((u): u is string => Boolean(u)),
+      averageRating,
+    });
+  }
+
+  // 2. Radar Picks (artists rated >= 4 by friends that current user still hasn't rated or discarded)
+  const backersByArtist = new Map<string, Array<{ username: string; rating: number }>>();
+  for (const fr of friendRatings) {
+    if (fr.rating === null || fr.rating < 4) continue;
+    const friend = friendById.get(fr.userId);
+    if (!friend) continue;
+    const myState = myStateByArtist.get(fr.artistId);
+    if (myState && (myState.rating !== null || myState.status === "DISCARDED")) {
+      continue;
+    }
+    const list = backersByArtist.get(fr.artistId) ?? [];
+    list.push({ username: friend.username, rating: fr.rating });
+    backersByArtist.set(fr.artistId, list);
+  }
+
+  const radarPicks: FriendRadarPickDTO[] = Array.from(backersByArtist.entries())
+    .map(([artistId, backers]) => {
+      const meta = artistEditionMap.get(artistId);
+      if (!meta) return null;
+      const myState = myStateByArtist.get(artistId);
+      return {
+        artistId,
+        artistName: meta.artistName,
+        editionId: meta.edition.id,
+        festivalSlug: meta.edition.slug,
+        festivalBrandSlug: meta.edition.festival.slug,
+        festivalName: meta.edition.festival.name,
+        festivalYear: meta.edition.year,
+        yourStatus: myState?.status ?? ("PENDING" as const),
+        backers: backers.sort((a, b) => b.rating - a.rating),
+      };
+    })
+    .filter((p): p is FriendRadarPickDTO => p !== null)
+    .sort((a, b) => b.backers.length - a.backers.length || a.artistName.localeCompare(b.artistName))
+    .slice(0, 8);
+
+  return { sharedFestivals, radarPicks, myEditionIds };
 }

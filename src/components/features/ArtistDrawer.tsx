@@ -17,6 +17,7 @@ import { HairlineButton } from "@/components/ui/HairlineButton";
 import { RatingControl } from "@/components/ui/RatingControl";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { getAlbumExternalLinks, getArtistExternalLinks } from "@/domain/external-links";
+import { festivalCartelPath } from "@/domain/festival-routes";
 import { toMediaApiUrl } from "@/domain/media-url";
 import { sortAlbumsForShelf } from "@/domain/rating";
 import type { ArtistStatus } from "@/domain/schemas";
@@ -24,6 +25,7 @@ import { useI18n } from "@/i18n/context";
 
 interface ArtistDrawerProps {
   entry: LineupEntryDTO | null;
+  mode?: "drawer" | "inline";
   onClose: () => void;
   onRateArtist: (artistId: string, rating: number) => void;
   onStatusArtist: (artistId: string, status: ArtistStatus) => void;
@@ -42,6 +44,7 @@ interface ArtistDrawerProps {
 
 export function ArtistDrawer({
   entry,
+  mode = "drawer",
   onClose,
   onRateArtist,
   onStatusArtist,
@@ -283,478 +286,502 @@ export function ArtistDrawer({
   const externalLinks = displayArtist ? getArtistExternalLinks(displayArtist.name) : null;
   const imageSrc = toMediaApiUrl(detail?.imagePath ?? displayArtist?.imagePath);
 
-  return (
-    <>
-      <Drawer
-        open={entry !== null}
-        onClose={onClose}
-        headerLabel={headerLabel}
-        ariaLabel={
-          displayArtist ? dict.drawer.artistAria(displayArtist.name) : dict.drawer.defaultAria
-        }
-      >
-        {entry && displayArtist ? (
+  const content =
+    entry && displayArtist ? (
+      <div>
+        {entry.artists.length > 1 ? (
+          <div
+            role="tablist"
+            aria-label={dict.drawer.collabTablistAria}
+            className="flex border-b border-line"
+          >
+            {entry.artists.map((artist, index) => {
+              const isActive = index === activeArtistIdx;
+              return (
+                <button
+                  key={artist.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveArtistIdx(index)}
+                  className={`flex-1 cursor-pointer border-r border-line px-4 py-3 text-left font-mono text-[0.76rem] uppercase transition-colors last:border-r-0 ${
+                    isActive
+                      ? "bg-acid font-semibold text-acid-ink"
+                      : "text-ink-muted hover:bg-surface hover:text-ink"
+                  }`}
+                >
+                  {artist.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-6">
+          <Artwork
+            src={imageSrc}
+            alt={displayArtist.name}
+            seedText={displayArtist.name}
+            variant="artist"
+            className="aspect-[16/8] w-full"
+          />
+
           <div>
-            {entry.artists.length > 1 ? (
-              <div
-                role="tablist"
-                aria-label={dict.drawer.collabTablistAria}
-                className="flex border-b border-line"
+            <h2 className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
+              {displayArtist.name}
+            </h2>
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+              <span className="font-mono text-[0.75rem] uppercase text-ink-muted">
+                {[
+                  detail?.country ?? displayArtist.country,
+                  entry.subtitle ?? dict.drawer.artistCardFallback,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDisambigOpen(true)}
+                className="cursor-pointer font-mono text-[0.72rem] text-ink-muted underline underline-offset-4 transition-colors hover:text-acid"
               >
-                {entry.artists.map((artist, index) => {
-                  const isActive = index === activeArtistIdx;
+                {dict.drawer.notThisArtist}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 border-y border-line py-4 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div className="flex flex-wrap gap-1.5">
+              {statusLabels.map((item) => {
+                const isActive = displayArtist.status === item.value;
+                return (
+                  <HairlineButton
+                    key={item.value}
+                    variant={isActive ? "inverted" : "default"}
+                    onClick={() => onStatusArtist(displayArtist.id, item.value)}
+                  >
+                    {item.label}
+                  </HairlineButton>
+                );
+              })}
+            </div>
+            <RatingControl
+              value={displayArtist.rating}
+              onRate={(value) => onRateArtist(displayArtist.id, value)}
+            />
+          </div>
+
+          {externalLinks ? (
+            <div className="grid grid-cols-3 border border-line">
+              <a
+                href={externalLinks.appleMusic}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
+              >
+                Apple Music ↗
+              </a>
+              <a
+                href={externalLinks.youtube}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
+              >
+                YouTube ↗
+              </a>
+              <a
+                href={externalLinks.youtubeLive}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
+              >
+                YouTube Live ↗
+              </a>
+            </div>
+          ) : null}
+
+          <div>
+            <div className="mb-2.5 flex items-center justify-between font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+              <span>{dict.drawer.personalNotes}</span>
+              <span>
+                {notesSaveState === "saving"
+                  ? dict.common.saving
+                  : notesSaveState === "saved"
+                    ? dict.common.saved
+                    : notesSaveState === "error"
+                      ? dict.common.saveError
+                      : ""}
+              </span>
+            </div>
+            <textarea
+              value={notesDraft}
+              onChange={(event) => handleNotesChange(event.target.value)}
+              onBlur={() => {
+                if (debounceRef.current) {
+                  clearTimeout(debounceRef.current);
+                  debounceRef.current = null;
+                }
+                void flushNotesSave(displayArtist.id, notesDraft);
+              }}
+              placeholder={dict.drawer.notesPlaceholder}
+              className="min-h-[84px] w-full resize-y border border-line bg-surface p-3 font-serif text-[1.15rem] text-ink placeholder:text-ink-muted focus:border-acid focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+              {dict.drawer.biography}
+            </div>
+            <p className="font-serif text-[1.2rem] leading-[1.42] text-ink">
+              {detail?.bio
+                ? detail.bio
+                : loadingDetail
+                  ? dict.drawer.loadingInfo
+                  : dict.drawer.noBioYet}
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+              {dict.drawer.discographyTitle}
+            </div>
+            {detail && detail.albums.length > 0 ? (
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {detail.albums.map((album) => {
+                  const albumLinks = getAlbumExternalLinks(displayArtist.name, album.title);
+                  const coverSrc = toMediaApiUrl(album.coverPath);
                   return (
-                    <button
-                      key={artist.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      onClick={() => setActiveArtistIdx(index)}
-                      className={`flex-1 cursor-pointer border-r border-line px-4 py-3 text-left font-mono text-[0.76rem] uppercase transition-colors last:border-r-0 ${
-                        isActive
-                          ? "bg-acid font-semibold text-acid-ink"
-                          : "text-ink-muted hover:bg-surface hover:text-ink"
-                      }`}
-                    >
-                      {artist.name}
-                    </button>
+                    <div key={album.id} className="flex w-[150px] shrink-0 flex-col gap-2">
+                      <div className="relative h-[150px] w-[150px]">
+                        <Artwork
+                          src={coverSrc}
+                          alt={album.title}
+                          seedText={`${displayArtist.name}-${album.title}`}
+                          variant="album"
+                          className="h-[150px] w-[150px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleTogglePin(album.id, album.isPinned)}
+                          className={`absolute top-2 right-2 cursor-pointer border px-1.5 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.06em] ${
+                            album.isPinned
+                              ? "border-acid bg-acid font-semibold text-acid-ink"
+                              : "border-[#444] bg-black/85 text-white hover:border-white"
+                          }`}
+                        >
+                          {album.isPinned ? dict.drawer.pinActive : dict.drawer.pinAction}
+                        </button>
+                      </div>
+
+                      <div className="font-sans text-[0.86rem] font-semibold leading-[1.2]">
+                        {album.title}
+                      </div>
+                      <div className="font-mono text-[0.7rem] text-ink-muted">
+                        {[album.releaseYear, album.releaseType].filter(Boolean).join(" · ")}
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 font-mono text-[0.66rem] uppercase">
+                        <a
+                          href={albumLinks.appleMusic}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
+                        >
+                          AM ↗
+                        </a>
+                        <a
+                          href={albumLinks.youtube}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
+                        >
+                          YT ↗
+                        </a>
+                        {album.customUrl ? (
+                          <a
+                            href={album.customUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="border border-acid bg-acid px-1.5 py-0.5 font-semibold text-acid-ink"
+                          >
+                            LINK ↗
+                          </a>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAlbumUrlId(editingAlbumUrlId === album.id ? null : album.id);
+                            setAlbumUrlDraft(album.customUrl ?? "");
+                            setAlbumUrlError(null);
+                          }}
+                          className="cursor-pointer border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
+                        >
+                          URL
+                        </button>
+                      </div>
+
+                      {editingAlbumUrlId === album.id ? (
+                        <div className="flex flex-col gap-1 border border-line bg-surface p-2">
+                          <input
+                            type="url"
+                            value={albumUrlDraft}
+                            onChange={(event) => setAlbumUrlDraft(event.target.value)}
+                            placeholder="https://..."
+                            className="w-full border border-line bg-bg px-1.5 py-1 font-mono text-[0.68rem] text-ink outline-none"
+                          />
+                          {albumUrlError ? (
+                            <span className="font-mono text-[0.64rem] text-ink-muted">
+                              {albumUrlError}
+                            </span>
+                          ) : null}
+                          <HairlineButton
+                            variant="acid"
+                            onClick={() => void handleSaveCustomUrl(album.id)}
+                            className="w-full py-1 text-[0.66rem]"
+                          >
+                            {dict.common.save}
+                          </HairlineButton>
+                        </div>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>
-            ) : null}
+            ) : (
+              <p className="font-mono text-xs uppercase text-ink-muted">
+                {loadingDetail ? dict.drawer.loadingDiscography : dict.drawer.noAlbumsYet}
+              </p>
+            )}
+          </div>
 
-            <div className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-6">
-              <Artwork
-                src={imageSrc}
-                alt={displayArtist.name}
-                seedText={displayArtist.name}
-                variant="artist"
-                className="aspect-[16/8] w-full"
+          <div>
+            <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+              {dict.drawer.currentSetTitle}
+            </div>
+            <div className="flex flex-col gap-3 border border-line bg-surface p-4">
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={dayDraft}
+                  onChange={(event) => {
+                    setDayDraft(event.target.value);
+                    setLiveSaveState("idle");
+                  }}
+                  placeholder={dict.drawer.dayPlaceholder}
+                  aria-label={dict.drawer.dayAria}
+                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                />
+                <input
+                  type="text"
+                  value={stageDraft}
+                  onChange={(event) => {
+                    setStageDraft(event.target.value);
+                    setLiveSaveState("idle");
+                  }}
+                  placeholder={dict.drawer.stagePlaceholder}
+                  aria-label={dict.drawer.stageAria}
+                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                />
+                <input
+                  type="text"
+                  value={timeDraft}
+                  onChange={(event) => {
+                    setTimeDraft(event.target.value);
+                    setLiveSaveState("idle");
+                  }}
+                  placeholder={dict.drawer.timePlaceholder}
+                  aria-label={dict.drawer.timeAria}
+                  className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-[0.72rem] uppercase text-ink-muted">
+                  {dict.drawer.liveRatingLabel}
+                </span>
+                <RatingControl
+                  compact
+                  value={liveRatingDraft}
+                  onRate={(value) => {
+                    setLiveRatingDraft(value);
+                    setLiveSaveState("idle");
+                  }}
+                />
+              </div>
+
+              <input
+                type="text"
+                value={liveNotesDraft}
+                onChange={(event) => {
+                  setLiveNotesDraft(event.target.value);
+                  setLiveSaveState("idle");
+                }}
+                placeholder={dict.drawer.liveNotesPlaceholder}
+                aria-label={dict.drawer.liveNotesAria}
+                className="border border-line bg-bg px-3 py-2 font-serif text-base text-ink outline-none focus:border-acid"
               />
 
-              <div>
-                <h2 className="font-display text-[clamp(2rem,4vw,3rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
-                  {displayArtist.name}
-                </h2>
-                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
-                  <span className="font-mono text-[0.75rem] uppercase text-ink-muted">
-                    {[
-                      detail?.country ?? displayArtist.country,
-                      entry.subtitle ?? dict.drawer.artistCardFallback,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDisambigOpen(true)}
-                    className="cursor-pointer font-mono text-[0.72rem] text-ink-muted underline underline-offset-4 transition-colors hover:text-acid"
-                  >
-                    {dict.drawer.notThisArtist}
-                  </button>
-                </div>
-                {detail?.syncStatus === "FAILED" && detail.syncError ? (
-                  <p className="mt-2 border border-line bg-surface px-2.5 py-1.5 font-mono text-[0.68rem] text-ink-muted">
-                    {dict.drawer.syncErrorPrefix} {detail.syncError}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 border-y border-line py-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                <div className="flex flex-wrap gap-1.5">
-                  {statusLabels.map((item) => {
-                    const isActive = displayArtist.status === item.value;
-                    return (
-                      <HairlineButton
-                        key={item.value}
-                        variant={isActive ? "inverted" : "default"}
-                        onClick={() => onStatusArtist(displayArtist.id, item.value)}
-                      >
-                        {item.label}
-                      </HairlineButton>
-                    );
-                  })}
-                </div>
-                <RatingControl
-                  value={displayArtist.rating}
-                  onRate={(value) => onRateArtist(displayArtist.id, value)}
-                />
-              </div>
-
-              {externalLinks ? (
-                <div className="grid grid-cols-3 border border-line">
-                  <a
-                    href={externalLinks.appleMusic}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
-                  >
-                    Apple Music ↗
-                  </a>
-                  <a
-                    href={externalLinks.youtube}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center border-r border-line px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
-                  >
-                    YouTube ↗
-                  </a>
-                  <a
-                    href={externalLinks.youtubeLive}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center px-2 py-3 text-center font-mono text-[0.68rem] uppercase tracking-[0.04em] transition-colors hover:bg-acid hover:font-semibold hover:text-acid-ink sm:p-3 sm:text-[0.74rem] sm:tracking-[0.06em]"
-                  >
-                    YouTube Live ↗
-                  </a>
-                </div>
-              ) : null}
-
-              <div>
-                <div className="mb-2.5 flex items-center justify-between font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  <span>{dict.drawer.personalNotes}</span>
-                  <span>
-                    {notesSaveState === "saving"
-                      ? dict.common.saving
-                      : notesSaveState === "saved"
-                        ? dict.common.saved
-                        : notesSaveState === "error"
-                          ? dict.common.saveError
-                          : ""}
-                  </span>
-                </div>
-                <textarea
-                  value={notesDraft}
-                  onChange={(event) => handleNotesChange(event.target.value)}
-                  onBlur={() => {
-                    if (debounceRef.current) {
-                      clearTimeout(debounceRef.current);
-                      debounceRef.current = null;
-                    }
-                    void flushNotesSave(displayArtist.id, notesDraft);
-                  }}
-                  placeholder={dict.drawer.notesPlaceholder}
-                  className="min-h-[84px] w-full resize-y border border-line bg-surface p-3 font-serif text-[1.15rem] text-ink placeholder:text-ink-muted focus:border-acid focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  {dict.drawer.biography}
-                </div>
-                <p className="font-serif text-[1.2rem] leading-[1.42] text-ink">
-                  {detail?.bio
-                    ? detail.bio
-                    : loadingDetail
-                      ? dict.drawer.loadingInfo
-                      : dict.drawer.noBioYet}
-                </p>
-              </div>
-
-              <div>
-                <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  {dict.drawer.discographyTitle}
-                </div>
-                {detail && detail.albums.length > 0 ? (
-                  <div className="flex gap-4 overflow-x-auto pb-2">
-                    {detail.albums.map((album) => {
-                      const albumLinks = getAlbumExternalLinks(displayArtist.name, album.title);
-                      const coverSrc = toMediaApiUrl(album.coverPath);
-                      return (
-                        <div key={album.id} className="flex w-[150px] shrink-0 flex-col gap-2">
-                          <div className="relative h-[150px] w-[150px]">
-                            <Artwork
-                              src={coverSrc}
-                              alt={album.title}
-                              seedText={`${displayArtist.name}-${album.title}`}
-                              variant="album"
-                              className="h-[150px] w-[150px]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void handleTogglePin(album.id, album.isPinned)}
-                              className={`absolute top-2 right-2 cursor-pointer border px-1.5 py-0.5 font-mono text-[0.64rem] uppercase tracking-[0.06em] ${
-                                album.isPinned
-                                  ? "border-acid bg-acid font-semibold text-acid-ink"
-                                  : "border-[#444] bg-black/85 text-white hover:border-white"
-                              }`}
-                            >
-                              {album.isPinned ? dict.drawer.pinActive : dict.drawer.pinAction}
-                            </button>
-                          </div>
-
-                          <div className="font-sans text-[0.86rem] font-semibold leading-[1.2]">
-                            {album.title}
-                          </div>
-                          <div className="font-mono text-[0.7rem] text-ink-muted">
-                            {[album.releaseYear, album.releaseType].filter(Boolean).join(" · ")}
-                          </div>
-
-                          <div className="flex flex-wrap gap-1 font-mono text-[0.66rem] uppercase">
-                            <a
-                              href={albumLinks.appleMusic}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
-                            >
-                              AM ↗
-                            </a>
-                            <a
-                              href={albumLinks.youtube}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
-                            >
-                              YT ↗
-                            </a>
-                            {album.customUrl ? (
-                              <a
-                                href={album.customUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="border border-acid bg-acid px-1.5 py-0.5 font-semibold text-acid-ink"
-                              >
-                                LINK ↗
-                              </a>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingAlbumUrlId(
-                                  editingAlbumUrlId === album.id ? null : album.id,
-                                );
-                                setAlbumUrlDraft(album.customUrl ?? "");
-                                setAlbumUrlError(null);
-                              }}
-                              className="cursor-pointer border border-line px-1.5 py-0.5 text-ink-muted hover:border-ink hover:text-ink"
-                            >
-                              URL
-                            </button>
-                          </div>
-
-                          {editingAlbumUrlId === album.id ? (
-                            <div className="flex flex-col gap-1 border border-line bg-surface p-2">
-                              <input
-                                type="url"
-                                value={albumUrlDraft}
-                                onChange={(event) => setAlbumUrlDraft(event.target.value)}
-                                placeholder="https://..."
-                                className="w-full border border-line bg-bg px-1.5 py-1 font-mono text-[0.68rem] text-ink outline-none"
-                              />
-                              {albumUrlError ? (
-                                <span className="font-mono text-[0.64rem] text-ink-muted">
-                                  {albumUrlError}
-                                </span>
-                              ) : null}
-                              <HairlineButton
-                                variant="acid"
-                                onClick={() => void handleSaveCustomUrl(album.id)}
-                                className="w-full py-1 text-[0.66rem]"
-                              >
-                                {dict.common.save}
-                              </HairlineButton>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="font-mono text-xs uppercase text-ink-muted">
-                    {loadingDetail ? dict.drawer.loadingDiscography : dict.drawer.noAlbumsYet}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  {dict.drawer.currentSetTitle}
-                </div>
-                <div className="flex flex-col gap-3 border border-line bg-surface p-4">
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      value={dayDraft}
-                      onChange={(event) => {
-                        setDayDraft(event.target.value);
-                        setLiveSaveState("idle");
-                      }}
-                      placeholder={dict.drawer.dayPlaceholder}
-                      aria-label={dict.drawer.dayAria}
-                      className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                    />
-                    <input
-                      type="text"
-                      value={stageDraft}
-                      onChange={(event) => {
-                        setStageDraft(event.target.value);
-                        setLiveSaveState("idle");
-                      }}
-                      placeholder={dict.drawer.stagePlaceholder}
-                      aria-label={dict.drawer.stageAria}
-                      className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                    />
-                    <input
-                      type="text"
-                      value={timeDraft}
-                      onChange={(event) => {
-                        setTimeDraft(event.target.value);
-                        setLiveSaveState("idle");
-                      }}
-                      placeholder={dict.drawer.timePlaceholder}
-                      aria-label={dict.drawer.timeAria}
-                      className="border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[0.72rem] uppercase text-ink-muted">
-                      {dict.drawer.liveRatingLabel}
-                    </span>
-                    <RatingControl
-                      compact
-                      value={liveRatingDraft}
-                      onRate={(value) => {
-                        setLiveRatingDraft(value);
-                        setLiveSaveState("idle");
-                      }}
-                    />
-                  </div>
-
-                  <input
-                    type="text"
-                    value={liveNotesDraft}
-                    onChange={(event) => {
-                      setLiveNotesDraft(event.target.value);
-                      setLiveSaveState("idle");
-                    }}
-                    placeholder={dict.drawer.liveNotesPlaceholder}
-                    aria-label={dict.drawer.liveNotesAria}
-                    className="border border-line bg-bg px-3 py-2 font-serif text-base text-ink outline-none focus:border-acid"
-                  />
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[0.7rem] uppercase text-ink-muted">
-                      {liveSaveState === "saving"
-                        ? dict.common.saving
-                        : liveSaveState === "saved"
-                          ? dict.drawer.setSaved
-                          : liveSaveState === "error"
-                            ? (liveSaveError ?? dict.common.saveError)
-                            : ""}
-                    </span>
-                    <HairlineButton
-                      variant="acid"
-                      disabled={liveSaveState === "saving"}
-                      onClick={() => void handleSaveEntrySchedule()}
-                    >
-                      {dict.drawer.saveSet}
-                    </HairlineButton>
-                  </div>
-                </div>
-              </div>
-
-              {detail && detail.friendReviews.length > 0 ? (
-                <div>
-                  <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                    {dict.drawer.friendReviewsTitle}
-                  </div>
-                  <ul className="border border-line bg-surface">
-                    {detail.friendReviews.map((review) => (
-                      <li
-                        key={review.userId}
-                        className="border-b border-line p-3.5 last:border-b-0"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <Link
-                            href={`/u/${encodeURIComponent(review.username)}`}
-                            onClick={onClose}
-                            className="flex min-w-0 items-center gap-2.5 hover:underline"
-                          >
-                            <UserAvatar
-                              avatarPath={review.avatarPath}
-                              username={review.username}
-                              displayName={review.displayName}
-                              size="sm"
-                            />
-                            <span className="truncate font-mono text-xs font-semibold text-ink">
-                              @{review.username}
-                            </span>
-                          </Link>
-
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {review.rating !== null ? (
-                              <span
-                                className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
-                                  review.rating >= 4
-                                    ? "border-acid bg-acid font-semibold text-acid-ink"
-                                    : "border-line text-ink"
-                                }`}
-                              >
-                                {dict.drawer.friendStudioBadge(review.rating)}
-                              </span>
-                            ) : null}
-                            {review.liveRating !== null ? (
-                              <span
-                                className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
-                                  review.liveRating >= 4
-                                    ? "border-acid bg-acid font-semibold text-acid-ink"
-                                    : "border-line text-ink"
-                                }`}
-                              >
-                                {dict.drawer.liveBadge(review.liveRating)}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {review.notes ? (
-                          <p className="mt-2 font-serif text-[1.06rem] italic leading-[1.38] text-ink">
-                            “{review.notes}”
-                          </p>
-                        ) : null}
-                        {review.liveNotes ? (
-                          <p className="mt-1.5 font-serif text-[1.02rem] italic leading-[1.38] text-ink-muted">
-                            {review.festivalName
-                              ? `${review.festivalName}${review.festivalYear ? ` ${review.festivalYear}` : ""}: `
-                              : ""}
-                            “{review.liveNotes}”
-                          </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              <div>
-                <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
-                  {dict.drawer.festivalHistoryTitle}
-                </div>
-                <div className="border-t border-line">
-                  {(detail?.festivals ?? []).map((appearance) => (
-                    <div
-                      key={appearance.entryId}
-                      className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2.5 font-mono text-[0.76rem]"
-                    >
-                      <span>
-                        {appearance.festivalName} {appearance.festivalYear}
-                        {appearance.day ? ` · ${appearance.day}` : ""}
-                        {appearance.stage ? ` · ${appearance.stage}` : ""}
-                      </span>
-                      {appearance.liveRating ? (
-                        <span className="border border-acid bg-acid px-2 py-0.5 text-[0.7rem] font-semibold text-acid-ink">
-                          {dict.drawer.liveBadge(appearance.liveRating)}
-                        </span>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[0.7rem] uppercase text-ink-muted">
+                  {liveSaveState === "saving"
+                    ? dict.common.saving
+                    : liveSaveState === "saved"
+                      ? dict.drawer.setSaved
+                      : liveSaveState === "error"
+                        ? (liveSaveError ?? dict.common.saveError)
+                        : ""}
+                </span>
+                <HairlineButton
+                  variant="acid"
+                  disabled={liveSaveState === "saving"}
+                  onClick={() => void handleSaveEntrySchedule()}
+                >
+                  {dict.drawer.saveSet}
+                </HairlineButton>
               </div>
             </div>
           </div>
-        ) : null}
-      </Drawer>
+
+          {detail && detail.friendReviews.length > 0 ? (
+            <div>
+              <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+                {dict.drawer.friendReviewsTitle}
+              </div>
+              <ul className="border border-line bg-surface">
+                {detail.friendReviews.map((review) => (
+                  <li key={review.userId} className="border-b border-line p-3.5 last:border-b-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Link
+                        href={`/u/${encodeURIComponent(review.username)}`}
+                        onClick={onClose}
+                        className="flex min-w-0 items-center gap-2.5 hover:underline"
+                      >
+                        <UserAvatar
+                          avatarPath={review.avatarPath}
+                          username={review.username}
+                          displayName={review.displayName}
+                          size="sm"
+                        />
+                        <span className="truncate font-mono text-xs font-semibold text-ink">
+                          @{review.username}
+                        </span>
+                      </Link>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {review.rating !== null ? (
+                          <span
+                            className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
+                              review.rating >= 4
+                                ? "border-acid bg-acid font-semibold text-acid-ink"
+                                : "border-line text-ink"
+                            }`}
+                          >
+                            {dict.drawer.friendStudioBadge(review.rating)}
+                          </span>
+                        ) : null}
+                        {review.liveRating !== null ? (
+                          <span
+                            className={`border px-2 py-0.5 font-mono text-[0.68rem] uppercase ${
+                              review.liveRating >= 4
+                                ? "border-acid bg-acid font-semibold text-acid-ink"
+                                : "border-line text-ink"
+                            }`}
+                          >
+                            {dict.drawer.liveBadge(review.liveRating)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div>
+            <div className="mb-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] text-ink-muted">
+              {dict.drawer.festivalHistoryTitle}
+            </div>
+            <div className="border-t border-line">
+              {(detail?.festivals ?? []).map((appearance) => {
+                const rowContent = (
+                  <>
+                    <span>
+                      {appearance.festivalName} {appearance.festivalYear}
+                      {appearance.day ? ` · ${appearance.day}` : ""}
+                      {appearance.stage ? ` · ${appearance.stage}` : ""}
+                    </span>
+                    {appearance.liveRating ? (
+                      <span className="border border-acid bg-acid px-2 py-0.5 text-[0.7rem] font-semibold text-acid-ink">
+                        {dict.drawer.liveBadge(appearance.liveRating)}
+                      </span>
+                    ) : null}
+                  </>
+                );
+
+                return appearance.festivalBrandSlug ? (
+                  <Link
+                    key={appearance.entryId}
+                    href={festivalCartelPath({
+                      brandSlug: appearance.festivalBrandSlug,
+                      year: appearance.festivalYear,
+                    })}
+                    onClick={onClose}
+                    className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2.5 font-mono text-[0.76rem] transition-colors hover:text-acid"
+                  >
+                    {rowContent}
+                  </Link>
+                ) : (
+                  <div
+                    key={appearance.entryId}
+                    className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2.5 font-mono text-[0.76rem]"
+                  >
+                    {rowContent}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  return (
+    <>
+      {mode === "inline" ? (
+        entry ? (
+          <aside
+            aria-label={
+              displayArtist ? dict.drawer.artistAria(displayArtist.name) : dict.drawer.defaultAria
+            }
+            className="sticky top-[calc(var(--kue-sticky-top)+2.75rem)] flex h-[calc(100dvh-var(--kue-sticky-top)-2.75rem)] flex-col border-l border-line bg-bg"
+          >
+            <div className="flex h-[50px] shrink-0 items-center justify-between gap-3 border-b border-line px-4">
+              <span className="truncate font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink-muted">
+                {headerLabel}
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="cursor-pointer border border-line px-2.5 py-1 font-mono text-[0.7rem] uppercase tracking-[0.06em] text-ink-muted transition-colors hover:border-ink hover:text-ink"
+              >
+                {dict.common.close}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">{content}</div>
+          </aside>
+        ) : null
+      ) : (
+        <Drawer
+          open={entry !== null}
+          onClose={onClose}
+          headerLabel={headerLabel}
+          ariaLabel={
+            displayArtist ? dict.drawer.artistAria(displayArtist.name) : dict.drawer.defaultAria
+          }
+        >
+          {content}
+        </Drawer>
+      )}
 
       {displayArtist ? (
         <DisambiguateModal

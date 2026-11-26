@@ -1,73 +1,30 @@
-import Link from "next/link";
-import { Suspense } from "react";
-import { FestivalModeView } from "@/components/features/FestivalModeView";
-import { TopBar } from "@/components/features/TopBar";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { getServerDictionary } from "@/i18n/server";
+import { redirect } from "next/navigation";
+import { festivalAgendaPath } from "@/domain/festival-routes";
 import { requirePageUser } from "@/server/auth/dal";
-import { listFestivalEntries } from "@/server/services/entries";
 import { getEditionBySlug, listUserEditions } from "@/server/services/festivals";
-import {
-  resolveActiveFestival,
-  toFestivalSummary,
-  toLineupEntryDTO,
-  toLocalizedFestivalSummary,
-} from "@/server/services/mappers";
+import { resolveActiveFestival } from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
 
-interface FestivalModePageProps {
+interface LegacyFestivalModePageProps {
   searchParams: Promise<{ festival?: string }>;
 }
 
-export default async function FestivalModePage({ searchParams }: FestivalModePageProps) {
+export default async function LegacyFestivalModeRedirectPage({
+  searchParams,
+}: LegacyFestivalModePageProps) {
   const user = await requirePageUser("/festival-mode");
-  const [params, { locale, dict }, editions] = await Promise.all([
-    searchParams,
-    getServerDictionary(),
-    listUserEditions(user.id),
-  ]);
+  const [params, editions] = await Promise.all([searchParams, listUserEditions(user.id)]);
 
-  const summaries = editions.map(toFestivalSummary);
-  const requestedEdition = params.festival
+  const requested = params.festival
     ? (editions.find((ed) => ed.slug === params.festival) ??
       (await getEditionBySlug(params.festival)))
     : null;
-  const activeFestivalRaw = requestedEdition ?? resolveActiveFestival(editions, params.festival);
-  const activeFestival = activeFestivalRaw
-    ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
-    : null;
+  const target = requested ?? resolveActiveFestival(editions, params.festival);
 
-  const entries = activeFestival
-    ? (await listFestivalEntries(user.id, activeFestival.id)).map(toLineupEntryDTO)
-    : [];
+  if (!target) {
+    redirect("/festivals");
+  }
 
-  return (
-    <div className="min-h-screen bg-bg text-ink">
-      <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar
-          festivals={summaries}
-          activeFestivalSlug={activeFestival?.slug ?? null}
-          currentUser={user}
-        />
-      </Suspense>
-
-      {activeFestival ? (
-        <FestivalModeView userId={user.id} festival={activeFestival} entries={entries} />
-      ) : (
-        <EmptyState
-          title={dict.festivalMode.noFestivalTitle}
-          description={dict.festivalMode.noFestivalDescription}
-          action={
-            <Link
-              href="/festivals"
-              className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-xs font-semibold uppercase text-acid-ink"
-            >
-              {dict.home.emptyAction}
-            </Link>
-          }
-        />
-      )}
-    </div>
-  );
+  redirect(festivalAgendaPath({ brandSlug: target.festival.slug, year: target.year }));
 }

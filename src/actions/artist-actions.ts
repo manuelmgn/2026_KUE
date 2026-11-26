@@ -17,6 +17,7 @@ import { requireActionUser } from "@/server/auth/dal";
 import {
   disambiguateArtist,
   getArtistDetail,
+  searchCatalogArtists,
   updateAlbumCustomUrl,
   updateAlbumPin,
   updateArtistNotes,
@@ -27,6 +28,14 @@ import {
 export async function getArtistDetailAction(artistId: string) {
   const user = await requireActionUser();
   return getArtistDetail(user.id, artistId);
+}
+
+export async function searchArtistsAction(query: string) {
+  const { dict } = await getServerDictionary();
+  return runAction(async () => {
+    const user = await requireActionUser();
+    return searchCatalogArtists(user.id, query, 48);
+  }, dict.common.unexpectedError);
 }
 
 export async function setArtistRatingAction(

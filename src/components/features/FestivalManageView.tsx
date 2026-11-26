@@ -7,9 +7,11 @@ import { deleteEntryAction } from "@/actions/entry-actions";
 import { updateFestivalAction } from "@/actions/festival-actions";
 import { importLineupAction } from "@/actions/import-actions";
 import { FestivalAutoSyncPanel } from "@/components/features/FestivalAutoSyncPanel";
+import { FestivalHeaderNav } from "@/components/features/FestivalHeaderNav";
 import { PlaceAutocomplete } from "@/components/features/PlaceAutocomplete";
 import type { FestivalEditDTO, LineupEntryDTO } from "@/components/features/types";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { festivalCartelPath } from "@/domain/festival-routes";
 import { parseRawLineup } from "@/domain/lineup-parser";
 import type { PlaceCandidate } from "@/domain/schemas";
 import { useI18n } from "@/i18n/context";
@@ -261,46 +263,33 @@ export function FestivalManageView({
     (festival.pendingLineupDiff?.added.length ?? 0) +
     (festival.pendingLineupDiff?.updated.length ?? 0);
 
+  const tabs: Array<{ id: ManageTab; label: string }> = [
+    { id: "details", label: dict.manage.tabDetails },
+    { id: "artists", label: dict.manage.tabArtists(entries.length) },
+    { id: "import", label: dict.manage.tabImport },
+    ...(isAdmin
+      ? [{ id: "autosync" as const, label: dict.manage.tabAutoSync(pendingDiffCount) }]
+      : []),
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-[880px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
-      {/* Editorial festival header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-5 py-6 sm:px-6">
-        <div>
-          <p className="font-mono text-[0.7rem] uppercase tracking-[0.1em] text-ink-muted">
-            {dict.nav.manage}
-          </p>
-          <h1
-            data-festival-heading
-            className="mt-1 font-display text-[clamp(1.85rem,5vw,3rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]"
-          >
-            {name || festival.name} {year || festival.year}
-          </h1>
-          {festival.existingYears.length > 1 ? (
-            <p className="mt-1.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
-              {dict.catalog.editionCount(festival.existingYears.length)} ·{" "}
-              {festival.existingYears.join(" / ")}
-            </p>
-          ) : null}
-        </div>
+    <main className="w-full">
+      <FestivalHeaderNav
+        brandSlug={festival.brandSlug}
+        name={name || festival.name}
+        year={Number(year) || festival.year}
+        location={festival.location}
+        activeTab="editar"
+      />
 
-        <Link
-          href={`/lineup?festival=${encodeURIComponent(festival.slug)}`}
-          className="inline-flex border border-line px-3.5 py-2 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
-        >
-          {dict.importer.viewLineup}
-        </Link>
-      </div>
-
-      {/* 4-section hairline tab bar */}
-      <div role="tablist" className="grid grid-cols-2 border-b border-line bg-bg sm:grid-cols-4">
-        {(
-          [
-            { id: "details", label: dict.manage.tabDetails },
-            { id: "artists", label: dict.manage.tabArtists(entries.length) },
-            { id: "import", label: dict.manage.tabImport },
-            { id: "autosync", label: dict.manage.tabAutoSync(pendingDiffCount) },
-          ] as const
-        ).map((tab, idx) => {
+      {/* Section hairline tab bar (3 tabs for regular users, 4 with Auto-sync for admins) */}
+      <div
+        role="tablist"
+        className={`grid border-b border-line bg-bg ${
+          isAdmin ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
+        }`}
+      >
+        {tabs.map((tab, idx) => {
           const isActive = activeTab === tab.id;
           return (
             <button
@@ -309,10 +298,8 @@ export function FestivalManageView({
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveTab(tab.id)}
-              className={`cursor-pointer px-3 py-3 font-mono text-[0.74rem] uppercase tracking-[0.08em] transition-colors ${
-                idx < 3 ? "sm:border-r sm:border-line" : ""
-              } ${idx % 2 === 0 ? "border-r border-line sm:border-r" : ""} ${
-                idx < 2 ? "border-b border-line sm:border-b-0" : ""
+              className={`cursor-pointer border-r border-line px-3 py-3 font-mono text-[0.74rem] uppercase tracking-[0.08em] transition-colors last:border-r-0 ${
+                isAdmin && idx < 2 ? "border-b border-line sm:border-b-0" : ""
               } ${
                 isActive
                   ? "bg-acid font-semibold text-acid-ink"
@@ -569,205 +556,217 @@ export function FestivalManageView({
             </p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor={`${formId}-raw`}
-              className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
-            >
-              {dict.importer.rawLineupLabel}
-            </label>
-            <textarea
-              id={`${formId}-raw`}
-              rows={7}
-              value={rawText}
-              onChange={(event) => setRawText(event.target.value)}
-              placeholder={
-                "Mabe Fratti & Bill Orcutt\nWilliam Basinski 'Passing the Cup of Sorrows'\nBIG|BRAVE"
-              }
-              className="w-full border border-line bg-surface p-3.5 font-mono text-xs leading-relaxed text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <HairlineButton
-              variant="acid"
-              size="md"
-              disabled={rawText.trim().length === 0}
-              onClick={handleParse}
-            >
-              {dict.importer.analyzeButton}
-            </HairlineButton>
-
-            {rows.length > 0 ? (
-              <span className="font-mono text-xs uppercase tracking-[0.06em] text-ink-muted">
-                {dict.importer.rowsReady(includedCount, rows.length)}
-              </span>
-            ) : null}
-          </div>
-
-          {importError ? (
-            <p
-              role="alert"
-              className="border border-line-strong bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
-            >
-              {importError}
-            </p>
-          ) : null}
-
-          {importSummary ? (
-            <div
-              role="status"
-              className="flex flex-wrap items-center justify-between gap-3 border border-acid bg-surface px-4 py-3"
-            >
-              <span className="font-mono text-xs text-ink">
-                {dict.importer.importedSummary(
-                  importSummary.createdEntriesCount,
-                  importSummary.newArtistsCount,
-                )}
-              </span>
-              <Link
-                href={`/lineup?festival=${encodeURIComponent(festival.slug)}`}
-                className="border border-acid bg-acid px-3 py-1.5 font-mono text-[0.72rem] font-semibold uppercase text-acid-ink"
-              >
-                {dict.importer.viewLineup}
-              </Link>
-            </div>
-          ) : null}
-
-          {rows.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <label className="inline-flex cursor-pointer items-center gap-2 font-mono text-xs uppercase tracking-[0.06em] text-ink-muted">
-                <input
-                  type="checkbox"
-                  checked={showScheduleColumns}
-                  onChange={(event) => setShowScheduleColumns(event.target.checked)}
+          <div
+            className={
+              rows.length > 0
+                ? "grid grid-cols-1 gap-6 tablet-h:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)] tablet-h:items-start"
+                : "flex flex-col gap-5"
+            }
+          >
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor={`${formId}-raw`}
+                  className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+                >
+                  {dict.importer.rawLineupLabel}
+                </label>
+                <textarea
+                  id={`${formId}-raw`}
+                  rows={8}
+                  value={rawText}
+                  onChange={(event) => setRawText(event.target.value)}
+                  placeholder={
+                    "Mabe Fratti & Bill Orcutt\nWilliam Basinski 'Passing the Cup of Sorrows'\nBIG|BRAVE"
+                  }
+                  className="w-full border border-line bg-surface p-3.5 font-mono text-xs leading-relaxed text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
                 />
-                <span>{dict.importer.scheduleToggle}</span>
-              </label>
-
-              <div className="overflow-x-auto border border-line">
-                <table className="w-full border-collapse text-left font-sans text-xs">
-                  <thead>
-                    <tr className="border-b border-line bg-surface font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
-                      <th className="px-2.5 py-2">{dict.importer.colInclude}</th>
-                      <th className="px-2.5 py-2">{dict.importer.colBillingName}</th>
-                      <th className="px-2.5 py-2">{dict.importer.colArtists}</th>
-                      <th className="px-2.5 py-2">{dict.importer.colSubtitle}</th>
-                      {showScheduleColumns ? (
-                        <>
-                          <th className="px-2.5 py-2">{dict.importer.colDay}</th>
-                          <th className="px-2.5 py-2">{dict.importer.colStage}</th>
-                          <th className="px-2.5 py-2">{dict.importer.colTime}</th>
-                        </>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, idx) => (
-                      <tr key={row.key} className="border-b border-line">
-                        <td className="px-2.5 py-1.5">
-                          <input
-                            type="checkbox"
-                            checked={row.included}
-                            aria-label={dict.importer.includeAria(row.billingName)}
-                            onChange={(event) =>
-                              updateImportRow(idx, { included: event.target.checked })
-                            }
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <input
-                            type="text"
-                            value={row.billingName}
-                            aria-label={dict.importer.billingNameRowAria(idx + 1)}
-                            onChange={(event) =>
-                              updateImportRow(idx, { billingName: event.target.value })
-                            }
-                            className="w-full min-w-[140px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <input
-                            type="text"
-                            value={row.artistsCsv}
-                            aria-label={dict.importer.artistsRowAria(idx + 1)}
-                            onChange={(event) =>
-                              updateImportRow(idx, { artistsCsv: event.target.value })
-                            }
-                            className="w-full min-w-[140px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <input
-                            type="text"
-                            value={row.subtitle}
-                            aria-label={dict.importer.subtitleRowAria(idx + 1)}
-                            onChange={(event) =>
-                              updateImportRow(idx, { subtitle: event.target.value })
-                            }
-                            className="w-full min-w-[120px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                          />
-                        </td>
-                        {showScheduleColumns ? (
-                          <>
-                            <td className="px-2 py-1.5">
-                              <input
-                                type="text"
-                                value={row.day}
-                                aria-label={dict.importer.dayRowAria(idx + 1)}
-                                onChange={(event) =>
-                                  updateImportRow(idx, { day: event.target.value })
-                                }
-                                className="w-full min-w-[90px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                              />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <input
-                                type="text"
-                                value={row.stage}
-                                aria-label={dict.importer.stageRowAria(idx + 1)}
-                                onChange={(event) =>
-                                  updateImportRow(idx, { stage: event.target.value })
-                                }
-                                className="w-full min-w-[90px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                              />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <input
-                                type="text"
-                                value={row.setTime}
-                                aria-label={dict.importer.timeRowAria(idx + 1)}
-                                onChange={(event) =>
-                                  updateImportRow(idx, { setTime: event.target.value })
-                                }
-                                className="w-full min-w-[70px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
-                              />
-                            </td>
-                          </>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <HairlineButton
                   variant="acid"
                   size="md"
-                  disabled={importing || includedCount === 0}
-                  onClick={() => void handleConfirmImport()}
+                  disabled={rawText.trim().length === 0}
+                  onClick={handleParse}
                 >
-                  {importing ? dict.importer.importing : dict.importer.importEntries(includedCount)}
+                  {dict.importer.analyzeButton}
                 </HairlineButton>
+
+                {rows.length > 0 ? (
+                  <span className="font-mono text-xs uppercase tracking-[0.06em] text-ink-muted">
+                    {dict.importer.rowsReady(includedCount, rows.length)}
+                  </span>
+                ) : null}
               </div>
+
+              {importError ? (
+                <p
+                  role="alert"
+                  className="border border-line-strong bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
+                >
+                  {importError}
+                </p>
+              ) : null}
+
+              {importSummary ? (
+                <div
+                  role="status"
+                  className="flex flex-wrap items-center justify-between gap-3 border border-acid bg-surface px-4 py-3"
+                >
+                  <span className="font-mono text-xs text-ink">
+                    {dict.importer.importedSummary(
+                      importSummary.createdEntriesCount,
+                      importSummary.newArtistsCount,
+                    )}
+                  </span>
+                  <Link
+                    href={festivalCartelPath(festival)}
+                    className="border border-acid bg-acid px-3 py-1.5 font-mono text-[0.72rem] font-semibold uppercase text-acid-ink"
+                  >
+                    {dict.importer.viewLineup}
+                  </Link>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+
+            {rows.length > 0 ? (
+              <div className="flex min-w-0 flex-col gap-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 font-mono text-xs uppercase tracking-[0.06em] text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={showScheduleColumns}
+                    onChange={(event) => setShowScheduleColumns(event.target.checked)}
+                  />
+                  <span>{dict.importer.scheduleToggle}</span>
+                </label>
+
+                <div className="overflow-x-auto border border-line">
+                  <table className="w-full border-collapse text-left font-sans text-xs">
+                    <thead>
+                      <tr className="border-b border-line bg-surface font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
+                        <th className="px-2.5 py-2">{dict.importer.colInclude}</th>
+                        <th className="px-2.5 py-2">{dict.importer.colBillingName}</th>
+                        <th className="px-2.5 py-2">{dict.importer.colArtists}</th>
+                        <th className="px-2.5 py-2">{dict.importer.colSubtitle}</th>
+                        {showScheduleColumns ? (
+                          <>
+                            <th className="px-2.5 py-2">{dict.importer.colDay}</th>
+                            <th className="px-2.5 py-2">{dict.importer.colStage}</th>
+                            <th className="px-2.5 py-2">{dict.importer.colTime}</th>
+                          </>
+                        ) : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, idx) => (
+                        <tr key={row.key} className="border-b border-line">
+                          <td className="px-2.5 py-1.5">
+                            <input
+                              type="checkbox"
+                              checked={row.included}
+                              aria-label={dict.importer.includeAria(row.billingName)}
+                              onChange={(event) =>
+                                updateImportRow(idx, { included: event.target.checked })
+                              }
+                            />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="text"
+                              value={row.billingName}
+                              aria-label={dict.importer.billingNameRowAria(idx + 1)}
+                              onChange={(event) =>
+                                updateImportRow(idx, { billingName: event.target.value })
+                              }
+                              className="w-full min-w-[140px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="text"
+                              value={row.artistsCsv}
+                              aria-label={dict.importer.artistsRowAria(idx + 1)}
+                              onChange={(event) =>
+                                updateImportRow(idx, { artistsCsv: event.target.value })
+                              }
+                              className="w-full min-w-[140px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="text"
+                              value={row.subtitle}
+                              aria-label={dict.importer.subtitleRowAria(idx + 1)}
+                              onChange={(event) =>
+                                updateImportRow(idx, { subtitle: event.target.value })
+                              }
+                              className="w-full min-w-[120px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                            />
+                          </td>
+                          {showScheduleColumns ? (
+                            <>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={row.day}
+                                  aria-label={dict.importer.dayRowAria(idx + 1)}
+                                  onChange={(event) =>
+                                    updateImportRow(idx, { day: event.target.value })
+                                  }
+                                  className="w-full min-w-[90px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={row.stage}
+                                  aria-label={dict.importer.stageRowAria(idx + 1)}
+                                  onChange={(event) =>
+                                    updateImportRow(idx, { stage: event.target.value })
+                                  }
+                                  className="w-full min-w-[90px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={row.setTime}
+                                  aria-label={dict.importer.timeRowAria(idx + 1)}
+                                  onChange={(event) =>
+                                    updateImportRow(idx, { setTime: event.target.value })
+                                  }
+                                  className="w-full min-w-[70px] border border-line bg-bg px-2 py-1 text-ink focus:border-ink focus:outline-none"
+                                />
+                              </td>
+                            </>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end">
+                  <HairlineButton
+                    variant="acid"
+                    size="md"
+                    disabled={importing || includedCount === 0}
+                    onClick={() => void handleConfirmImport()}
+                  >
+                    {importing
+                      ? dict.importer.importing
+                      : dict.importer.importEntries(includedCount)}
+                  </HairlineButton>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
-      {/* TAB 4: Auto-sync lineup source */}
-      {activeTab === "autosync" ? (
+      {/* TAB 4: Auto-sync lineup source (Admin only) */}
+      {isAdmin && activeTab === "autosync" ? (
         <FestivalAutoSyncPanel
           festival={festival}
           hasGeminiApiKey={hasGeminiApiKey}

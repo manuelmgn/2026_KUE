@@ -41,7 +41,7 @@ export function FilterBar({
   return (
     <section
       aria-label={dict.filters.sectionAria}
-      className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-30 flex flex-col border-y border-line bg-bg sm:h-[50px] sm:flex-row sm:items-stretch sm:overflow-x-auto"
+      className="sticky top-[calc(var(--kue-sticky-top)+2.75rem)] z-30 flex flex-col border-b border-line bg-bg sm:h-[50px] sm:flex-row sm:items-stretch sm:overflow-x-auto"
     >
       <div className="flex h-[46px] items-stretch border-b border-line sm:h-auto sm:min-w-[180px] sm:flex-1 sm:border-r sm:border-b-0">
         <div className="flex min-w-0 flex-1 items-center gap-3 px-4 sm:px-[18px]">

@@ -173,6 +173,139 @@ export const notificationPayloadSchema = z.object({
 });
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
+// Group Comparison & Joint Agenda schemas
+
+export const COMPARISON_SORT_MODES = [
+  "LINEUP",
+  "AVG_DESC",
+  "AVG_ASC",
+  "DISAGREEMENT_DESC",
+  "MUST_SEE_DESC",
+] as const;
+export const comparisonSortModeSchema = z.enum(COMPARISON_SORT_MODES);
+export type ComparisonSortMode = z.infer<typeof comparisonSortModeSchema>;
+
+export const JOINT_AGENDA_STRATEGIES = [
+  "RECOMMENDED",
+  "MUST_SEE",
+  "SHARED_FAVORITES",
+  "CUSTOM",
+  "EMPTY",
+] as const;
+export const jointAgendaStrategySchema = z.enum(JOINT_AGENDA_STRATEGIES);
+export type JointAgendaStrategy = z.infer<typeof jointAgendaStrategySchema>;
+
+export const ratingThresholdSchema = z
+  .number()
+  .min(1, "El umbral mínimo debe estar entre 1 y 5")
+  .max(5, "El umbral mínimo debe estar entre 1 y 5");
+
+const friendIdsArraySchema = z
+  .array(z.string().trim().min(1))
+  .max(50, "No se pueden seleccionar más de 50 amigos");
+
+export const festivalComparisonQuerySchema = z.object({
+  editionId: z.string().trim().min(1, "Edición de festival obligatoria"),
+  friendIds: friendIdsArraySchema.optional(),
+  sortBy: comparisonSortModeSchema.optional(),
+  onlyRated: z.boolean().optional(),
+});
+export type FestivalComparisonQueryInput = z.infer<typeof festivalComparisonQuerySchema>;
+
+export const createFestivalComparisonSchema = z.object({
+  editionId: z.string().trim().min(1, "Edición de festival obligatoria"),
+  friendIds: friendIdsArraySchema.optional(),
+  name: z
+    .string()
+    .trim()
+    .max(120, "El nombre de la comparativa no puede superar los 120 caracteres")
+    .optional(),
+});
+export type CreateFestivalComparisonInput = z.infer<typeof createFestivalComparisonSchema>;
+
+export const updateFestivalComparisonSchema = z.object({
+  comparisonId: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .max(120, "El nombre de la comparativa no puede superar los 120 caracteres")
+    .optional(),
+  friendIds: friendIdsArraySchema.optional(),
+});
+export type UpdateFestivalComparisonInput = z.infer<typeof updateFestivalComparisonSchema>;
+
+export const festivalComparisonIdSchema = z.object({
+  comparisonId: z.string().trim().min(1),
+});
+export type FestivalComparisonIdInput = z.infer<typeof festivalComparisonIdSchema>;
+
+export const createJointAgendaSchema = z
+  .object({
+    comparisonId: z.string().trim().min(1).optional(),
+    editionId: z.string().trim().min(1).optional(),
+    friendIds: friendIdsArraySchema.optional(),
+    name: z
+      .string()
+      .trim()
+      .max(120, "El nombre de la agenda conjunta no puede superar los 120 caracteres")
+      .optional(),
+    strategy: jointAgendaStrategySchema.default("RECOMMENDED"),
+    minRatingThreshold: ratingThresholdSchema.optional(),
+    entryIds: z
+      .array(z.string().trim().min(1))
+      .max(2_000, "Demasiadas entradas seleccionadas")
+      .optional(),
+  })
+  .refine((val) => Boolean(val.comparisonId || val.editionId), {
+    error: "Debes indicar una comparativa guardada o una edición de festival",
+    path: ["editionId"],
+  })
+  .refine(
+    (val) => val.strategy !== "CUSTOM" || (val.entryIds !== undefined && val.entryIds.length > 0),
+    {
+      error: "Selecciona al menos un concierto para crear una agenda personalizada",
+      path: ["entryIds"],
+    },
+  );
+export type CreateJointAgendaInput = z.input<typeof createJointAgendaSchema>;
+
+export const updateJointAgendaSchema = z.object({
+  agendaId: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .max(120, "El nombre de la agenda conjunta no puede superar los 120 caracteres")
+    .optional(),
+  minRatingThreshold: ratingThresholdSchema.optional(),
+  friendIds: friendIdsArraySchema.optional(),
+});
+export type UpdateJointAgendaInput = z.infer<typeof updateJointAgendaSchema>;
+
+export const setJointAgendaEntrySchema = z.object({
+  agendaId: z.string().trim().min(1),
+  entryId: z.string().trim().min(1),
+  included: z.boolean().optional(),
+  note: z
+    .string()
+    .trim()
+    .max(280, "La nota de grupo no puede superar los 280 caracteres")
+    .optional(),
+});
+export type SetJointAgendaEntryInput = z.infer<typeof setJointAgendaEntrySchema>;
+
+export const regenerateJointAgendaSchema = z.object({
+  agendaId: z.string().trim().min(1),
+  strategy: jointAgendaStrategySchema.default("RECOMMENDED"),
+  minRatingThreshold: ratingThresholdSchema.optional(),
+  preserveManualEntries: z.boolean().default(false),
+});
+export type RegenerateJointAgendaInput = z.input<typeof regenerateJointAgendaSchema>;
+
+export const jointAgendaIdSchema = z.object({
+  agendaId: z.string().trim().min(1),
+});
+export type JointAgendaIdInput = z.infer<typeof jointAgendaIdSchema>;
+
 // Festival & Edition schemas
 
 const lineupUrlField = z

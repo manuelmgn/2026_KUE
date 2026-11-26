@@ -10,24 +10,29 @@ import {
   updateProfileAction,
 } from "@/actions/social-actions";
 import { SocialPostList } from "@/components/features/SocialPostList";
-import type { UserProfileViewDTO } from "@/components/features/types";
+import type { FriendListItemDTO, UserProfileViewDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { prepareAvatarUploadFile } from "@/domain/avatar-client";
+import { festivalHomePath } from "@/domain/festival-routes";
 import { useI18n } from "@/i18n/context";
 
 interface UserProfileViewProps {
   initialProfile: UserProfileViewDTO;
+  initialFriends?: FriendListItemDTO[];
 }
 
-export function UserProfileView({ initialProfile }: UserProfileViewProps) {
+export function UserProfileView({ initialProfile, initialFriends = [] }: UserProfileViewProps) {
   const { dict } = useI18n();
   const router = useRouter();
   const formId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<UserProfileViewDTO>(initialProfile);
+  const [friends, setFriends] = useState<FriendListItemDTO[]>(initialFriends);
+  const [confirmRemoveFriendId, setConfirmRemoveFriendId] = useState<string | null>(null);
+  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [tab, setTab] = useState<"posts" | "festivals">("posts");
   const [editing, setEditing] = useState(false);
 
@@ -37,10 +42,11 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
 
   useEffect(() => {
     setProfile(initialProfile);
+    setFriends(initialFriends);
     setDisplayName(initialProfile.user.displayName ?? "");
     setLocation(initialProfile.user.location ?? "");
     setBio(initialProfile.user.bio);
-  }, [initialProfile]);
+  }, [initialProfile, initialFriends]);
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -216,8 +222,29 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
     }
   };
 
+  const handleRemoveFriendFromList = async (friendId: string) => {
+    setRemovingFriendId(friendId);
+    setError(null);
+    try {
+      const res = await removeOrRejectFriendAction(friendId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setFriends((prev) => prev.filter((item) => item.id !== friendId));
+      setProfile((prev) => ({
+        ...prev,
+        friendsCount: prev.friendsCount !== null ? Math.max(0, prev.friendsCount - 1) : null,
+      }));
+      setConfirmRemoveFriendId(null);
+      router.refresh();
+    } finally {
+      setRemovingFriendId(null);
+    }
+  };
+
   return (
-    <main className="mx-auto w-full max-w-[920px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
+    <main className="w-full">
       {/* Editorial Profile Hero */}
       <section className="border-b border-line px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -229,7 +256,10 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
               size="xl"
             />
             <div className="min-w-0">
-              <h1 className="font-display text-[clamp(1.75rem,5vw,3rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em] text-ink">
+              <h1
+                data-page-heading
+                className="font-display text-[clamp(1.75rem,5vw,3rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em] text-ink"
+              >
                 {profile.user.displayName || `@${profile.user.username}`}
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-xs uppercase tracking-[0.06em] text-ink-muted">
@@ -497,7 +527,7 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
             {profile.sharedFestivals.map((fest) => (
               <Link
                 key={fest.id}
-                href={`/lineup?festival=${encodeURIComponent(fest.slug)}`}
+                href={festivalHomePath({ brandSlug: fest.brandSlug, year: fest.year })}
                 className="border border-acid bg-acid px-2.5 py-0.5 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.06em] text-acid-ink"
               >
                 {fest.name} {fest.year}
@@ -582,7 +612,7 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
               className="border-b border-line transition-colors hover:bg-surface last:border-b-0"
             >
               <Link
-                href={`/lineup?festival=${encodeURIComponent(fest.slug)}`}
+                href={festivalHomePath({ brandSlug: fest.brandSlug, year: fest.year })}
                 className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6"
               >
                 <div className="min-w-0">
@@ -606,6 +636,108 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
           ))}
         </ul>
       )}
+
+      {/* Self-only: My Friends list right before Settings */}
+      {isSelf ? (
+        <>
+          <section aria-labelledby="profile-friends-heading" className="border-t border-line">
+            <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
+              <h2 id="profile-friends-heading" className="font-semibold text-ink">
+                {dict.social.myFriendsHeading(friends.length)}
+              </h2>
+            </div>
+
+            {friends.length === 0 ? (
+              <p className="border-b border-line px-4 py-5 font-serif text-[1.02rem] italic text-ink-muted sm:px-6">
+                {dict.social.emptyFriendsDescription}
+              </p>
+            ) : (
+              <ul>
+                {friends.map((friend) => {
+                  const isConfirming = confirmRemoveFriendId === friend.id;
+                  const isRemoving = removingFriendId === friend.id;
+                  return (
+                    <li
+                      key={friend.id}
+                      className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6"
+                    >
+                      <Link
+                        href={`/u/${encodeURIComponent(friend.username)}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 hover:underline"
+                      >
+                        <UserAvatar
+                          avatarPath={friend.avatarPath}
+                          username={friend.username}
+                          displayName={friend.displayName}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate font-display text-sm font-extrabold uppercase tracking-[-0.02em] text-ink">
+                            {friend.displayName || `@${friend.username}`}
+                          </div>
+                          <div className="truncate font-mono text-[0.68rem] text-ink-muted">
+                            @{friend.username}
+                            {friend.sharedFestivalsCount > 0
+                              ? ` · ${dict.social.sharedFestivalsBadge(friend.sharedFestivalsCount)}`
+                              : ""}
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {isConfirming ? (
+                          <>
+                            <HairlineButton
+                              size="sm"
+                              variant="inverted"
+                              disabled={isRemoving}
+                              onClick={() => void handleRemoveFriendFromList(friend.id)}
+                            >
+                              {dict.social.removeFriendAction}
+                            </HairlineButton>
+                            <HairlineButton
+                              size="sm"
+                              disabled={isRemoving}
+                              onClick={() => setConfirmRemoveFriendId(null)}
+                            >
+                              {dict.common.close}
+                            </HairlineButton>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveFriendId(friend.id)}
+                            className="cursor-pointer border border-line px-2.5 py-1 font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted transition-colors hover:border-ink hover:text-ink"
+                          >
+                            {dict.social.removeFriendAction}
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className="flex flex-wrap items-center justify-between gap-3 bg-surface px-4 py-4 sm:px-6">
+            <div>
+              <div className="font-mono text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-ink">
+                {dict.settings.title}
+              </div>
+              <p className="mt-0.5 font-serif text-[0.98rem] italic text-ink-muted">
+                {dict.settings.subtitle}
+              </p>
+            </div>
+            <Link
+              href="/settings"
+              className="inline-flex border border-line bg-bg px-3.5 py-2 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+            >
+              {dict.nav.settings} →
+            </Link>
+          </section>
+        </>
+      ) : null}
     </main>
   );
 }

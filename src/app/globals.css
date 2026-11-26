@@ -86,6 +86,16 @@
   --font-serif: var(--font-instrument-serif), serif;
   --font-mono: var(--font-ibm-plex-mono), monospace;
   --font-sans: var(--font-archivo), sans-serif;
+
+  /* 5-tier KUE responsive system:
+     1. Phone V:           < 640px (base)
+     2. Phone H / Tablet V: 640px–959px (sm) + short landscape media query
+     3. Tablet H:           960px–1279px (tablet-h)
+     4. Desktop:            1280px–1599px (desktop)
+     5. Large screen:       >= 1600px (wide) */
+  --breakpoint-tablet-h: 60rem;
+  --breakpoint-desktop: 80rem;
+  --breakpoint-wide: 100rem;
 }
 
 * {
@@ -102,11 +112,22 @@ html,
 body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 /* Native <dialog> modal scroll containment & backdrop */
@@ -143,14 +164,14 @@ dialog.kue-drawer[open] {
 
 @media (min-width: 640px) {
   dialog.kue-drawer[open] {
-    width: min(680px, 94vw);
+    width: min(640px, 92dvw);
     border-left: 1px solid var(--line);
   }
 }
 
 dialog.kue-modal[open] {
   margin: auto;
-  width: min(560px, 92vw);
+  width: min(560px, 92dvw);
   max-height: 85dvh;
   display: flex;
   flex-direction: column;
@@ -171,11 +192,7 @@ dialog.kue-modal[open] {
   transform: scale(1.03);
 }
 
-/* iOS PWA safe areas, touch ergonomics, and scroll padding */
-html {
-  scroll-padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
-}
-
+/* Touch ergonomics and safe areas */
 a,
 button,
 select {
@@ -195,19 +212,11 @@ select {
   bottom: 0;
   left: 0;
   right: 0;
-  padding-bottom: max(0.875rem, calc(env(safe-area-inset-bottom, 0px) + 0.375rem));
+  padding-bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.25rem));
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   user-select: none;
   -webkit-user-select: none;
-}
-
-.kue-bottom-sheet {
-  bottom: calc(3.5rem + max(0.875rem, calc(env(safe-area-inset-bottom, 0px) + 0.375rem)));
-  left: 0;
-  right: 0;
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
 }
 
 .kue-bottom-nav a:focus-visible,
@@ -223,13 +232,115 @@ select {
   }
 }
 
-@media (max-width: 767px) {
-  html {
-    scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+/* =======================================================================
+   5-TIER LATERAL SHELL (Option B)
+   - Tier 1 (Phone V: <640px, non-short-landscape):
+       Mobile TopBar + Fixed BottomNav (5 cols)
+   - Tier 2a (Phone H: max-height 500px & landscape):
+       Compact 56px Left Rail (icons only), NO TopBar, NO BottomNav
+   - Tier 2b (Tablet V: 640px–959px):
+       Compact 74px Left Rail (icon + label), NO TopBar, NO BottomNav
+   - Tier 3–5 (Tablet H >=960px, Desktop >=1280px, Wide >=1600px):
+       Full 228px Left Sidebar, NO TopBar, NO BottomNav
+   ======================================================================= */
+
+:root {
+  --kue-sticky-top: calc(3rem + env(safe-area-inset-top, 0px));
+}
+
+.kue-shell-mobile-bar {
+  display: block;
+}
+
+.kue-shell-bottom-nav {
+  display: grid;
+}
+
+.kue-shell-rail {
+  display: none;
+}
+
+.kue-shell-sidebar {
+  display: none;
+}
+
+.kue-shell-content {
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+html {
+  scroll-padding-top: var(--kue-sticky-top);
+  scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Tier 2b: Tablet V (640px–959px) */
+@media (min-width: 640px) {
+  :root {
+    --kue-sticky-top: 0px;
   }
 
-  body {
-    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  .kue-shell-mobile-bar,
+  .kue-shell-bottom-nav {
+    display: none;
+  }
+
+  .kue-shell-rail {
+    display: flex;
+    width: 74px;
+  }
+
+  .kue-shell-rail-label {
+    display: block;
+  }
+
+  .kue-shell-content {
+    padding-bottom: 0;
+  }
+
+  html {
+    scroll-padding-bottom: 0;
+  }
+}
+
+/* Tier 3–5: Tablet H (>=960px), Desktop (>=1280px), Wide (>=1600px) */
+@media (min-width: 960px) {
+  .kue-shell-rail {
+    display: none;
+  }
+
+  .kue-shell-sidebar {
+    display: flex;
+    width: 228px;
+  }
+}
+
+/* Tier 2a: Phone H (landscape with short height <= 500px) overrides everything into 56px compact rail */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --kue-sticky-top: 0px;
+  }
+
+  .kue-shell-mobile-bar,
+  .kue-shell-bottom-nav,
+  .kue-shell-sidebar {
+    display: none;
+  }
+
+  .kue-shell-rail {
+    display: flex;
+    width: 56px;
+  }
+
+  .kue-shell-rail-label {
+    display: none;
+  }
+
+  .kue-shell-content {
+    padding-bottom: 0;
+  }
+
+  html {
+    scroll-padding-bottom: 0;
   }
 }
 

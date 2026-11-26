@@ -17,10 +17,13 @@ import { useI18n } from "@/i18n/context";
 interface NotificationsListProps {
   initialItems: NotificationItemDTO[];
   initialUnreadCount: number;
+  showPageHeader?: boolean;
   onSelectLink?: () => void;
 }
 
-function formatDateTime(iso: string, locale: string): string {
+type NotifFilter = "all" | "unread" | "festivals" | "social";
+
+function formatShortTime(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return "";
@@ -36,12 +39,14 @@ function formatDateTime(iso: string, locale: string): string {
 export function NotificationsList({
   initialItems,
   initialUnreadCount,
+  showPageHeader = false,
   onSelectLink,
 }: NotificationsListProps) {
   const { dict, locale } = useI18n();
   const router = useRouter();
   const [items, setItems] = useState<NotificationItemDTO[]>(initialItems);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [filter, setFilter] = useState<NotifFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +122,21 @@ export function NotificationsList({
     }
   };
 
+  const getTag = (item: NotificationItemDTO): string => {
+    switch (item.type) {
+      case "FRIEND_REQUEST_RECEIVED":
+        return dict.notifications.tagFriendRequest;
+      case "FRIEND_REQUEST_ACCEPTED":
+        return dict.notifications.tagFriendAccepted;
+      case "FESTIVAL_LINEUP_UPDATED":
+        return dict.notifications.tagLineup;
+      case "FESTIVAL_METADATA_UPDATED":
+        return dict.notifications.tagMetadata;
+      case "FRIEND_JOINED_FESTIVAL":
+        return dict.notifications.tagFestivalJoined;
+    }
+  };
+
   const renderMessage = (item: NotificationItemDTO): string => {
     const p = item.payload;
     const actor = p.actorUsername ?? "user";
@@ -164,100 +184,179 @@ export function NotificationsList({
     return null;
   };
 
+  const visibleItems = items.filter((item) => {
+    if (filter === "unread") return item.readAt === null;
+    if (filter === "festivals") {
+      return item.type === "FESTIVAL_LINEUP_UPDATED" || item.type === "FESTIVAL_METADATA_UPDATED";
+    }
+    if (filter === "social") {
+      return (
+        item.type === "FRIEND_REQUEST_RECEIVED" ||
+        item.type === "FRIEND_REQUEST_ACCEPTED" ||
+        item.type === "FRIEND_JOINED_FESTIVAL"
+      );
+    }
+    return true;
+  });
+
+  const filterTabs: Array<{ id: NotifFilter; label: string }> = [
+    { id: "all", label: dict.notifications.filterAll },
+    { id: "unread", label: dict.notifications.filterUnread(unreadCount) },
+    { id: "festivals", label: dict.notifications.filterFestivals },
+    { id: "social", label: dict.notifications.filterSocial },
+  ];
+
   return (
     <div>
-      {unreadCount > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2.5 sm:px-6">
-          <span className="border border-acid bg-acid px-2 py-0.5 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-acid-ink">
-            {dict.notifications.unreadBadge(unreadCount)}
-          </span>
-          <HairlineButton size="sm" disabled={markingAll} onClick={() => void handleMarkAllRead()}>
-            {markingAll ? dict.notifications.markingAllRead : dict.notifications.markAllRead}
-          </HairlineButton>
+      {/* Compact 1-line header on phones/tablets; subtitle description ONLY on Desktop/Wide */}
+      {showPageHeader ? (
+        <div className="flex items-center justify-between gap-2 border-b border-line px-3.5 py-3.5 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <h1
+              data-page-heading
+              className="font-display text-[1.5rem] font-extrabold uppercase leading-[0.95] tracking-[-0.03em] sm:text-[2.2rem] desktop:text-[2.8rem]"
+            >
+              {dict.notifications.title}
+            </h1>
+            <p className="mt-1.5 hidden font-serif text-[1.1rem] italic text-ink-muted desktop:block">
+              {dict.notifications.subtitle}
+            </p>
+          </div>
+
+          {unreadCount > 0 ? (
+            <HairlineButton
+              size="sm"
+              disabled={markingAll}
+              onClick={() => void handleMarkAllRead()}
+              className="shrink-0"
+            >
+              <span className="sm:hidden">
+                {markingAll
+                  ? dict.notifications.markingAllRead
+                  : dict.notifications.shortMarkAll(unreadCount)}
+              </span>
+              <span className="hidden sm:inline">
+                {markingAll ? dict.notifications.markingAllRead : dict.notifications.markAllRead}
+              </span>
+            </HairlineButton>
+          ) : (
+            <span className="shrink-0 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
+              {dict.notifications.allCaughtUp}
+            </span>
+          )}
         </div>
       ) : null}
+
+      {/* Full-width 4-cell filter strip on Phone V (zero wasted horizontal space) */}
+      <div className="grid h-10 grid-cols-4 border-b border-line bg-surface sm:flex sm:h-11 sm:items-stretch">
+        {filterTabs.map((tab, idx) => {
+          const isActive = filter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFilter(tab.id)}
+              className={`flex cursor-pointer items-center justify-center truncate px-1 font-mono text-[0.62rem] uppercase tracking-[0.04em] transition-colors sm:border-r sm:border-line sm:px-5 sm:text-[0.72rem] sm:tracking-[0.08em] ${
+                idx < 3 ? "border-r border-line" : ""
+              } ${
+                isActive
+                  ? "bg-acid font-semibold text-acid-ink"
+                  : "text-ink hover:bg-surface-elevated"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
       {error ? (
         <p
           role="alert"
-          className="border-b border-line bg-surface px-4 py-2.5 font-mono text-xs text-ink sm:px-6"
+          className="border-b border-line bg-surface px-3.5 py-2.5 font-mono text-xs text-ink sm:px-6"
         >
           {error}
         </p>
       ) : null}
 
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <EmptyState
           title={dict.notifications.emptyTitle}
           description={dict.notifications.emptyDescription}
         />
       ) : (
         <ul>
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const isUnread = item.readAt === null;
             const linkInfo = resolveTargetLink(item);
             const isBusy = busyId === item.id;
+            const isPendingFriendReq =
+              item.type === "FRIEND_REQUEST_RECEIVED" && item.pendingFriendshipId;
 
             return (
               <li
                 key={item.id}
-                className={`border-b border-line transition-colors last:border-b-0 ${
-                  isUnread ? "border-l-4 border-l-acid bg-surface pl-3 sm:pl-5" : "px-4 sm:px-6"
-                } py-4 pr-4 sm:pr-6`}
+                className={`border-b border-line border-l-4 px-3.5 py-3 transition-colors last:border-b-0 sm:px-5 sm:py-3.5 ${
+                  isUnread
+                    ? "border-l-acid bg-surface"
+                    : "border-l-transparent bg-bg opacity-80 hover:opacity-100"
+                }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="min-w-0 flex-1 font-sans text-[0.95rem] leading-snug text-ink">
-                    {renderMessage(item)}
-                  </p>
-                  <span className="shrink-0 font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted">
-                    {formatDateTime(item.createdAt, locale)}
+                {/* Top micro-row: Tag left, Timestamp right */}
+                <div className="flex items-center justify-between gap-2 font-mono text-[0.62rem] uppercase tracking-[0.06em]">
+                  <span
+                    className={
+                      isUnread
+                        ? "bg-acid px-1.5 py-0.5 font-semibold text-acid-ink"
+                        : "border border-line px-1.5 py-0.5 text-ink-muted"
+                    }
+                  >
+                    {getTag(item)}
+                  </span>
+                  <span className="shrink-0 text-ink-muted">
+                    {formatShortTime(item.createdAt, locale)}
                   </span>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {item.type === "FRIEND_REQUEST_RECEIVED" && item.pendingFriendshipId ? (
-                    <>
-                      <HairlineButton
-                        size="sm"
-                        variant="acid"
-                        disabled={isBusy}
-                        onClick={() => void handleFriendDecision(item, true)}
-                      >
-                        {dict.social.acceptAction}
-                      </HairlineButton>
-                      <HairlineButton
-                        size="sm"
-                        disabled={isBusy}
-                        onClick={() => void handleFriendDecision(item, false)}
-                      >
-                        {dict.social.rejectAction}
-                      </HairlineButton>
-                    </>
-                  ) : null}
+                {/* Main row: Full-width title left + compact action button flush right */}
+                <div className="mt-1.5 grid grid-cols-[1fr_auto] items-center gap-2.5">
+                  <p className="min-w-0 font-display text-[0.96rem] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[1.05rem]">
+                    {renderMessage(item)}
+                  </p>
 
-                  {linkInfo ? (
-                    <Link
-                      href={linkInfo.href}
-                      onClick={() => {
-                        void handleMarkOneRead(item.id);
-                        onSelectLink?.();
-                      }}
-                      className="inline-flex border border-line px-2.5 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
-                    >
-                      {linkInfo.label}
-                    </Link>
-                  ) : null}
-
-                  {isUnread ? (
-                    <button
-                      type="button"
-                      aria-label={dict.notifications.markReadAria}
-                      onClick={() => void handleMarkOneRead(item.id)}
-                      className="cursor-pointer font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted underline underline-offset-4 hover:text-ink"
-                    >
-                      ✓
-                    </button>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {isPendingFriendReq ? (
+                      <>
+                        <HairlineButton
+                          size="sm"
+                          variant="acid"
+                          disabled={isBusy}
+                          onClick={() => void handleFriendDecision(item, true)}
+                        >
+                          {dict.social.acceptAction}
+                        </HairlineButton>
+                        <HairlineButton
+                          size="sm"
+                          disabled={isBusy}
+                          onClick={() => void handleFriendDecision(item, false)}
+                        >
+                          ✕
+                        </HairlineButton>
+                      </>
+                    ) : linkInfo ? (
+                      <Link
+                        href={linkInfo.href}
+                        onClick={() => {
+                          void handleMarkOneRead(item.id);
+                          onSelectLink?.();
+                        }}
+                        className="inline-flex border border-line bg-bg px-2.5 py-1.5 font-mono text-[0.64rem] uppercase tracking-[0.06em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated sm:px-3"
+                      >
+                        <span className="sm:hidden">{dict.notifications.shortOpen}</span>
+                        <span className="hidden sm:inline">{linkInfo.label}</span>
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </li>
             );

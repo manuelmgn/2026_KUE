@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import type { SocialPostItemDTO } from "@/components/features/types";
-import { Artwork } from "@/components/ui/Artwork";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { toMediaApiUrl } from "@/domain/media-url";
+import { festivalCartelPath, festivalHomePath } from "@/domain/festival-routes";
 import { useI18n } from "@/i18n/context";
 
 interface SocialPostListProps {
@@ -20,8 +19,25 @@ function formatShortDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
-    year: "numeric",
   }).format(date);
+}
+
+function HeroScoreBlock({ rating }: { rating: number }) {
+  const styleClass =
+    rating >= 4
+      ? "border-transparent bg-acid text-acid-ink"
+      : rating === 3
+        ? "border-line-strong bg-surface text-ink"
+        : "border-line-strong bg-surface-elevated text-ink";
+
+  return (
+    <div
+      className={`flex h-[50px] w-[62px] shrink-0 items-baseline justify-center gap-0.5 border pt-2.5 ${styleClass}`}
+    >
+      <span className="font-display text-[1.6rem] font-extrabold leading-none">{rating}</span>
+      <span className="font-mono text-[0.64rem] font-semibold leading-none opacity-75">/5</span>
+    </div>
+  );
 }
 
 export function SocialPostList({ posts, showAuthor = true }: SocialPostListProps) {
@@ -30,25 +46,24 @@ export function SocialPostList({ posts, showAuthor = true }: SocialPostListProps
   return (
     <ul>
       {posts.map((post) => {
-        const isHighRating = post.rating !== null && post.rating >= 4;
         const formattedDate = formatShortDate(post.createdAt, locale);
-
-        const actionLabel =
-          post.kind === "LIVE_REVIEW"
-            ? dict.social.postLiveReview
-            : post.kind === "FESTIVAL_ADDED"
-              ? dict.social.postAddedFestival
-              : post.rating !== null
-                ? dict.social.postRatedArtist
-                : dict.social.postNotedArtist;
 
         const targetHref =
           post.kind === "FESTIVAL_ADDED" && post.festival
-            ? `/lineup?festival=${encodeURIComponent(post.festival.slug)}`
+            ? festivalHomePath({
+                brandSlug: post.festival.brandSlug,
+                year: post.festival.year,
+              })
             : post.festival && post.artist
-              ? `/lineup?festival=${encodeURIComponent(post.festival.slug)}&q=${encodeURIComponent(post.artist.name)}`
+              ? festivalCartelPath(
+                  { brandSlug: post.festival.brandSlug, year: post.festival.year },
+                  { q: post.artist.name },
+                )
               : post.festival
-                ? `/lineup?festival=${encodeURIComponent(post.festival.slug)}`
+                ? festivalHomePath({
+                    brandSlug: post.festival.brandSlug,
+                    year: post.festival.year,
+                  })
                 : null;
 
         const titleText =
@@ -56,20 +71,25 @@ export function SocialPostList({ posts, showAuthor = true }: SocialPostListProps
             ? `${post.festival.name} ${post.festival.year}`
             : (post.entry?.billingName ?? post.artist?.name ?? "");
 
-        const artistImg = post.artist ? toMediaApiUrl(post.artist.imagePath) : null;
+        const isLiveReview = post.kind === "LIVE_REVIEW";
+        const hasPreToPost =
+          isLiveReview &&
+          post.rating !== null &&
+          post.preRating !== null &&
+          post.preRating !== undefined;
 
         return (
           <li
             key={post.id}
             className="border-b border-line transition-colors hover:bg-surface last:border-b-0"
           >
-            <div className="flex flex-col gap-2.5 px-4 py-4 sm:px-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[0.64rem] uppercase tracking-[0.06em]">
                   {showAuthor ? (
                     <Link
                       href={`/u/${encodeURIComponent(post.author.username)}`}
-                      className="flex min-w-0 items-center gap-2.5 hover:underline"
+                      className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-ink hover:underline"
                     >
                       <UserAvatar
                         avatarPath={post.author.avatarPath}
@@ -77,84 +97,69 @@ export function SocialPostList({ posts, showAuthor = true }: SocialPostListProps
                         displayName={post.author.displayName}
                         size="sm"
                       />
-                      <span className="truncate font-mono text-xs font-semibold text-ink">
-                        @{post.author.username}
-                      </span>
+                      <span className="truncate">@{post.author.username}</span>
                     </Link>
                   ) : null}
-                  <span className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
-                    {actionLabel}
-                  </span>
-                </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                  {post.rating !== null ? (
-                    <span
-                      className={`border px-2 py-0.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] ${
-                        isHighRating
-                          ? "border-acid bg-acid font-semibold text-acid-ink"
-                          : "border-line text-ink"
-                      }`}
+                  {post.kind === "FESTIVAL_ADDED" ? (
+                    <span className="text-ink-muted">{dict.social.postAddedFestival}</span>
+                  ) : post.festival ? (
+                    <Link
+                      href={festivalHomePath({
+                        brandSlug: post.festival.brandSlug,
+                        year: post.festival.year,
+                      })}
+                      className="border border-line bg-surface px-1.5 py-0.5 text-ink hover:border-ink"
                     >
-                      {post.kind === "LIVE_REVIEW"
-                        ? dict.social.liveScoreBadge(post.rating)
-                        : `${post.rating}/5`}
+                      {post.festival.name} {post.festival.year}
+                    </Link>
+                  ) : null}
+
+                  {isLiveReview ? (
+                    <span className="border border-line px-1.5 py-0.5 text-ink-muted">
+                      {dict.social.postLiveReview}
                     </span>
                   ) : null}
-                  <span className="font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted">
-                    {formattedDate}
-                  </span>
-                </div>
-              </div>
 
-              <div className="flex items-start gap-3.5">
-                {post.artist ? (
-                  <Artwork
-                    src={artistImg}
-                    alt={post.artist.name}
-                    seedText={post.artist.name}
-                    variant="artist"
-                    className="h-12 w-12 shrink-0"
-                  />
+                  {formattedDate ? <span className="text-ink-muted">· {formattedDate}</span> : null}
+                </div>
+
+                {targetHref ? (
+                  <Link
+                    href={targetHref}
+                    className="mt-1 block truncate font-display text-[1.12rem] font-extrabold leading-tight tracking-[-0.02em] text-ink hover:underline"
+                  >
+                    {titleText}
+                  </Link>
+                ) : (
+                  <div className="mt-1 truncate font-display text-[1.12rem] font-extrabold leading-tight tracking-[-0.02em] text-ink">
+                    {titleText}
+                  </div>
+                )}
+
+                {post.kind === "FESTIVAL_ADDED" && post.festival?.location ? (
+                  <div className="mt-0.5 font-serif text-[0.94rem] italic text-ink-muted">
+                    {post.festival.location}
+                  </div>
                 ) : null}
-
-                <div className="min-w-0 flex-1">
-                  {targetHref ? (
-                    <Link
-                      href={targetHref}
-                      className="inline-block font-display text-[1.15rem] font-extrabold leading-tight tracking-[-0.02em] text-ink hover:underline"
-                    >
-                      {titleText}
-                    </Link>
-                  ) : (
-                    <div className="font-display text-[1.15rem] font-extrabold leading-tight tracking-[-0.02em] text-ink">
-                      {titleText}
-                    </div>
-                  )}
-
-                  {post.kind !== "FESTIVAL_ADDED" && post.festival ? (
-                    <div className="mt-0.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
-                      {[
-                        `${post.festival.name} ${post.festival.year}`,
-                        post.entry?.day,
-                        post.entry?.stage,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                  ) : post.kind === "FESTIVAL_ADDED" && post.festival?.location ? (
-                    <div className="mt-0.5 font-serif text-[0.98rem] italic text-ink-muted">
-                      {post.festival.location}
-                    </div>
-                  ) : null}
-
-                  {post.notes ? (
-                    <p className="mt-1.5 whitespace-pre-line font-serif text-[1.08rem] italic leading-[1.38] text-ink">
-                      “{post.notes}”
-                    </p>
-                  ) : null}
-                </div>
               </div>
+
+              {/* Right Protagonist Score Area — ZERO written notes/comments; pre → post evolution on live reviews */}
+              {post.rating !== null ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  {hasPreToPost && post.preRating !== null && post.preRating !== undefined ? (
+                    <div className="flex items-center gap-1.5 font-mono text-ink-muted">
+                      <span className="border border-line px-1.5 py-0.5 text-[0.72rem] font-semibold text-ink">
+                        {post.preRating}/5
+                      </span>
+                      <span aria-hidden="true" className="text-xs text-ink-muted">
+                        →
+                      </span>
+                    </div>
+                  ) : null}
+                  <HeroScoreBlock rating={post.rating} />
+                </div>
+              ) : null}
             </div>
           </li>
         );

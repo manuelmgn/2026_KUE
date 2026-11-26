@@ -1,4 +1,4 @@
-import type { FriendArtistReviewDTO } from "@/components/features/types";
+import type { FriendArtistReviewDTO, GlobalArtistSearchItemDTO } from "@/components/features/types";
 import { DomainError } from "@/domain/errors";
 import { resolveStatusOnRating, sortAlbumsForShelf } from "@/domain/rating";
 import {
@@ -47,7 +47,7 @@ export async function getArtistDetail(
             include: {
               edition: {
                 include: {
-                  festival: { select: { name: true } },
+                  festival: { select: { slug: true, name: true } },
                 },
               },
               userStates: {
@@ -142,17 +142,14 @@ export async function getArtistDetail(
       if (!aState && !lState) continue;
 
       const canSeeRatings = friend.ratingsVisibility === "FRIENDS";
-      const canSeeNotes = friend.notesVisibility === "FRIENDS";
 
       const rating = canSeeRatings ? (aState?.rating ?? null) : null;
-      // Personal artist notes are always strictly private and never exposed to friends.
+      // Personal artist notes and live comments are strictly private and never exposed to friends.
       const notes = null;
-
       const liveRating = canSeeRatings ? (lState?.liveRating ?? null) : null;
-      const rawLiveNotes = lState?.liveNotes.trim() ?? "";
-      const liveNotes = canSeeNotes && rawLiveNotes.length > 0 ? rawLiveNotes : null;
+      const liveNotes = null;
 
-      if (rating === null && liveRating === null && liveNotes === null) {
+      if (rating === null && liveRating === null) {
         continue;
       }
 
@@ -182,6 +179,12 @@ export async function getArtistDetail(
     );
   }
 
+  const myMemberships = await db.userFestivalEdition.findMany({
+    where: { userId },
+    select: { editionId: true },
+  });
+  const myEditionIds = new Set(myMemberships.map((m) => m.editionId));
+
   return {
     id: artist.id,
     name: artist.name,
@@ -202,6 +205,7 @@ export async function getArtistDetail(
           entryId: link.entry.id,
           festivalId: link.entry.edition.id,
           festivalSlug: link.entry.edition.slug,
+          festivalBrandSlug: link.entry.edition.festival.slug,
           festivalName: link.entry.edition.festival.name,
           festivalYear: link.entry.edition.year,
           billingName: link.entry.billingName,
@@ -211,11 +215,123 @@ export async function getArtistDetail(
           setTime: link.entry.setTime,
           liveRating: entryState?.liveRating ?? null,
           liveNotes: entryState?.liveNotes ?? "",
+          isInMyFestivals: myEditionIds.has(link.entry.edition.id),
         };
       })
-      .sort((a, b) => b.festivalYear - a.festivalYear),
+      .sort((a, b) => {
+        if (a.isInMyFestivals !== b.isInMyFestivals) {
+          return a.isInMyFestivals ? -1 : 1;
+        }
+        return b.festivalYear - a.festivalYear;
+      }),
     friendReviews,
   };
+}
+
+export async function searchCatalogArtists(
+  userId: string,
+  rawQuery = "",
+  limit = 40,
+  db: PrismaClient = getDb(),
+): Promise<GlobalArtistSearchItemDTO[]> {
+  const needle = rawQuery.trim().toLowerCase();
+
+  const [myMemberships, artists] = await Promise.all([
+    db.userFestivalEdition.findMany({
+      where: { userId },
+      select: { editionId: true },
+    }),
+    db.artist.findMany({
+      include: {
+        userStates: {
+          where: { userId },
+          take: 1,
+        },
+        entries: {
+          include: {
+            entry: {
+              select: {
+                edition: {
+                  select: {
+                    id: true,
+                    slug: true,
+                    year: true,
+                    festival: { select: { slug: true, name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ name: "asc" }],
+    }),
+  ]);
+
+  const myEditionIds = new Set(myMemberships.map((m) => m.editionId));
+
+  const filtered = needle
+    ? artists.filter((artist) => {
+        if (artist.name.toLowerCase().includes(needle)) {
+          return true;
+        }
+        return artist.entries.some((link) =>
+          link.entry.edition.festival.name.toLowerCase().includes(needle),
+        );
+      })
+    : artists;
+
+  return filtered
+    .map((artist) => {
+      const state = artist.userStates[0];
+      const seenEditions = new Set<string>();
+      const festivals: GlobalArtistSearchItemDTO["festivals"] = [];
+
+      for (const link of artist.entries) {
+        const ed = link.entry.edition;
+        if (seenEditions.has(ed.id)) continue;
+        seenEditions.add(ed.id);
+        festivals.push({
+          editionId: ed.id,
+          slug: ed.slug,
+          brandSlug: ed.festival.slug,
+          name: ed.festival.name,
+          year: ed.year,
+          isInMyFestivals: myEditionIds.has(ed.id),
+        });
+      }
+
+      festivals.sort((a, b) => {
+        if (a.isInMyFestivals !== b.isInMyFestivals) {
+          return a.isInMyFestivals ? -1 : 1;
+        }
+        return b.year - a.year;
+      });
+
+      return {
+        id: artist.id,
+        name: artist.name,
+        country: artist.country,
+        imagePath: artist.imagePath,
+        rating: state?.rating ?? null,
+        status: state?.status ?? ("PENDING" as const),
+        festivals,
+      };
+    })
+    .sort((a, b) => {
+      const aInMine = a.festivals.some((f) => f.isInMyFestivals) ? 1 : 0;
+      const bInMine = b.festivals.some((f) => f.isInMyFestivals) ? 1 : 0;
+      if (aInMine !== bInMine) {
+        return bInMine - aInMine;
+      }
+      const aRated = a.rating ?? -1;
+      const bRated = b.rating ?? -1;
+      if (aRated !== bRated) {
+        return bRated - aRated;
+      }
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, limit);
 }
 
 export async function updateArtistRating(

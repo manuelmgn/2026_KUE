@@ -286,8 +286,8 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
       db,
     );
 
-    // 1. Default (all FRIENDS): Bob sees festivals, shared festivals, scores, and live reviews,
-    //    but personal artist notes are ALWAYS strictly private and never exposed to friends.
+    // 1. Default (all FRIENDS): Bob sees festivals, shared festivals, studio scores, and live scores
+    //    (with pre-concert evolution), while ALL written notes (personal + live) remain strictly private.
     const viewAllOpen = await getUserProfileByUsername(bob.id, "alice", db);
     expect(viewAllOpen?.sharedFestivals).toHaveLength(1);
     expect(viewAllOpen?.festivals).toHaveLength(1);
@@ -300,12 +300,17 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     expect(aliceArtistPost?.rating).toBe(5);
     expect(aliceArtistPost?.notes).toBeNull();
 
+    const aliceLivePost = viewAllOpen?.posts.find((p) => p.kind === "LIVE_REVIEW");
+    expect(aliceLivePost?.rating).toBe(4);
+    expect(aliceLivePost?.preRating).toBe(5);
+    expect(aliceLivePost?.notes).toBeNull();
+
     const kaliDetailOpen = await getArtistDetail(bob.id, kaliArtistId, db);
     expect(kaliDetailOpen?.friendReviews).toHaveLength(1);
     expect(kaliDetailOpen?.friendReviews[0]?.rating).toBe(5);
     expect(kaliDetailOpen?.friendReviews[0]?.notes).toBeNull();
     expect(kaliDetailOpen?.friendReviews[0]?.liveRating).toBe(4);
-    expect(kaliDetailOpen?.friendReviews[0]?.liveNotes).toBe("Sonido brutal en el Auditori");
+    expect(kaliDetailOpen?.friendReviews[0]?.liveNotes).toBeNull();
 
     // 2. Alice sets notesVisibility = PRIVATE (keeps ratingsVisibility = FRIENDS)
     //    Live review comments are now hidden too, while numeric ratings remain visible.
@@ -356,10 +361,10 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     const kaliDetailLocked = await getArtistDetail(bob.id, kaliArtistId, db);
     expect(kaliDetailLocked?.friendReviews).toHaveLength(0);
 
-    // Self still sees everything on her own profile
+    // Self still sees her own festivals and numeric-rating/festival posts (note-only items stay private)
     const aliceSelfView = await getUserProfileByUsername(alice.id, "alice", db);
     expect(aliceSelfView?.festivals).toHaveLength(1);
-    expect(aliceSelfView?.posts.length).toBeGreaterThanOrEqual(4);
+    expect(aliceSelfView?.posts).toHaveLength(3);
   });
 
   it("delivers and coalesces festival update and friend-coincidence notifications", async () => {

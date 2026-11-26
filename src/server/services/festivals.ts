@@ -100,6 +100,26 @@ export async function getEditionBySlug(
   });
 }
 
+export async function getEditionByBrandAndYear(
+  brandSlug: string,
+  year: number,
+  db: PrismaClient = getDb(),
+): Promise<EditionWithFestivalAndCount | null> {
+  if (!Number.isInteger(year) || year < 1950 || year > 2100) {
+    return null;
+  }
+  return db.festivalEdition.findFirst({
+    where: {
+      year,
+      festival: { slug: brandSlug },
+    },
+    include: {
+      festival: { select: { id: true, slug: true, name: true } },
+      _count: { select: { entries: true } },
+    },
+  });
+}
+
 export async function getEditionWithSiblingYears(
   editionId: string,
   db: PrismaClient = getDb(),
@@ -509,7 +529,75 @@ export async function listHomeArtists(userId: string, db: PrismaClient = getDb()
             include: {
               edition: {
                 include: {
-                  festival: { select: { name: true } },
+                  festival: { select: { slug: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const hydrated = artists.map((artist) => {
+    const state = artist.userStates[0];
+    return {
+      id: artist.id,
+      name: artist.name,
+      imagePath: artist.imagePath,
+      rating: state?.rating ?? null,
+      status: state?.status ?? ("PENDING" as const),
+      notes: state?.notes ?? "",
+      stateUpdatedAt: state?.updatedAt ?? artist.updatedAt,
+      edition: artist.entries[0]?.entry.edition ?? null,
+    };
+  });
+
+  const queue = hydrated
+    .filter((a) => a.status === "LISTENING" || a.status === "PENDING")
+    .sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === "LISTENING" ? -1 : 1;
+      }
+      return b.stateUpdatedAt.getTime() - a.stateUpdatedAt.getTime();
+    })
+    .slice(0, 6);
+
+  const recentlyRated = hydrated
+    .filter((a) => a.rating !== null && a.status !== "DISCARDED")
+    .sort((a, b) => b.stateUpdatedAt.getTime() - a.stateUpdatedAt.getTime())
+    .slice(0, 6);
+
+  return { queue, recentlyRated };
+}
+
+export async function listEditionHomeArtists(
+  userId: string,
+  editionId: string,
+  db: PrismaClient = getDb(),
+) {
+  const artists = await db.artist.findMany({
+    where: {
+      entries: {
+        some: {
+          entry: { editionId },
+        },
+      },
+    },
+    include: {
+      userStates: {
+        where: { userId },
+        take: 1,
+      },
+      entries: {
+        where: { entry: { editionId } },
+        take: 1,
+        include: {
+          entry: {
+            include: {
+              edition: {
+                include: {
+                  festival: { select: { slug: true, name: true } },
                 },
               },
             },

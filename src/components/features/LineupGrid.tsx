@@ -9,21 +9,31 @@ import { useI18n } from "@/i18n/context";
 interface LineupGridProps {
   entries: LineupEntryDTO[];
   onSelectEntry: (entryId: string) => void;
+  selectedEntryId?: string | null;
+  compactForPane?: boolean;
 }
 
-export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
+export function LineupGrid({
+  entries,
+  onSelectEntry,
+  selectedEntryId = null,
+  compactForPane = false,
+}: LineupGridProps) {
   const { dict } = useI18n();
 
   return (
     <section
       aria-label={dict.workspace.gridAria}
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      className={`grid grid-cols-1 sm:grid-cols-2 tablet-h:grid-cols-3 desktop:grid-cols-4 ${
+        compactForPane ? "wide:grid-cols-3" : "wide:grid-cols-5"
+      }`}
     >
       {entries.map((entry, idx) => {
         const lead = entry.artists[0];
         const rating = getEffectiveEntryRating(entry.artists);
         const status = getEffectiveEntryStatus(entry.artists);
         const isDiscarded = status === "DISCARDED";
+        const isSelected = selectedEntryId === entry.id;
         const imageUrl = toMediaApiUrl(lead?.imagePath);
         const noteText = entry.artists.find((a) => a.notes.trim().length > 0)?.notes ?? "";
 
@@ -39,7 +49,7 @@ export function LineupGrid({ entries, onSelectEntry }: LineupGridProps) {
             key={entry.id}
             className={`group flex cursor-pointer flex-col gap-3.5 border-b border-line p-4 transition-colors hover:bg-surface sm:border-r ${
               isDiscarded ? "opacity-[0.38]" : ""
-            }`}
+            } ${isSelected ? "bg-surface ring-1 ring-inset ring-acid" : ""}`}
           >
             <button
               type="button"

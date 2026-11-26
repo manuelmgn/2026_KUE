@@ -1,23 +1,18 @@
-import { Suspense } from "react";
 import { AdminDashboardView } from "@/components/features/AdminDashboardView";
-import { TopBar } from "@/components/features/TopBar";
 import type { CatalogFestivalDTO } from "@/components/features/types";
 import { requirePageAdmin } from "@/server/auth/dal";
-import { listAllCatalogFestivals, listUserEditions } from "@/server/services/festivals";
-import { toFestivalSummary } from "@/server/services/mappers";
+import { listAllCatalogFestivals } from "@/server/services/festivals";
 import { getAdminDashboardData } from "@/server/services/users";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const admin = await requirePageAdmin();
-  const [dashboard, myEditions, rawCatalog] = await Promise.all([
+  const [dashboard, rawCatalog] = await Promise.all([
     getAdminDashboardData(),
-    listUserEditions(admin.id),
     listAllCatalogFestivals(admin.id),
   ]);
 
-  const summaries = myEditions.map(toFestivalSummary);
   const catalog: CatalogFestivalDTO[] = rawCatalog.map((fest) => ({
     id: fest.id,
     slug: fest.slug,
@@ -45,20 +40,11 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-bg text-ink">
-      <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar
-          festivals={summaries}
-          activeFestivalSlug={summaries[0]?.slug ?? null}
-          currentUser={admin}
-        />
-      </Suspense>
-      <AdminDashboardView
-        currentUserId={admin.id}
-        initialStats={dashboard.stats}
-        initialUsers={dashboard.users}
-        initialCatalog={catalog}
-      />
-    </div>
+    <AdminDashboardView
+      currentUserId={admin.id}
+      initialStats={dashboard.stats}
+      initialUsers={dashboard.users}
+      initialCatalog={catalog}
+    />
   );
 }

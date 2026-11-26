@@ -8,6 +8,7 @@ export function toFestivalSummary(edition: EditionWithFestival): FestivalSummary
   return {
     id: edition.id,
     festivalId: edition.festival.id,
+    brandSlug: edition.festival.slug,
     slug: edition.slug,
     name: edition.festival.name,
     year: edition.year,

@@ -1,32 +1,28 @@
-import { Suspense } from "react";
-import { RawImporter } from "@/components/features/RawImporter";
-import { TopBar } from "@/components/features/TopBar";
+import { redirect } from "next/navigation";
+import { festivalEditPath } from "@/domain/festival-routes";
 import { requirePageUser } from "@/server/auth/dal";
-import { listUserEditions } from "@/server/services/festivals";
-import { resolveActiveFestival, toFestivalSummary } from "@/server/services/mappers";
+import { getEditionBySlug, listUserEditions } from "@/server/services/festivals";
+import { resolveActiveFestival } from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
 
-interface ImportPageProps {
+interface LegacyImportPageProps {
   searchParams: Promise<{ festival?: string }>;
 }
 
-export default async function ImportPage({ searchParams }: ImportPageProps) {
+export default async function LegacyImportRedirectPage({ searchParams }: LegacyImportPageProps) {
   const user = await requirePageUser("/import");
   const [params, editions] = await Promise.all([searchParams, listUserEditions(user.id)]);
-  const summaries = editions.map(toFestivalSummary);
-  const active = resolveActiveFestival(summaries, params.festival);
 
-  return (
-    <div className="min-h-screen bg-bg text-ink">
-      <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar
-          festivals={summaries}
-          activeFestivalSlug={active?.slug ?? null}
-          currentUser={user}
-        />
-      </Suspense>
-      <RawImporter festivals={summaries} initialFestivalId={active?.id ?? null} />
-    </div>
-  );
+  const requested = params.festival
+    ? (editions.find((ed) => ed.slug === params.festival) ??
+      (await getEditionBySlug(params.festival)))
+    : null;
+  const target = requested ?? resolveActiveFestival(editions, params.festival);
+
+  if (!target) {
+    redirect("/festivals");
+  }
+
+  redirect(festivalEditPath({ brandSlug: target.festival.slug, year: target.year }));
 }

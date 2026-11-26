@@ -6,12 +6,14 @@ import { useEffect, useOptimistic, useRef, useState, useTransition } from "react
 import { setArtistRatingAction, setArtistStatusAction } from "@/actions/artist-actions";
 import { addEditionToMyFestivalsAction } from "@/actions/festival-actions";
 import { ArtistDrawer } from "@/components/features/ArtistDrawer";
+import { FestivalHeaderNav } from "@/components/features/FestivalHeaderNav";
 import { FilterBar } from "@/components/features/FilterBar";
 import { LineupGrid } from "@/components/features/LineupGrid";
 import { LineupIndex } from "@/components/features/LineupIndex";
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { festivalCartelPath, festivalEditPath } from "@/domain/festival-routes";
 import { matchesEntryFilters, resolveStatusOnRating } from "@/domain/rating";
 import type { ArtistStatus, RatingFilter, StatusFilter, ViewMode } from "@/domain/schemas";
 import { useI18n } from "@/i18n/context";
@@ -117,10 +119,19 @@ export function LineupWorkspace({
   const [view, setView] = useState<ViewMode>(initialView);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
+  const [isWideViewport, setIsWideViewport] = useState(false);
 
   useEffect(() => {
     setBaseEntries(initialEntries);
   }, [initialEntries]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 100rem)");
+    const sync = () => setIsWideViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   // Update URL search params via native History API (integrated with Next.js 16 router)
   // so typing in the search bar or toggling filters never triggers a server RSC roundtrip.
@@ -131,7 +142,7 @@ export function LineupWorkspace({
     view?: ViewMode;
   }) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("festival", festival.slug);
+    params.delete("festival");
 
     const nextQ = patch.q ?? query;
     const nextStatus = patch.status ?? status;
@@ -162,7 +173,9 @@ export function LineupWorkspace({
       params.delete("view");
     }
 
-    window.history.replaceState(null, "", `/lineup?${params.toString()}`);
+    const basePath = festivalCartelPath(festival);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${basePath}?${qs}` : basePath);
   };
 
   const visibleEntries = optimisticEntries.filter((entry) =>
@@ -300,23 +313,18 @@ export function LineupWorkspace({
   }, [view, visibleEntries, focusedIndex, openEntryId]);
 
   const openEntry = optimisticEntries.find((entry) => entry.id === openEntryId) ?? null;
+  const showInlinePane = isWideViewport && openEntry !== null;
 
   return (
-    <main>
-      <section className="flex flex-wrap items-end justify-between gap-2 px-4 pt-6 pb-5 sm:gap-4 sm:px-6 sm:pt-10 sm:pb-8">
-        <h1
-          data-festival-heading
-          className="font-display text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold uppercase leading-[0.9] tracking-[-0.04em]"
-        >
-          {festival.name} {festival.year}
-        </h1>
-        <div className="flex flex-wrap items-center gap-3">
-          {festival.location ? (
-            <p className="font-serif text-[clamp(1.35rem,2.4vw,1.9rem)] italic leading-[1.1] text-ink-muted">
-              {festival.location}
-            </p>
-          ) : null}
-          {!inMyFestivals ? (
+    <main className="w-full">
+      <FestivalHeaderNav
+        brandSlug={festival.brandSlug}
+        name={festival.name}
+        year={festival.year}
+        location={festival.location}
+        activeTab="cartel"
+        rightSlot={
+          !inMyFestivals ? (
             <HairlineButton
               variant="acid"
               size="sm"
@@ -325,9 +333,9 @@ export function LineupWorkspace({
             >
               {dict.catalog.addEditionAction}
             </HairlineButton>
-          ) : null}
-        </div>
-      </section>
+          ) : undefined
+        }
+      />
 
       <FilterBar
         searchInputRef={searchInputRef}
@@ -372,50 +380,74 @@ export function LineupWorkspace({
         </div>
       ) : null}
 
-      {visibleEntries.length === 0 ? (
-        <EmptyState
-          title={
-            baseEntries.length === 0
-              ? dict.workspace.emptyLineupTitle
-              : dict.workspace.noMatchesTitle
-          }
-          description={
-            baseEntries.length === 0
-              ? dict.workspace.emptyLineupDescription
-              : dict.workspace.noMatchesDescription
-          }
-          action={
-            baseEntries.length === 0 ? (
-              <Link
-                href={`/import?festival=${encodeURIComponent(festival.slug)}`}
-                className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
-              >
-                {dict.workspace.emptyLineupAction}
-              </Link>
-            ) : undefined
-          }
-        />
-      ) : view === "grid" ? (
-        <LineupGrid entries={visibleEntries} onSelectEntry={(id) => setOpenEntryId(id)} />
-      ) : (
-        <LineupIndex
-          entries={visibleEntries}
-          focusedIndex={Math.min(focusedIndex, visibleEntries.length - 1)}
-          onFocusIndex={setFocusedIndex}
-          onSelectEntry={(id) => setOpenEntryId(id)}
-          onQuickRate={handleRateArtist}
-          onQuickDiscard={(artistId) => handleStatusArtist(artistId, "DISCARDED")}
-        />
-      )}
+      <div className={showInlinePane ? "wide:grid wide:grid-cols-[minmax(0,1fr)_440px]" : ""}>
+        <div className="min-w-0">
+          {visibleEntries.length === 0 ? (
+            <EmptyState
+              title={
+                baseEntries.length === 0
+                  ? dict.workspace.emptyLineupTitle
+                  : dict.workspace.noMatchesTitle
+              }
+              description={
+                baseEntries.length === 0
+                  ? dict.workspace.emptyLineupDescription
+                  : dict.workspace.noMatchesDescription
+              }
+              action={
+                baseEntries.length === 0 ? (
+                  <Link
+                    href={festivalEditPath(festival)}
+                    className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
+                  >
+                    {dict.workspace.emptyLineupAction}
+                  </Link>
+                ) : undefined
+              }
+            />
+          ) : view === "grid" ? (
+            <LineupGrid
+              entries={visibleEntries}
+              selectedEntryId={openEntryId}
+              compactForPane={showInlinePane}
+              onSelectEntry={(id) => setOpenEntryId(id)}
+            />
+          ) : (
+            <LineupIndex
+              entries={visibleEntries}
+              focusedIndex={Math.min(focusedIndex, visibleEntries.length - 1)}
+              onFocusIndex={setFocusedIndex}
+              onSelectEntry={(id) => setOpenEntryId(id)}
+              onQuickRate={handleRateArtist}
+              onQuickDiscard={(artistId) => handleStatusArtist(artistId, "DISCARDED")}
+            />
+          )}
+        </div>
 
-      <ArtistDrawer
-        entry={openEntry}
-        onClose={() => setOpenEntryId(null)}
-        onRateArtist={handleRateArtist}
-        onStatusArtist={handleStatusArtist}
-        onNotesSaved={handleNotesSaved}
-        onEntryUpdated={handleEntryUpdated}
-      />
+        {showInlinePane ? (
+          <ArtistDrawer
+            mode="inline"
+            entry={openEntry}
+            onClose={() => setOpenEntryId(null)}
+            onRateArtist={handleRateArtist}
+            onStatusArtist={handleStatusArtist}
+            onNotesSaved={handleNotesSaved}
+            onEntryUpdated={handleEntryUpdated}
+          />
+        ) : null}
+      </div>
+
+      {!isWideViewport ? (
+        <ArtistDrawer
+          mode="drawer"
+          entry={openEntry}
+          onClose={() => setOpenEntryId(null)}
+          onRateArtist={handleRateArtist}
+          onStatusArtist={handleStatusArtist}
+          onNotesSaved={handleNotesSaved}
+          onEntryUpdated={handleEntryUpdated}
+        />
+      ) : null}
     </main>
   );
 }

@@ -17,6 +17,7 @@ import type {
 } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { festivalHomePath } from "@/domain/festival-routes";
 import type { PlaceCandidate } from "@/domain/schemas";
 import { useI18n } from "@/i18n/context";
 
@@ -25,6 +26,7 @@ interface FestivalsViewProps {
   initialCatalog: CatalogFestivalDTO[];
   activeFestivalSlug: string | null;
   todayIso: string;
+  isAdmin?: boolean;
 }
 
 type PanelMode = "closed" | "catalog" | "create-festival" | "create-edition";
@@ -104,6 +106,7 @@ export function FestivalsView({
   initialCatalog,
   activeFestivalSlug,
   todayIso,
+  isAdmin = false,
 }: FestivalsViewProps) {
   const { locale, dict } = useI18n();
   const router = useRouter();
@@ -320,6 +323,7 @@ export function FestivalsView({
       const createdItem: FestivalArchiveItemDTO = {
         id: res.data.id,
         festivalId: res.data.festivalId,
+        brandSlug: res.data.brandSlug,
         slug: res.data.slug,
         name: res.data.name,
         year: res.data.year,
@@ -437,7 +441,7 @@ export function FestivalsView({
                   } ${isPast ? "opacity-80 hover:opacity-100" : ""}`}
                 >
                   <Link
-                    href={`/lineup?festival=${encodeURIComponent(fest.slug)}`}
+                    href={festivalHomePath({ brandSlug: fest.brandSlug, year: fest.year })}
                     className="min-w-0 flex-1"
                   >
                     <div className="flex flex-wrap items-center gap-2 font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted">
@@ -458,7 +462,7 @@ export function FestivalsView({
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     <div className="flex items-center gap-1.5">
                       <Link
-                        href={`/lineup?festival=${encodeURIComponent(fest.slug)}`}
+                        href={festivalHomePath({ brandSlug: fest.brandSlug, year: fest.year })}
                         className={
                           isActive
                             ? "border border-acid bg-acid px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
@@ -518,7 +522,7 @@ export function FestivalsView({
                       }`}
                     >
                       <Link
-                        href={`/lineup?festival=${encodeURIComponent(ed.slug)}`}
+                        href={festivalHomePath({ brandSlug: ed.brandSlug, year: ed.year })}
                         className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5"
                       >
                         <span className="font-mono text-sm font-semibold text-ink">{ed.year}</span>
@@ -534,7 +538,7 @@ export function FestivalsView({
 
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Link
-                          href={`/lineup?festival=${encodeURIComponent(ed.slug)}`}
+                          href={festivalHomePath({ brandSlug: ed.brandSlug, year: ed.year })}
                           className={
                             isActive
                               ? "border border-acid bg-acid px-2 py-0.5 font-mono text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
@@ -564,10 +568,13 @@ export function FestivalsView({
   };
 
   return (
-    <main className="mx-auto w-full max-w-[820px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
-      <div className="flex items-end justify-between gap-4 border-b border-line px-5 py-6 sm:px-6">
+    <main className="w-full">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-4 py-6 sm:px-6">
         <div>
-          <h1 className="font-display text-[clamp(2rem,6vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
+          <h1
+            data-page-heading
+            className="font-display text-[clamp(2rem,6vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]"
+          >
             {dict.festivals.title}
           </h1>
           <p className="mt-2 font-serif text-[1.15rem] italic text-ink-muted">
@@ -811,45 +818,49 @@ export function FestivalsView({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor={`${formId}-lineup-url`}
-                className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
-              >
-                {dict.manage.autoSync.sourceUrlOptionalLabel}
-              </label>
-              <input
-                id={`${formId}-lineup-url`}
-                type="url"
-                value={lineupSourceUrl}
-                onChange={(event) => setLineupSourceUrl(event.target.value)}
-                placeholder={dict.manage.autoSync.sourceUrlPlaceholder}
-                className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
-              />
-            </div>
+            {isAdmin ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`${formId}-lineup-url`}
+                    className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+                  >
+                    {dict.manage.autoSync.sourceUrlOptionalLabel}
+                  </label>
+                  <input
+                    id={`${formId}-lineup-url`}
+                    type="url"
+                    value={lineupSourceUrl}
+                    onChange={(event) => setLineupSourceUrl(event.target.value)}
+                    placeholder={dict.manage.autoSync.sourceUrlPlaceholder}
+                    className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-muted focus:border-ink focus:outline-none"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor={`${formId}-sync-schedule`}
-                className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
-              >
-                {dict.manage.autoSync.intervalLabel}
-              </label>
-              <select
-                id={`${formId}-sync-schedule`}
-                value={syncSchedule}
-                disabled={lineupSourceUrl.trim().length === 0}
-                onChange={(event) =>
-                  setSyncSchedule(event.target.value as "once" | "12" | "24" | "168")
-                }
-                className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none disabled:opacity-50"
-              >
-                <option value="once">{dict.manage.autoSync.intervalOnce}</option>
-                <option value="12">{dict.manage.autoSync.intervalHours(12)}</option>
-                <option value="24">{dict.manage.autoSync.intervalDays(1)}</option>
-                <option value="168">{dict.manage.autoSync.intervalWeek}</option>
-              </select>
-            </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor={`${formId}-sync-schedule`}
+                    className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted"
+                  >
+                    {dict.manage.autoSync.intervalLabel}
+                  </label>
+                  <select
+                    id={`${formId}-sync-schedule`}
+                    value={syncSchedule}
+                    disabled={lineupSourceUrl.trim().length === 0}
+                    onChange={(event) =>
+                      setSyncSchedule(event.target.value as "once" | "12" | "24" | "168")
+                    }
+                    className="border border-line bg-bg px-3 py-2 font-mono text-xs text-ink focus:border-ink focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="once">{dict.manage.autoSync.intervalOnce}</option>
+                    <option value="12">{dict.manage.autoSync.intervalHours(12)}</option>
+                    <option value="24">{dict.manage.autoSync.intervalDays(1)}</option>
+                    <option value="168">{dict.manage.autoSync.intervalWeek}</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
           </div>
 
           {error ? (
@@ -904,8 +915,11 @@ export function FestivalsView({
           description={dict.festivals.emptyDescription}
         />
       ) : (
-        <>
-          <section aria-labelledby="festivals-upcoming-heading">
+        <div className="grid grid-cols-1 tablet-h:grid-cols-2">
+          <section
+            aria-labelledby="festivals-upcoming-heading"
+            className="tablet-h:border-r tablet-h:border-line"
+          >
             <div className="flex items-center justify-between border-b border-line bg-surface px-5 py-2.5 font-mono text-[0.72rem] uppercase tracking-[0.1em] sm:px-6">
               <h2 id="festivals-upcoming-heading" className="font-semibold text-ink">
                 {dict.festivals.upcomingTitle}
@@ -936,7 +950,7 @@ export function FestivalsView({
               </p>
             )}
           </section>
-        </>
+        </div>
       )}
     </main>
   );

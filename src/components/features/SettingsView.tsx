@@ -279,9 +279,12 @@ export function SettingsView({
   ];
 
   return (
-    <main className="mx-auto flex max-w-[820px] flex-col gap-7 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
+    <main className="flex w-full flex-col gap-7 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
       <div className="border-b border-line pb-6">
-        <h1 className="font-display text-[clamp(2rem,5vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
+        <h1
+          data-page-heading
+          className="font-display text-[clamp(2rem,5vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]"
+        >
           {dict.settings.title}
         </h1>
         <p className="mt-2 font-serif text-[1.25rem] italic text-ink-muted">

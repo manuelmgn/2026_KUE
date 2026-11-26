@@ -1,23 +1,15 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { HomeView } from "@/components/features/HomeView";
-import { TopBar } from "@/components/features/TopBar";
-import type { FestivalArchiveItemDTO, HomeArtistItemDTO } from "@/components/features/types";
+import { type HomeUpcomingCard, HomeView } from "@/components/features/HomeView";
+import type { HomeArtistItemDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getPlacesApiLanguage } from "@/i18n/config";
 import { getServerDictionary } from "@/i18n/server";
 import { requirePageUser } from "@/server/auth/dal";
 import { getLocalizedPlaceName } from "@/server/clients/places";
 import { listHomeArtists, listUserEditionsWithCounts } from "@/server/services/festivals";
-import { resolveActiveFestival, toFestivalSummary } from "@/server/services/mappers";
-import { getUnreadNotificationCount } from "@/server/services/notifications";
 import { listFriendsActivityFeed } from "@/server/services/profile";
 
 export const dynamic = "force-dynamic";
-
-interface HomePageProps {
-  searchParams: Promise<{ festival?: string }>;
-}
 
 function isPastDate(startDate: string | null, endDate: string | null, year: number, today: string) {
   if (endDate) return endDate < today;
@@ -34,22 +26,19 @@ function computeDaysUntil(startDate: string | null, todayIso: string): number | 
   return diff >= 0 ? diff : null;
 }
 
-export default async function HomePage({ searchParams }: HomePageProps) {
+export default async function HomePage() {
   const user = await requirePageUser("/");
-  const [params, { locale, dict }, rawEditions, homeArtists, friendsPosts, unreadCount] =
-    await Promise.all([
-      searchParams,
-      getServerDictionary(),
-      listUserEditionsWithCounts(user.id),
-      listHomeArtists(user.id),
-      listFriendsActivityFeed(user.id, { limit: 5 }),
-      getUnreadNotificationCount(user.id),
-    ]);
+  const [{ locale, dict }, rawEditions, homeArtists, friendsPosts] = await Promise.all([
+    getServerDictionary(),
+    listUserEditionsWithCounts(user.id),
+    listHomeArtists(user.id),
+    listFriendsActivityFeed(user.id, { limit: 8 }),
+  ]);
 
-  const festivalSummaries = rawEditions.map(toFestivalSummary);
   const todayIso = new Date().toISOString().slice(0, 10);
+  const placesLang = getPlacesApiLanguage(locale);
 
-  const upcomingEditions = rawEditions
+  const upcomingRaw = rawEditions
     .filter(
       (ed) =>
         !isPastDate(
@@ -63,41 +52,35 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       const aKey = a.startDate ? a.startDate.toISOString().slice(0, 10) : `${a.year}-99-99`;
       const bKey = b.startDate ? b.startDate.toISOString().slice(0, 10) : `${b.year}-99-99`;
       return aKey.localeCompare(bKey);
-    });
+    })
+    .slice(0, 3);
 
-  const featuredRaw = params.festival
-    ? resolveActiveFestival(rawEditions, params.festival)
-    : (upcomingEditions[0] ?? rawEditions[0] ?? null);
+  const featuredSource = upcomingRaw.length > 0 ? upcomingRaw : rawEditions.slice(0, 1);
 
-  let featuredFestival: FestivalArchiveItemDTO | null = null;
-  let isUpcoming = false;
-  let daysUntil: number | null = null;
-
-  if (featuredRaw) {
-    const startDate = featuredRaw.startDate
-      ? featuredRaw.startDate.toISOString().slice(0, 10)
-      : null;
-    const endDate = featuredRaw.endDate ? featuredRaw.endDate.toISOString().slice(0, 10) : null;
-    const localizedLocation = await getLocalizedPlaceName(
-      featuredRaw.locationPlaceId,
-      getPlacesApiLanguage(locale),
-      featuredRaw.location,
-    );
-
-    featuredFestival = {
-      id: featuredRaw.id,
-      festivalId: featuredRaw.festival.id,
-      slug: featuredRaw.slug,
-      name: featuredRaw.festival.name,
-      year: featuredRaw.year,
-      location: localizedLocation,
-      startDate,
-      endDate,
-      entriesCount: featuredRaw._count.entries,
-    };
-    isUpcoming = !isPastDate(startDate, endDate, featuredRaw.year, todayIso);
-    daysUntil = computeDaysUntil(startDate, todayIso);
-  }
+  const upcomingCards: HomeUpcomingCard[] = await Promise.all(
+    featuredSource.map(async (ed) => {
+      const startDate = ed.startDate ? ed.startDate.toISOString().slice(0, 10) : null;
+      const endDate = ed.endDate ? ed.endDate.toISOString().slice(0, 10) : null;
+      const localizedLocation = await getLocalizedPlaceName(
+        ed.locationPlaceId,
+        placesLang,
+        ed.location,
+      );
+      return {
+        id: ed.id,
+        festivalId: ed.festival.id,
+        brandSlug: ed.festival.slug,
+        slug: ed.slug,
+        name: ed.festival.name,
+        year: ed.year,
+        location: localizedLocation,
+        startDate,
+        endDate,
+        entriesCount: ed._count.entries,
+        daysUntil: computeDaysUntil(startDate, todayIso),
+      };
+    }),
+  );
 
   const mapArtist = (
     artist: Awaited<ReturnType<typeof listHomeArtists>>["queue"][number],
@@ -111,6 +94,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       status: artist.status,
       notes: artist.notes,
       festivalSlug: artist.edition.slug,
+      festivalBrandSlug: artist.edition.festival.slug,
       festivalName: artist.edition.festival.name,
       festivalYear: artist.edition.year,
     };
@@ -123,27 +107,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     .map(mapArtist)
     .filter((item): item is HomeArtistItemDTO => item !== null);
 
-  return (
-    <div className="min-h-screen bg-bg text-ink">
-      <Suspense fallback={<div className="h-14 border-b border-line bg-bg" />}>
-        <TopBar
-          festivals={festivalSummaries}
-          activeFestivalSlug={featuredFestival?.slug ?? null}
-          currentUser={user}
-        />
-      </Suspense>
-
-      {featuredFestival ? (
-        <HomeView
-          featuredFestival={featuredFestival}
-          isUpcoming={isUpcoming}
-          daysUntil={daysUntil}
-          upNextArtists={upNextArtists}
-          recentlyRatedArtists={recentlyRatedArtists}
-          friendsPosts={friendsPosts}
-          unreadNotificationsCount={unreadCount}
-        />
-      ) : (
+  if (upcomingCards.length === 0 && friendsPosts.length === 0) {
+    return (
+      <main className="w-full min-h-[calc(100dvh-3rem)] sm:min-h-dvh">
         <EmptyState
           title={dict.home.emptyTitle}
           description={dict.home.emptyDescription}
@@ -156,7 +122,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </Link>
           }
         />
-      )}
-    </div>
+      </main>
+    );
+  }
+
+  return (
+    <HomeView
+      upcomingFestivals={upcomingCards}
+      upNextArtists={upNextArtists}
+      recentlyRatedArtists={recentlyRatedArtists}
+      friendsPosts={friendsPosts}
+    />
   );
 }

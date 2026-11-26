@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LOCALE,
+  detectLocaleFromAcceptLanguage,
   getPlacesApiLanguage,
   isSupportedLocale,
   normalizeLocale,
@@ -29,6 +30,15 @@ describe("i18n", () => {
     expect(normalizeLocale("es")).toBe("es-ES");
     expect(normalizeLocale("es-ES")).toBe("es-ES");
     expect(normalizeLocale("fr")).toBe("gl");
+  });
+
+  it("detects browser language from Accept-Language with silent gl fallback", () => {
+    expect(detectLocaleFromAcceptLanguage("es-ES,es;q=0.9,en;q=0.8")).toBe("es-ES");
+    expect(detectLocaleFromAcceptLanguage("pt-PT,pt;q=0.9")).toBe("pt-PT");
+    expect(detectLocaleFromAcceptLanguage("en-US,en;q=0.9,pt-BR;q=0.7")).toBe("pt-PT");
+    expect(detectLocaleFromAcceptLanguage("en-US,en;q=0.9,gl;q=0.8")).toBe("gl");
+    expect(detectLocaleFromAcceptLanguage("fr-FR,fr;q=0.9,de;q=0.8")).toBe("gl");
+    expect(detectLocaleFromAcceptLanguage(null)).toBe("gl");
   });
 
   it("maps locale to Open-Meteo geocoding language codes", () => {

@@ -85,10 +85,15 @@ model User {
   entryStates         UserEntryState[]
   createdFestivals    Festival[]            @relation("FestivalCreator")
   createdEditions     FestivalEdition[]     @relation("EditionCreator")
-  sentFriendships     Friendship[]          @relation("FriendshipRequester")
-  receivedFriendships Friendship[]          @relation("FriendshipAddressee")
-  notifications       Notification[]        @relation("NotificationRecipient")
-  actedNotifications  Notification[]        @relation("NotificationActor")
+  sentFriendships     Friendship[]               @relation("FriendshipRequester")
+  receivedFriendships Friendship[]               @relation("FriendshipAddressee")
+  notifications       Notification[]             @relation("NotificationRecipient")
+  actedNotifications  Notification[]             @relation("NotificationActor")
+  createdComparisons  FestivalComparison[]       @relation("ComparisonCreator")
+  comparisonMembers   FestivalComparisonMember[]
+  createdJointAgendas JointAgenda[]              @relation("JointAgendaCreator")
+  jointAgendaMembers  JointAgendaMember[]
+  addedJointItems     JointAgendaItem[]          @relation("JointAgendaItemAdder")
 
   @@index([role])
   @@index([isActive])
@@ -224,6 +229,8 @@ model FestivalEdition {
   entries       FestivalEntry[]
   followers     UserFestivalEdition[]
   notifications Notification[]
+  comparisons   FestivalComparison[]
+  jointAgendas  JointAgenda[]
 
   @@unique([festivalId, year])
   @@index([year])
@@ -255,9 +262,10 @@ model FestivalEntry {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  edition    FestivalEdition       @relation(fields: [editionId], references: [id], onDelete: Cascade)
-  artists    FestivalEntryArtist[]
-  userStates UserEntryState[]
+  edition          FestivalEdition       @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  artists          FestivalEntryArtist[]
+  userStates       UserEntryState[]
+  jointAgendaItems JointAgendaItem[]
 
   @@index([editionId, day])
   @@index([editionId, sortOrder])
@@ -356,4 +364,82 @@ model Notification {
   @@index([userId, createdAt])
   @@index([actorId])
   @@index([editionId])
+}
+
+model FestivalComparison {
+  id          String   @id @default(cuid())
+  editionId   String
+  createdById String
+  name        String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  edition      FestivalEdition            @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  createdBy    User                       @relation("ComparisonCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members      FestivalComparisonMember[]
+  jointAgendas JointAgenda[]
+
+  @@index([editionId])
+  @@index([createdById])
+}
+
+model FestivalComparisonMember {
+  comparisonId String
+  userId       String
+  addedAt      DateTime @default(now())
+
+  comparison FestivalComparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([comparisonId, userId])
+  @@index([userId])
+}
+
+model JointAgenda {
+  id                 String   @id @default(cuid())
+  editionId          String
+  comparisonId       String?
+  createdById        String
+  name               String   @default("")
+  minRatingThreshold Float    @default(3.2)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  edition    FestivalEdition     @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  comparison FestivalComparison? @relation(fields: [comparisonId], references: [id], onDelete: SetNull)
+  createdBy  User                @relation("JointAgendaCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members    JointAgendaMember[]
+  items      JointAgendaItem[]
+
+  @@index([editionId])
+  @@index([comparisonId])
+  @@index([createdById])
+}
+
+model JointAgendaMember {
+  agendaId String
+  userId   String
+  addedAt  DateTime @default(now())
+
+  agenda JointAgenda @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([agendaId, userId])
+  @@index([userId])
+}
+
+model JointAgendaItem {
+  agendaId  String
+  entryId   String
+  addedById String?
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agenda  JointAgenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  entry   FestivalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  addedBy User?         @relation("JointAgendaItemAdder", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@id([agendaId, entryId])
+  @@index([entryId])
 }

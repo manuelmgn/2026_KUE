@@ -109,6 +109,7 @@ describe("integration: services against real database", () => {
     expect(summary).toEqual({
       id: rewire.id,
       festivalId: rewire.festival.id,
+      brandSlug: "rewire",
       slug: "rewire-2027",
       name: "Rewire",
       year: 2027,

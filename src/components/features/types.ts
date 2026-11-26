@@ -21,6 +21,7 @@ export interface AuthUserDTO {
 export interface FestivalSummary {
   id: string;
   festivalId: string;
+  brandSlug: string;
   slug: string;
   name: string;
   year: number;
@@ -31,6 +32,7 @@ export interface FestivalArchiveItemDTO extends FestivalSummary {
   startDate: string | null;
   endDate: string | null;
   entriesCount: number;
+  lineupSourceUrl?: string | null;
 }
 
 export interface CatalogEditionItemDTO {
@@ -89,6 +91,7 @@ export interface HomeArtistItemDTO {
   status: ArtistStatus;
   notes: string;
   festivalSlug: string;
+  festivalBrandSlug: string;
   festivalName: string;
   festivalYear: number;
 }
@@ -131,6 +134,7 @@ export interface FestivalAppearanceDTO {
   entryId: string;
   festivalId: string;
   festivalSlug: string;
+  festivalBrandSlug: string;
   festivalName: string;
   festivalYear: number;
   billingName: string;
@@ -140,6 +144,7 @@ export interface FestivalAppearanceDTO {
   setTime: string | null;
   liveRating: number | null;
   liveNotes: string;
+  isInMyFestivals?: boolean;
 }
 
 export interface ArtistDetailDTO {
@@ -215,6 +220,7 @@ export interface SocialPostItemDTO {
   festival: {
     id: string;
     slug: string;
+    brandSlug: string;
     name: string;
     year: number;
     location: string | null;
@@ -226,7 +232,48 @@ export interface SocialPostItemDTO {
     stage: string | null;
   } | null;
   rating: number | null;
+  preRating?: number | null;
   notes: string | null;
+}
+
+export interface GlobalArtistSearchItemDTO {
+  id: string;
+  name: string;
+  country: string | null;
+  imagePath: string | null;
+  rating: number | null;
+  status: ArtistStatus;
+  festivals: Array<{
+    editionId: string;
+    slug: string;
+    brandSlug: string;
+    name: string;
+    year: number;
+    isInMyFestivals: boolean;
+  }>;
+}
+
+export interface SharedFestivalMatchDTO {
+  editionId: string;
+  slug: string;
+  brandSlug: string;
+  name: string;
+  year: number;
+  location: string | null;
+  friendUsernames: string[];
+  averageRating: number | null;
+}
+
+export interface FriendRadarPickDTO {
+  artistId: string;
+  artistName: string;
+  editionId: string;
+  festivalSlug: string;
+  festivalBrandSlug: string;
+  festivalName: string;
+  festivalYear: number;
+  yourStatus: ArtistStatus;
+  backers: Array<{ username: string; rating: number }>;
 }
 
 export interface FriendArtistReviewDTO {

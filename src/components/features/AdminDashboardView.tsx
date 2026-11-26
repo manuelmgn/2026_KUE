@@ -277,11 +277,14 @@ export function AdminDashboardView({
     : users;
 
   return (
-    <main className="mx-auto w-full max-w-[1040px] min-h-[calc(100dvh-56px)] md:border-x md:border-line">
+    <main className="w-full">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-5 py-6 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-4 py-6 sm:px-6">
         <div>
-          <h1 className="font-display text-[clamp(2rem,5vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
+          <h1
+            data-page-heading
+            className="font-display text-[clamp(2rem,5vw,3.4rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]"
+          >
             {dict.admin.title}
           </h1>
           <p className="mt-2 font-serif text-[1.15rem] italic text-ink-muted">
