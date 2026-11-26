@@ -203,6 +203,31 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     );
     await addEditionToUserFestivals(bob.id, edition.id, db);
 
+    // Unrelated festival created by a third user that also books Kali Malone (Alice does NOT follow it)
+    const stranger = await seedUser("stranger_org");
+    const otherEdition = await createFestival(
+      { name: "Unfollowed Fest", year: 2029, location: "Berlin" },
+      stranger.id,
+      db,
+    );
+    await importFestivalLineup(
+      {
+        festivalId: otherEdition.id,
+        rows: [
+          {
+            billingName: "Kali Malone",
+            artistNames: ["Kali Malone"],
+            subtitle: null,
+            day: null,
+            stage: null,
+            setTime: null,
+            included: true,
+          },
+        ],
+      },
+      { db, enqueueSync: false, actorUserId: stranger.id },
+    );
+
     await importFestivalLineup(
       {
         festivalId: edition.id,
@@ -266,6 +291,10 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     expect(viewAllOpen?.sharedFestivals).toHaveLength(1);
     expect(viewAllOpen?.festivals).toHaveLength(1);
     expect(viewAllOpen?.posts.length).toBeGreaterThanOrEqual(4);
+    const aliceArtistPost = viewAllOpen?.posts.find(
+      (p) => p.kind === "ARTIST_REVIEW" && p.artist?.id === kaliArtistId,
+    );
+    expect(aliceArtistPost?.festival?.name).toBe("Primavera Sound");
 
     const kaliDetailOpen = await getArtistDetail(bob.id, kaliArtistId, db);
     expect(kaliDetailOpen?.friendReviews).toHaveLength(1);

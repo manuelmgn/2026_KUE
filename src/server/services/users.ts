@@ -28,6 +28,7 @@ import {
 import { createSessionRecord, invalidateAllUserSessions } from "@/server/auth/session";
 import { getDb } from "@/server/db";
 import { getEnv } from "@/server/env";
+import { deleteMediaFile } from "@/server/media-storage";
 
 const SETTING_REGISTRATION_OPEN = "registration_open";
 const SETTING_LEGACY_CLAIMED = "legacy_claimed_by";
@@ -628,7 +629,7 @@ export async function adminDeleteUser(
 
   const target = await db.user.findUnique({
     where: { id: input.userId },
-    select: { id: true, role: true },
+    select: { id: true, role: true, avatarPath: true },
   });
   if (!target) {
     throw new DomainError("Usuario no encontrado");
@@ -644,6 +645,9 @@ export async function adminDeleteUser(
   }
 
   await db.user.delete({ where: { id: input.userId } });
+  if (target.avatarPath) {
+    await deleteMediaFile(target.avatarPath);
+  }
 }
 
 function toPublicUserDTO(user: {

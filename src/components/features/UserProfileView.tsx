@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   acceptFriendRequestAction,
   removeOrRejectFriendAction,
@@ -34,6 +34,13 @@ export function UserProfileView({ initialProfile }: UserProfileViewProps) {
   const [displayName, setDisplayName] = useState(initialProfile.user.displayName ?? "");
   const [location, setLocation] = useState(initialProfile.user.location ?? "");
   const [bio, setBio] = useState(initialProfile.user.bio);
+
+  useEffect(() => {
+    setProfile(initialProfile);
+    setDisplayName(initialProfile.user.displayName ?? "");
+    setLocation(initialProfile.user.location ?? "");
+    setBio(initialProfile.user.bio);
+  }, [initialProfile]);
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);

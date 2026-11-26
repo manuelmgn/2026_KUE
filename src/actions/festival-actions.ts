@@ -62,6 +62,7 @@ export async function createFestivalAction(
         const syncResult = await checkFestivalLineupSync(created.id, {
           force: true,
           applyDirectly: true,
+          actorUserId: user.id,
         });
         initialEntriesCount = syncResult.addedCount;
         initialNewArtistsCount = syncResult.newArtistsCount;
@@ -97,6 +98,7 @@ export async function createFestivalEditionAction(
         const syncResult = await checkFestivalLineupSync(created.id, {
           force: true,
           applyDirectly: true,
+          actorUserId: user.id,
         });
         initialEntriesCount = syncResult.addedCount;
         initialNewArtistsCount = syncResult.newArtistsCount;
@@ -175,9 +177,10 @@ export async function checkFestivalLineupAction(
 ): Promise<ActionResult<CheckFestivalLineupResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionAdmin();
-    const result = await checkFestivalLineupSync(festivalId, { force });
+    const admin = await requireActionAdmin();
+    const result = await checkFestivalLineupSync(festivalId, { force, actorUserId: admin.id });
     revalidateFestivalViews();
+    revalidatePath("/notifications");
     return result;
   }, dict.errors.importLineup);
 }

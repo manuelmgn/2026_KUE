@@ -212,6 +212,7 @@ export async function checkFestivalLineupSync(
   options: {
     force?: boolean | undefined;
     applyDirectly?: boolean | undefined;
+    actorUserId?: string | null | undefined;
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
     enqueueSync?: boolean | undefined;
@@ -241,6 +242,7 @@ async function runCheckFestivalLineupSync(
   options: {
     force?: boolean | undefined;
     applyDirectly?: boolean | undefined;
+    actorUserId?: string | null | undefined;
     db?: PrismaClient | undefined;
     queue?: SyncQueue | undefined;
     enqueueSync?: boolean | undefined;
@@ -371,6 +373,7 @@ async function runCheckFestivalLineupSync(
           db,
           queue: options.queue ?? getSyncQueue(),
           ...(options.enqueueSync !== undefined ? { enqueueSync: options.enqueueSync } : {}),
+          ...(options.actorUserId !== undefined ? { actorUserId: options.actorUserId } : {}),
         },
       );
 

@@ -246,7 +246,7 @@ async function collectPostsForAuthors(
     .filter((a) => a.id === viewerId || a.festivalsVisibility === "FRIENDS")
     .map((a) => a.id);
 
-  const [artistStates, entryStates, editionFollows] = await Promise.all([
+  const [artistStates, entryStates, editionFollows, authorMemberships] = await Promise.all([
     reviewAuthorIds.length > 0
       ? db.userArtistState.findMany({
           where: {
@@ -262,7 +262,6 @@ async function collectPostsForAuthors(
                 name: true,
                 imagePath: true,
                 entries: {
-                  take: 1,
                   orderBy: { entry: { edition: { year: "desc" } } },
                   include: {
                     entry: {
@@ -335,7 +334,23 @@ async function collectPostsForAuthors(
           },
         })
       : Promise.resolve([]),
+    festivalAuthorIds.length > 0
+      ? db.userFestivalEdition.findMany({
+          where: { userId: { in: festivalAuthorIds } },
+          select: { userId: true, editionId: true },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const followedEditionsByUser = new Map<string, Set<string>>();
+  for (const m of authorMemberships) {
+    let set = followedEditionsByUser.get(m.userId);
+    if (!set) {
+      set = new Set();
+      followedEditionsByUser.set(m.userId, set);
+    }
+    set.add(m.editionId);
+  }
 
   void authorIds;
   const posts: SocialPostItemDTO[] = [];
@@ -356,7 +371,10 @@ async function collectPostsForAuthors(
     }
 
     const canSeeFestivals = isSelf || author.festivalsVisibility === "FRIENDS";
-    const linkedEdition = canSeeFestivals ? state.artist.entries[0]?.entry.edition : undefined;
+    const authorSet = followedEditionsByUser.get(author.id);
+    const linkedEdition = canSeeFestivals
+      ? state.artist.entries.find((link) => authorSet?.has(link.entry.edition.id))?.entry.edition
+      : undefined;
 
     posts.push({
       id: `artist:${state.userId}:${state.artistId}`,
