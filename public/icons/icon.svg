@@ -1,14 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <title>KUE</title>
-  <rect width="512" height="512" fill="#000000" />
-  <text
-    x="256"
-    y="286"
-    text-anchor="middle"
-    fill="#CCFF00"
-    font-family="'Syne', 'Arial Black', sans-serif"
-    font-weight="800"
-    font-size="132"
-    letter-spacing="-5.28"
-  >KUE</text>
+  <rect width="512" height="512" fill="#CCFF00" />
+  <path d="M247.6 257.91 L247.6 236.52 L468 378.23 L325.9 378.23 L138.73 248.36 L311.39 133.77 L447.37 133.77 Z M44 133.77 L139.5 133.77 L139.5 378.23 L44 378.23 Z" fill="#000000" />
 </svg>

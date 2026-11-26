@@ -1,4 +1,4 @@
-const CACHE_NAME = "kue-shell-v6";
+const CACHE_NAME = "kue-shell-v7";
 const STATIC_SHELL_URLS = [
   "/manifest.webmanifest",
   "/icons/icon.svg",
