@@ -194,8 +194,7 @@ export const ptPT: Dictionary = {
     title: "Definições",
     subtitle: "Personaliza o idioma e a aparência da aplicação.",
     languageSectionTitle: "Idioma",
-    languageDescription:
-      "Escolhe o idioma principal da interface. Galego é o idioma predefinido.",
+    languageDescription: "Escolhe o idioma principal da interface. Galego é o idioma predefinido.",
     languageGlLabel: "Galego",
     languageGlMeta: "GL · Idioma principal",
     languagePtLabel: "Português (Portugal)",

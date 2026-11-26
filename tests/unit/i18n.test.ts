@@ -9,35 +9,43 @@ import {
 import { getDictionary } from "@/i18n/dictionaries";
 
 describe("i18n", () => {
-  it("uses pt-PT as the primary default locale and preserves es", () => {
-    expect(DEFAULT_LOCALE).toBe("pt-PT");
-    expect(SUPPORTED_LOCALES).toEqual(["pt-PT", "es"]);
+  it("uses gl as the primary default locale and preserves pt-PT and es", () => {
+    expect(DEFAULT_LOCALE).toBe("gl");
+    expect(SUPPORTED_LOCALES).toEqual(["gl", "pt-PT", "es"]);
+    expect(isSupportedLocale("gl")).toBe(true);
     expect(isSupportedLocale("pt-PT")).toBe(true);
     expect(isSupportedLocale("es")).toBe(true);
     expect(isSupportedLocale("en")).toBe(false);
   });
 
-  it("normalizes locale values safely with pt-PT fallback", () => {
-    expect(normalizeLocale(undefined)).toBe("pt-PT");
-    expect(normalizeLocale(null)).toBe("pt-PT");
-    expect(normalizeLocale("")).toBe("pt-PT");
+  it("normalizes locale values safely with gl fallback", () => {
+    expect(normalizeLocale(undefined)).toBe("gl");
+    expect(normalizeLocale(null)).toBe("gl");
+    expect(normalizeLocale("")).toBe("gl");
+    expect(normalizeLocale("gl")).toBe("gl");
+    expect(normalizeLocale("gl-ES")).toBe("gl");
     expect(normalizeLocale("pt-PT")).toBe("pt-PT");
     expect(normalizeLocale("pt")).toBe("pt-PT");
     expect(normalizeLocale("es")).toBe("es");
     expect(normalizeLocale("es-ES")).toBe("es");
-    expect(normalizeLocale("fr")).toBe("pt-PT");
+    expect(normalizeLocale("fr")).toBe("gl");
   });
 
   it("maps locale to Open-Meteo geocoding language codes", () => {
+    expect(getPlacesApiLanguage("gl")).toBe("es");
     expect(getPlacesApiLanguage("pt-PT")).toBe("pt");
     expect(getPlacesApiLanguage("es")).toBe("es");
   });
 
-  it("provides complete pt-PT and es dictionaries with matching sections", () => {
+  it("provides complete gl, pt-PT, and es dictionaries with matching sections", () => {
+    const gl = getDictionary("gl");
     const pt = getDictionary("pt-PT");
     const es = getDictionary("es");
 
-    expect(Object.keys(pt).sort()).toEqual(Object.keys(es).sort());
+    expect(Object.keys(gl).sort()).toEqual(Object.keys(pt).sort());
+    expect(Object.keys(gl).sort()).toEqual(Object.keys(es).sort());
+    expect(gl.nav.lineup).toBe("Cartel");
+    expect(gl.nav.settings).toBe("Axustes");
     expect(pt.nav.lineup).toBe("Cartaz");
     expect(pt.nav.settings).toBe("Definições");
     expect(es.nav.lineup).toBe("Cartel");
