@@ -21,7 +21,7 @@ import type {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { festivalCartelPath, festivalHomePath } from "@/domain/festival-routes";
+import { festivalCartelPath, festivalComparisonPath } from "@/domain/festival-routes";
 import { useI18n } from "@/i18n/context";
 
 interface SocialHubViewProps {
@@ -478,7 +478,7 @@ export function SocialHubView({
                   : (sf.location ?? "")}
               </span>
               <Link
-                href={festivalHomePath({ brandSlug: sf.brandSlug, year: sf.year })}
+                href={festivalComparisonPath({ brandSlug: sf.brandSlug, year: sf.year })}
                 className="font-semibold text-ink hover:underline"
               >
                 {dict.social.compareAction}

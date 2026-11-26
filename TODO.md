@@ -18,9 +18,9 @@
 
 - [x] **Gestión de amigos**: añadir sistema para gestionar amistades entre usuarios.
 - [x] **Visibilidad entre amigos**: permitir que los amigos vean los festivales añadidos y las valoraciones de los demás.
-- [ ] **Tabla comparativa y recomendación de festival**: cuando un usuario y uno o varios amigos coinciden en ir a un mismo festival, permitir crear una tabla comparativa con sus valoraciones y generar una recomendación automática del festival (recomendar ir si la media de valoraciones iguala o supera `3.2`).
+- [x] **Tabla comparativa y recomendación de festival**: cuando un usuario y uno o varios amigos coinciden en ir a un mismo festival, permitir crear una tabla comparativa con sus valoraciones y generar una recomendación automática del festival (recomendar ir si la media de valoraciones iguala o supera `3.2`).
   - [x] Backend (dominio, Prisma/migraciones, servicios, Server Actions y API REST)
-  - [ ] Interfaz de usuario (frontend)
-- [ ] **Agenda conjunta**: a partir de la comparativa/coincidencia en un festival con amigos, poder crear una agenda conjunta.
+  - [x] Interfaz de usuario (frontend)
+- [x] **Agenda conjunta**: a partir de la comparativa/coincidencia en un festival con amigos, poder crear una agenda conjunta.
   - [x] Backend (dominio, Prisma/migraciones, servicios, Server Actions y API REST)
-  - [ ] Interfaz de usuario (frontend)
+  - [x] Interfaz de usuario (frontend)

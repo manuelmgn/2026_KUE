@@ -29,6 +29,24 @@ export function festivalAgendaPath(target: FestivalRouteTarget): string {
   return `${festivalHomePath(target)}/agenda`;
 }
 
+export function festivalComparisonPath(
+  target: FestivalRouteTarget,
+  query?: Record<string, string | null | undefined>,
+): string {
+  const base = `${festivalHomePath(target)}/comparativa`;
+  if (!query) {
+    return base;
+  }
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value && value.trim().length > 0) {
+      params.set(key, value.trim());
+    }
+  }
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 export function festivalEditPath(target: FestivalRouteTarget): string {
   return `${festivalHomePath(target)}/editar`;
 }

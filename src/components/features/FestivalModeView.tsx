@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { FestivalHeaderNav } from "@/components/features/FestivalHeaderNav";
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { festivalCartelPath } from "@/domain/festival-routes";
+import { festivalCartelPath, festivalComparisonPath } from "@/domain/festival-routes";
 import { getEffectiveEntryRating } from "@/domain/rating";
 import { useI18n } from "@/i18n/context";
 
@@ -138,18 +138,26 @@ export function FestivalModeView({ userId, festival, entries }: FestivalModeView
         location={festival.location}
         activeTab="agenda"
         rightSlot={
-          <button
-            type="button"
-            aria-pressed={onlyMustSee}
-            onClick={() => setOnlyMustSee((prev) => !prev)}
-            className={`cursor-pointer border px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors ${
-              onlyMustSee
-                ? "border-acid bg-acid font-semibold text-acid-ink"
-                : "border-line text-ink-muted hover:border-ink hover:text-ink"
-            }`}
-          >
-            {onlyMustSee ? dict.festivalMode.mustSeeLabel : dict.festivalMode.allSetsLabel}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={festivalComparisonPath(festival, { tab: "agenda" })}
+              className="inline-flex border border-line px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] text-ink transition-colors hover:border-ink hover:bg-surface-elevated"
+            >
+              {dict.groupPlanning.openGroupAgendaLink}
+            </Link>
+            <button
+              type="button"
+              aria-pressed={onlyMustSee}
+              onClick={() => setOnlyMustSee((prev) => !prev)}
+              className={`cursor-pointer border px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.06em] transition-colors ${
+                onlyMustSee
+                  ? "border-acid bg-acid font-semibold text-acid-ink"
+                  : "border-line text-ink-muted hover:border-ink hover:text-ink"
+              }`}
+            >
+              {onlyMustSee ? dict.festivalMode.mustSeeLabel : dict.festivalMode.allSetsLabel}
+            </button>
+          </div>
         }
       />
 

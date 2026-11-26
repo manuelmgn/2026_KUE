@@ -4,12 +4,13 @@ import Link from "next/link";
 import {
   festivalAgendaPath,
   festivalCartelPath,
+  festivalComparisonPath,
   festivalEditPath,
   festivalHomePath,
 } from "@/domain/festival-routes";
 import { useI18n } from "@/i18n/context";
 
-export type FestivalSectionTab = "home" | "cartel" | "agenda" | "editar";
+export type FestivalSectionTab = "home" | "cartel" | "agenda" | "grupo" | "editar";
 
 interface FestivalHeaderNavProps {
   brandSlug: string;
@@ -40,6 +41,7 @@ export function FestivalHeaderNav({
     { id: "home", label: dict.nav.festivalHome, href: festivalHomePath(target) },
     { id: "cartel", label: dict.nav.lineup, href: festivalCartelPath(target) },
     { id: "agenda", label: dict.nav.festivalMode, href: festivalAgendaPath(target) },
+    { id: "grupo", label: dict.nav.groupPlanning, href: festivalComparisonPath(target) },
     { id: "editar", label: dict.nav.manage, href: festivalEditPath(target) },
   ];
 
@@ -77,7 +79,7 @@ export function FestivalHeaderNav({
         aria-label={dict.nav.festivalSectionsAria}
         className="sticky top-[var(--kue-sticky-top)] z-30 border-y border-line bg-surface"
       >
-        <div className="grid h-11 grid-cols-4 sm:flex sm:items-stretch">
+        <div className="grid h-11 grid-cols-5 sm:flex sm:items-stretch">
           {tabs.map((tab, idx) => {
             const isActive = tab.id === activeTab;
             return (
@@ -85,8 +87,8 @@ export function FestivalHeaderNav({
                 key={tab.id}
                 href={tab.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center justify-center whitespace-nowrap font-mono text-[0.72rem] uppercase tracking-[0.08em] transition-colors sm:border-r sm:border-line sm:px-6 ${
-                  idx < 3 ? "border-r border-line" : ""
+                className={`flex min-w-0 items-center justify-center truncate px-1 font-mono text-[0.64rem] uppercase tracking-[0.04em] transition-colors sm:border-r sm:border-line sm:px-6 sm:text-[0.72rem] sm:tracking-[0.08em] ${
+                  idx < tabs.length - 1 ? "border-r border-line" : ""
                 } ${
                   isActive
                     ? "bg-acid font-semibold text-acid-ink"
