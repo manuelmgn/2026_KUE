@@ -768,7 +768,11 @@ export function FestivalManageView({
 
       {/* TAB 4: Auto-sync lineup source */}
       {activeTab === "autosync" ? (
-        <FestivalAutoSyncPanel festival={festival} hasGeminiApiKey={hasGeminiApiKey} />
+        <FestivalAutoSyncPanel
+          festival={festival}
+          hasGeminiApiKey={hasGeminiApiKey}
+          isAdmin={isAdmin}
+        />
       ) : null}
     </main>
   );

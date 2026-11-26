@@ -17,6 +17,7 @@ import { useI18n } from "@/i18n/context";
 interface FestivalAutoSyncPanelProps {
   festival: FestivalEditDTO;
   hasGeminiApiKey: boolean;
+  isAdmin: boolean;
 }
 
 function normalizeIntervalOption(hours: number): "12" | "24" | "168" {
@@ -25,7 +26,11 @@ function normalizeIntervalOption(hours: number): "12" | "24" | "168" {
   return "168";
 }
 
-export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAutoSyncPanelProps) {
+export function FestivalAutoSyncPanel({
+  festival,
+  hasGeminiApiKey,
+  isAdmin,
+}: FestivalAutoSyncPanelProps) {
   const { dict, locale } = useI18n();
   const router = useRouter();
   const formId = useId();
@@ -90,6 +95,9 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
   };
 
   const handleCheckNow = async (force = false) => {
+    if (!isAdmin) {
+      return;
+    }
     setErrorMessage(null);
     setStatusMessage(null);
     setConfigSaved(false);
@@ -320,10 +328,16 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-          <span className="font-mono text-[0.7rem] uppercase tracking-[0.06em] text-ink-muted">
-            {t.lastCheckLabel} <strong className="text-ink">{formattedLastCheck}</strong>
-          </span>
+        <div
+          className={`flex flex-wrap items-center gap-3 border-t border-line pt-3 ${
+            isAdmin ? "justify-between" : "justify-end"
+          }`}
+        >
+          {isAdmin ? (
+            <span className="font-mono text-[0.7rem] uppercase tracking-[0.06em] text-ink-muted">
+              {t.lastCheckLabel} <strong className="text-ink">{formattedLastCheck}</strong>
+            </span>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
             <HairlineButton
@@ -335,24 +349,28 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
               {savingConfig ? dict.common.saving : t.saveConfig}
             </HairlineButton>
 
-            <HairlineButton
-              variant="acid"
-              size="sm"
-              disabled={checking || savingConfig || sourceUrl.trim().length === 0}
-              onClick={() => void handleCheckNow(false)}
-            >
-              {checking ? t.checking : t.checkNow}
-            </HairlineButton>
+            {isAdmin ? (
+              <>
+                <HairlineButton
+                  variant="acid"
+                  size="sm"
+                  disabled={checking || savingConfig || sourceUrl.trim().length === 0}
+                  onClick={() => void handleCheckNow(false)}
+                >
+                  {checking ? t.checking : t.checkNow}
+                </HairlineButton>
 
-            {lastCheckAt ? (
-              <HairlineButton
-                variant="ghost"
-                size="sm"
-                disabled={checking || savingConfig || sourceUrl.trim().length === 0}
-                onClick={() => void handleCheckNow(true)}
-              >
-                {t.forceCheck}
-              </HairlineButton>
+                {lastCheckAt ? (
+                  <HairlineButton
+                    variant="ghost"
+                    size="sm"
+                    disabled={checking || savingConfig || sourceUrl.trim().length === 0}
+                    onClick={() => void handleCheckNow(true)}
+                  >
+                    {t.forceCheck}
+                  </HairlineButton>
+                ) : null}
+              </>
             ) : null}
           </div>
         </div>
@@ -376,7 +394,7 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
         </p>
       ) : null}
 
-      {errorMessage || lastError ? (
+      {errorMessage || (isAdmin && lastError) ? (
         <p
           role="alert"
           className="border border-line-strong bg-surface px-3.5 py-2.5 font-mono text-xs text-ink"
@@ -397,11 +415,13 @@ export function FestivalAutoSyncPanel({ festival, hasGeminiApiKey }: FestivalAut
                 {t.pendingTitle}
               </h3>
               <p className="mt-0.5 font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted">
-                {pendingDiff.method} ·{" "}
-                {new Intl.DateTimeFormat(locale, {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                }).format(new Date(pendingDiff.checkedAt))}
+                {pendingDiff.method}
+                {isAdmin && pendingDiff.checkedAt
+                  ? ` · ${new Intl.DateTimeFormat(locale, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }).format(new Date(pendingDiff.checkedAt))}`
+                  : ""}
               </p>
             </div>
 

@@ -42,6 +42,7 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
     : null;
   const activeRaw = requestedEdition ?? resolveActiveFestival(myEditions, params.festival);
 
+  const isAdmin = user.role === "ADMIN";
   let activeEdit: FestivalEditDTO | null = null;
   let entries: ReturnType<typeof toLineupEntryDTO>[] = [];
 
@@ -55,6 +56,8 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
       listFestivalEntries(user.id, activeRaw.id),
       getEditionWithSiblingYears(activeRaw.id),
     ]);
+
+    const parsedPendingDiff = parsePendingLineupDiff(activeRaw.pendingLineupDiff);
 
     activeEdit = {
       id: activeRaw.id,
@@ -76,11 +79,14 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
       autoSyncEnabled: activeRaw.autoSyncEnabled,
       autoSyncMode: activeRaw.autoSyncMode,
       syncIntervalHours: activeRaw.syncIntervalHours,
-      lastLineupSyncAt: activeRaw.lastLineupSyncAt
-        ? activeRaw.lastLineupSyncAt.toISOString()
+      lastLineupSyncAt:
+        isAdmin && activeRaw.lastLineupSyncAt ? activeRaw.lastLineupSyncAt.toISOString() : null,
+      lastLineupSyncError: isAdmin ? activeRaw.lastLineupSyncError : null,
+      pendingLineupDiff: parsedPendingDiff
+        ? isAdmin
+          ? parsedPendingDiff
+          : { ...parsedPendingDiff, checkedAt: "" }
         : null,
-      lastLineupSyncError: activeRaw.lastLineupSyncError,
-      pendingLineupDiff: parsePendingLineupDiff(activeRaw.pendingLineupDiff),
       existingYears,
     };
     entries = rawEntries.map(toLineupEntryDTO);
@@ -104,7 +110,7 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
           festival={activeEdit}
           initialEntries={entries}
           hasGeminiApiKey={hasGeminiApiKey}
-          isAdmin={user.role === "ADMIN"}
+          isAdmin={isAdmin}
         />
       ) : (
         <EmptyState

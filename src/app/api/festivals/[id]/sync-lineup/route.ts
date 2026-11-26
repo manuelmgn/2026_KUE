@@ -13,6 +13,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
   }
+  if (user.role !== "ADMIN") {
+    return NextResponse.json(
+      { ok: false, error: "Forbidden" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const { id } = await context.params;
   if (!id) {

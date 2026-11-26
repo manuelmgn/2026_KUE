@@ -11,7 +11,7 @@ import type {
   UpdateFestivalSyncConfigInput,
 } from "@/domain/schemas";
 import { getServerDictionary } from "@/i18n/server";
-import { requireActionUser } from "@/server/auth/dal";
+import { requireActionAdmin, requireActionUser } from "@/server/auth/dal";
 import {
   addEditionToUserFestivals,
   createFestival,
@@ -174,7 +174,7 @@ export async function checkFestivalLineupAction(
 ): Promise<ActionResult<CheckFestivalLineupResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
+    await requireActionAdmin();
     const result = await checkFestivalLineupSync(festivalId, { force });
     revalidateFestivalViews();
     return result;

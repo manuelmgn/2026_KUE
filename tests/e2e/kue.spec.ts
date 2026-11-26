@@ -198,10 +198,47 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
     // Non-admin visiting /admin is redirected to /
     await secondPage.goto("/admin");
     await expect(secondPage).toHaveURL(/\/$/);
+
+    // Seed a lastLineupSyncAt on Rewire 2027 and verify sync visibility/trigger permissions
+    const dbSync = createTestDb();
+    let rewireEditionId: string;
+    try {
+      const updatedEdition = await dbSync.festivalEdition.update({
+        where: { slug: "rewire-2027" },
+        data: {
+          lineupSourceUrl: "https://www.rewirefestival.nl/lineup",
+          lastLineupSyncAt: new Date("2026-11-26T12:00:00.000Z"),
+        },
+      });
+      rewireEditionId = updatedEdition.id;
+    } finally {
+      await dbSync.$disconnect();
+    }
+
+    // Non-admin cannot see last sync timestamp or trigger/force sync (UI + API)
+    await secondPage.goto("/manage?festival=rewire-2027");
+    await secondPage.getByRole("tab", { name: /Auto-sync/i }).click();
+    await expect(secondPage.getByRole("button", { name: "Gardar configuración" })).toBeVisible();
+    await expect(secondPage.getByText(/Última comprobación:/i)).toBeHidden();
+    await expect(secondPage.getByRole("button", { name: "Comprobar agora" })).toBeHidden();
+    await expect(secondPage.getByRole("button", { name: "Forzar análise" })).toBeHidden();
+
+    const nonAdminSyncRes = await secondPage.request.post(
+      `/api/festivals/${rewireEditionId}/sync-lineup`,
+      { data: { force: true } },
+    );
+    expect(nonAdminSyncRes.status()).toBe(403);
     await secondContext.close();
 
-    // 6. Admin opens /admin and sees both users
+    // Admin can see last sync timestamp and sync trigger buttons
     await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/manage?festival=rewire-2027");
+    await page.getByRole("tab", { name: /Auto-sync/i }).click();
+    await expect(page.getByText(/Última comprobación:/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Comprobar agora" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Forzar análise" })).toBeVisible();
+
+    // 6. Admin opens /admin and sees both users
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "Administración" })).toBeVisible();
     await expect(page.getByText("@admin_kue")).toBeVisible();
