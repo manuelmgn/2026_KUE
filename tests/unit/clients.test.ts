@@ -9,6 +9,7 @@ import {
   searchMusicBrainzArtists,
   setMusicBrainzMinInterval,
 } from "@/server/clients/musicbrainz";
+import { searchPlaces } from "@/server/clients/places";
 import { fetchWikipediaBio } from "@/server/clients/wikipedia";
 
 const server = setupServer();
@@ -190,5 +191,55 @@ describe("server/clients (MSW)", () => {
 
     const bio = await fetchWikipediaBio("Barker");
     expect(bio).toContain("Sam Barker is a Berlin-based electronic musician");
+  });
+
+  it("fetches and normalizes places from Open-Meteo Geocoding API", async () => {
+    server.use(
+      http.get("https://geocoding-api.open-meteo.com/v1/search", ({ request }) => {
+        const name = new URL(request.url).searchParams.get("name");
+        if (name === "Nowhere") {
+          return HttpResponse.json({});
+        }
+        return HttpResponse.json({
+          results: [
+            {
+              id: 2747373,
+              name: "La Haya",
+              latitude: 52.07667,
+              longitude: 4.29861,
+              country_code: "nl",
+              country: "Países Bajos",
+              admin1: "Holanda Meridional",
+              admin2: "Gemeente Den Haag",
+            },
+          ],
+        });
+      }),
+    );
+
+    const places = await searchPlaces("La Haya");
+    expect(places).toEqual([
+      {
+        placeId: "2747373",
+        name: "La Haya",
+        province: "Gemeente Den Haag",
+        region: "Holanda Meridional",
+        country: "Países Bajos",
+        countryCode: "NL",
+        latitude: 52.07667,
+        longitude: 4.29861,
+      },
+    ]);
+
+    expect(await searchPlaces("Nowhere")).toEqual([]);
+    expect(await searchPlaces("a")).toEqual([]);
+
+    server.use(
+      http.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        () => new HttpResponse(null, { status: 503 }),
+      ),
+    );
+    await expect(searchPlaces("Madrid")).rejects.toBeInstanceOf(ExternalApiError);
   });
 });

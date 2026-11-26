@@ -20,20 +20,41 @@ describe("domain/schemas", () => {
     expect(nullableRatingSchema.safeParse(null).success).toBe(true);
   });
 
-  it("validates festival creation inputs", () => {
+  it("validates festival creation inputs with location metadata and dates", () => {
     const valid = createFestivalSchema.safeParse({
       name: "  Rewire 2027  ",
       year: "2027",
       location: "La Haya",
+      locationProvince: "Gemeente Den Haag",
+      locationRegion: "Holanda Meridional",
+      locationCountry: "Países Bajos",
+      locationCountryCode: "NL",
+      locationLatitude: 52.07667,
+      locationLongitude: 4.29861,
+      locationPlaceId: "2747373",
+      startDate: "2027-04-08",
+      endDate: "2027-04-11",
     });
     expect(valid.success).toBe(true);
     if (valid.success) {
       expect(valid.data.name).toBe("Rewire 2027");
       expect(valid.data.year).toBe(2027);
+      expect(valid.data.locationRegion).toBe("Holanda Meridional");
+      expect(valid.data.locationCountryCode).toBe("NL");
+      expect(valid.data.startDate?.toISOString().slice(0, 10)).toBe("2027-04-08");
+      expect(valid.data.endDate?.toISOString().slice(0, 10)).toBe("2027-04-11");
     }
 
     expect(createFestivalSchema.safeParse({ name: "", year: 2027 }).success).toBe(false);
     expect(createFestivalSchema.safeParse({ name: "Rewire", year: 1800 }).success).toBe(false);
+    expect(
+      createFestivalSchema.safeParse({
+        name: "Rewire",
+        year: 2027,
+        startDate: "2027-04-11",
+        endDate: "2027-04-08",
+      }).success,
+    ).toBe(false);
   });
 
   it("validates album custom URLs and rejects javascript: or invalid schemes", () => {

@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createFestivalAction } from "@/actions/festival-actions";
 import { importLineupAction } from "@/actions/import-actions";
+import { PlaceAutocomplete } from "@/components/features/PlaceAutocomplete";
 import type { FestivalSummary } from "@/components/features/types";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { parseRawLineup } from "@/domain/lineup-parser";
+import type { PlaceCandidate } from "@/domain/schemas";
 
 interface RawImporterProps {
   festivals: FestivalSummary[];
@@ -25,18 +27,24 @@ interface EditableRow {
 }
 
 export function RawImporter({ festivals: initialFestivals, initialFestivalId }: RawImporterProps) {
+  const formId = useId();
   const [festivals, setFestivals] = useState<FestivalSummary[]>(initialFestivals);
   const [selectedFestivalId, setSelectedFestivalId] = useState<string>(
     initialFestivalId ?? initialFestivals[0]?.id ?? "",
   );
   const [showNewFestival, setShowNewFestival] = useState(initialFestivals.length === 0);
-  const [newFestName, setNewFestName] = useState("Rewire");
-  const [newFestYear, setNewFestYear] = useState("2027");
-  const [newFestLocation, setNewFestLocation] = useState("La Haya · 8–11 abril 2027");
+  const [newFestName, setNewFestName] = useState("");
+  const [newFestYear, setNewFestYear] = useState(String(new Date().getFullYear()));
+  const [newFestLocationQuery, setNewFestLocationQuery] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<PlaceCandidate | null>(null);
+  const [locationInvalid, setLocationInvalid] = useState(false);
+  const [newFestStartDate, setNewFestStartDate] = useState("");
+  const [newFestEndDate, setNewFestEndDate] = useState("");
   const [creatingFestival, setCreatingFestival] = useState(false);
 
   const [rawText, setRawText] = useState("");
   const [rows, setRows] = useState<EditableRow[]>([]);
+  const [showScheduleColumns, setShowScheduleColumns] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultSummary, setResultSummary] = useState<{
@@ -45,14 +53,46 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
     festivalSlug: string;
   } | null>(null);
 
+  const handleStartDateChange = (nextStartDate: string) => {
+    setNewFestStartDate(nextStartDate);
+    const yearMatch = nextStartDate.match(/^(\d{4})-/);
+    if (yearMatch?.[1]) {
+      setNewFestYear(yearMatch[1]);
+    }
+    if (newFestEndDate && nextStartDate && newFestEndDate < nextStartDate) {
+      setNewFestEndDate("");
+    }
+  };
+
   const handleCreateFestival = async () => {
-    setCreatingFestival(true);
     setError(null);
+
+    if (newFestLocationQuery.trim().length > 0 && !selectedPlace) {
+      setLocationInvalid(true);
+      setError("Selecciona una ubicación de la lista de resultados o deja el campo vacío.");
+      return;
+    }
+
+    if (newFestStartDate && newFestEndDate && newFestEndDate < newFestStartDate) {
+      setError("La fecha de fin no puede ser anterior a la de inicio.");
+      return;
+    }
+
+    setCreatingFestival(true);
     try {
       const res = await createFestivalAction({
         name: newFestName,
         year: Number(newFestYear),
-        location: newFestLocation || undefined,
+        location: selectedPlace ? selectedPlace.name : undefined,
+        locationProvince: selectedPlace?.province ?? null,
+        locationRegion: selectedPlace?.region ?? null,
+        locationCountry: selectedPlace?.country ?? null,
+        locationCountryCode: selectedPlace?.countryCode ?? null,
+        locationLatitude: selectedPlace?.latitude ?? null,
+        locationLongitude: selectedPlace?.longitude ?? null,
+        locationPlaceId: selectedPlace?.placeId ?? null,
+        startDate: newFestStartDate ? new Date(`${newFestStartDate}T00:00:00.000Z`) : undefined,
+        endDate: newFestEndDate ? new Date(`${newFestEndDate}T00:00:00.000Z`) : undefined,
       });
       if (!res.ok) {
         setError(res.error);
@@ -61,6 +101,12 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       setFestivals((prev) => [res.data, ...prev]);
       setSelectedFestivalId(res.data.id);
       setShowNewFestival(false);
+      setNewFestName("");
+      setNewFestLocationQuery("");
+      setSelectedPlace(null);
+      setLocationInvalid(false);
+      setNewFestStartDate("");
+      setNewFestEndDate("");
     } finally {
       setCreatingFestival(false);
     }
@@ -103,9 +149,9 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
           .map((s) => s.trim())
           .filter(Boolean),
         subtitle: row.subtitle.trim() || null,
-        day: row.day.trim() || null,
-        stage: row.stage.trim() || null,
-        setTime: row.setTime.trim() || null,
+        day: showScheduleColumns ? row.day.trim() || null : null,
+        stage: showScheduleColumns ? row.stage.trim() || null : null,
+        setTime: showScheduleColumns ? row.setTime.trim() || null : null,
         included: true,
       }))
       .filter((row) => row.artistNames.length > 0);
@@ -134,6 +180,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       });
       setRows([]);
       setRawText("");
+      setShowScheduleColumns(false);
     } finally {
       setSubmitting(false);
     }
@@ -149,8 +196,8 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             Importador en bruto
           </h1>
           <p className="mt-2 font-serif text-[1.25rem] italic text-ink-muted">
-            Pega un anuncio o tabla de cartel. Separa colaboraciones, subtítulos, días y escenarios
-            sin APIs de pago.
+            Pega la lista de artistas del cartel. Separa colaboraciones y subtítulos al instante;
+            días y escenarios se pueden añadir opcionalmente después.
           </p>
         </div>
 
@@ -170,6 +217,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
             </select>
           ) : null}
           <HairlineButton
+            type="button"
             variant={showNewFestival ? "inverted" : "default"}
             size="md"
             onClick={() => setShowNewFestival((prev) => !prev)}
@@ -182,36 +230,113 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
 
       {showNewFestival ? (
         <form
+          aria-label="Crear nuevo festival"
           onSubmit={(event) => {
             event.preventDefault();
             void handleCreateFestival();
           }}
-          className="grid grid-cols-1 gap-3 border border-line bg-surface p-4 sm:grid-cols-[2fr_100px_2fr_auto]"
+          className="grid grid-cols-1 gap-4 border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[2fr_100px_2fr_1fr_1fr_auto] lg:items-end"
         >
-          <input
-            type="text"
-            value={newFestName}
-            onChange={(event) => setNewFestName(event.target.value)}
-            placeholder="Nombre (ej. Rewire)"
-            aria-label="Nombre del festival"
-            className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus:border-acid"
-          />
-          <input
-            type="number"
-            value={newFestYear}
-            onChange={(event) => setNewFestYear(event.target.value)}
-            placeholder="Año"
-            aria-label="Año del festival"
-            className="border border-line bg-bg px-3 py-2 font-mono text-sm text-ink outline-none focus:border-acid"
-          />
-          <input
-            type="text"
-            value={newFestLocation}
-            onChange={(event) => setNewFestLocation(event.target.value)}
-            placeholder="Ubicación / fechas"
-            aria-label="Ubicación del festival"
-            className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus:border-acid"
-          />
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${formId}-name`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              Nombre del festival
+            </label>
+            <input
+              id={`${formId}-name`}
+              name="name"
+              type="text"
+              required
+              value={newFestName}
+              onChange={(event) => setNewFestName(event.target.value)}
+              placeholder="ej. Rewire"
+              className="border border-line bg-bg px-3 py-2 font-sans text-sm text-ink outline-none focus-visible:border-acid"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${formId}-year`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              Año del festival
+            </label>
+            <input
+              id={`${formId}-year`}
+              name="year"
+              type="number"
+              min={1950}
+              max={2100}
+              required
+              value={newFestYear}
+              onChange={(event) => setNewFestYear(event.target.value)}
+              placeholder="2027"
+              className="border border-line bg-bg px-3 py-2 font-mono text-sm text-ink outline-none focus-visible:border-acid"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${formId}-location`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              Ubicación del festival
+            </label>
+            <PlaceAutocomplete
+              id={`${formId}-location`}
+              value={newFestLocationQuery}
+              selectedPlace={selectedPlace}
+              onInputChange={(next) => {
+                setNewFestLocationQuery(next);
+                if (locationInvalid) {
+                  setLocationInvalid(false);
+                }
+              }}
+              onSelectPlace={(place) => {
+                setSelectedPlace(place);
+                setLocationInvalid(false);
+              }}
+              invalid={locationInvalid}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${formId}-start-date`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              Fecha de inicio
+            </label>
+            <input
+              id={`${formId}-start-date`}
+              name="startDate"
+              type="date"
+              value={newFestStartDate}
+              onChange={(event) => handleStartDateChange(event.target.value)}
+              className="border border-line bg-bg px-3 py-2 font-mono text-sm text-ink outline-none focus-visible:border-acid"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${formId}-end-date`}
+              className="font-mono text-[0.68rem] uppercase tracking-[0.06em] text-ink-muted"
+            >
+              Fecha de fin
+            </label>
+            <input
+              id={`${formId}-end-date`}
+              name="endDate"
+              type="date"
+              min={newFestStartDate || undefined}
+              value={newFestEndDate}
+              onChange={(event) => setNewFestEndDate(event.target.value)}
+              className="border border-line bg-bg px-3 py-2 font-mono text-sm text-ink outline-none focus-visible:border-acid"
+            />
+          </div>
+
           <HairlineButton type="submit" variant="acid" size="md" disabled={creatingFestival}>
             {creatingFestival ? "Creando..." : "Crear"}
           </HairlineButton>
@@ -219,18 +344,26 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       ) : null}
 
       <section className="flex flex-col gap-3">
+        <label
+          htmlFor={`${formId}-raw-lineup`}
+          className="font-mono text-[0.72rem] uppercase tracking-[0.06em] text-ink-muted"
+        >
+          Texto del cartel en bruto
+        </label>
         <textarea
+          id={`${formId}-raw-lineup`}
+          name="rawLineup"
           value={rawText}
           onChange={(event) => setRawText(event.target.value)}
           placeholder={
-            "Tim Hecker & Vincent de Belleval | Viernes 09 | Grote Kerk\nWilliam Basinski 'Passing the Cup of Sorrows' | Sábado 10 | Amare\nBIG|BRAVE | Sábado 10 | PAARD"
+            "Tim Hecker & Vincent de Belleval\nWilliam Basinski 'Passing the Cup of Sorrows'\nBIG|BRAVE · Mabe Fratti & Bill Orcutt · Sarah Davachi 'The Will of Tongues'"
           }
-          aria-label="Texto del cartel en bruto"
           className="min-h-[190px] w-full resize-y border border-line bg-surface p-4 font-mono text-[0.82rem] leading-relaxed text-ink placeholder:text-ink-muted focus:border-acid focus:outline-none"
         />
 
         <div className="flex flex-wrap items-center gap-3">
           <HairlineButton
+            type="button"
             variant="acid"
             size="md"
             disabled={rawText.trim().length === 0}
@@ -253,7 +386,10 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
       ) : null}
 
       {resultSummary ? (
-        <div className="flex flex-wrap items-center justify-between gap-4 border border-acid bg-surface p-4">
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-4 border border-acid bg-surface p-4"
+        >
           <div className="font-mono text-xs uppercase">
             Importadas {resultSummary.createdEntriesCount} entradas ({resultSummary.newArtistsCount}{" "}
             artistas nuevos en cola de enriquecimiento).
@@ -273,6 +409,22 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
 
       {rows.length > 0 ? (
         <section className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label
+              htmlFor={`${formId}-schedule-toggle`}
+              className="inline-flex cursor-pointer items-center gap-2 font-mono text-xs uppercase tracking-[0.05em] text-ink-muted hover:text-ink"
+            >
+              <input
+                id={`${formId}-schedule-toggle`}
+                type="checkbox"
+                checked={showScheduleColumns}
+                onChange={(event) => setShowScheduleColumns(event.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-acid"
+              />
+              <span>Añadir días y escenarios ahora (opcional)</span>
+            </label>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -281,8 +433,13 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                   <th className="border border-line p-2.5 text-left">Nombre en cartel</th>
                   <th className="border border-line p-2.5 text-left">Artistas a vincular</th>
                   <th className="border border-line p-2.5 text-left">Subtítulo</th>
-                  <th className="border border-line p-2.5 text-left">Día</th>
-                  <th className="border border-line p-2.5 text-left">Escenario</th>
+                  {showScheduleColumns ? (
+                    <>
+                      <th className="border border-line p-2.5 text-left">Día</th>
+                      <th className="border border-line p-2.5 text-left">Escenario</th>
+                      <th className="border border-line p-2.5 text-left">Hora</th>
+                    </>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -300,6 +457,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
+                        aria-label={`Nombre en cartel fila ${idx + 1}`}
                         value={row.billingName}
                         onChange={(event) => updateRow(idx, { billingName: event.target.value })}
                         className="w-full bg-transparent px-1.5 py-1 font-sans font-semibold text-ink outline-none focus:bg-surface"
@@ -308,6 +466,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
+                        aria-label={`Artistas a vincular fila ${idx + 1}`}
                         value={row.artistsCsv}
                         onChange={(event) => updateRow(idx, { artistsCsv: event.target.value })}
                         className="w-full bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
@@ -316,30 +475,47 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
                     <td className="border border-line p-1.5">
                       <input
                         type="text"
+                        aria-label={`Subtítulo fila ${idx + 1}`}
                         value={row.subtitle}
                         onChange={(event) => updateRow(idx, { subtitle: event.target.value })}
                         placeholder="—"
                         className="w-full bg-transparent px-1.5 py-1 font-serif text-base italic text-ink outline-none focus:bg-surface"
                       />
                     </td>
-                    <td className="border border-line p-1.5">
-                      <input
-                        type="text"
-                        value={row.day}
-                        onChange={(event) => updateRow(idx, { day: event.target.value })}
-                        placeholder="—"
-                        className="w-28 bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
-                      />
-                    </td>
-                    <td className="border border-line p-1.5">
-                      <input
-                        type="text"
-                        value={row.stage}
-                        onChange={(event) => updateRow(idx, { stage: event.target.value })}
-                        placeholder="—"
-                        className="w-28 bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
-                      />
-                    </td>
+                    {showScheduleColumns ? (
+                      <>
+                        <td className="border border-line p-1.5">
+                          <input
+                            type="text"
+                            aria-label={`Día fila ${idx + 1}`}
+                            value={row.day}
+                            onChange={(event) => updateRow(idx, { day: event.target.value })}
+                            placeholder="—"
+                            className="w-28 bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
+                          />
+                        </td>
+                        <td className="border border-line p-1.5">
+                          <input
+                            type="text"
+                            aria-label={`Escenario fila ${idx + 1}`}
+                            value={row.stage}
+                            onChange={(event) => updateRow(idx, { stage: event.target.value })}
+                            placeholder="—"
+                            className="w-28 bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
+                          />
+                        </td>
+                        <td className="border border-line p-1.5">
+                          <input
+                            type="text"
+                            aria-label={`Hora fila ${idx + 1}`}
+                            value={row.setTime}
+                            onChange={(event) => updateRow(idx, { setTime: event.target.value })}
+                            placeholder="—"
+                            className="w-20 bg-transparent px-1.5 py-1 font-mono text-xs text-ink outline-none focus:bg-surface"
+                          />
+                        </td>
+                      </>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -348,6 +524,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
 
           <div className="flex justify-end">
             <HairlineButton
+              type="button"
               variant="acid"
               size="md"
               disabled={submitting || includedCount === 0}

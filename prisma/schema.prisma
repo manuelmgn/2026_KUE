@@ -76,15 +76,22 @@ model Album {
 }
 
 model Festival {
-  id        String          @id @default(cuid())
-  slug      String          @unique
-  name      String
-  year      Int
-  location  String?
-  startDate DateTime?
-  endDate   DateTime?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id                  String          @id @default(cuid())
+  slug                String          @unique
+  name                String
+  year                Int
+  location            String?
+  locationProvince    String?
+  locationRegion      String?
+  locationCountry     String?
+  locationCountryCode String?
+  locationLatitude    Float?
+  locationLongitude   Float?
+  locationPlaceId     String?
+  startDate           DateTime?
+  endDate             DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   entries FestivalEntry[]
 

@@ -14,12 +14,36 @@ test.describe("KUE E2E flows", () => {
   test("imports raw lineup with collaboration & subtitle, edits preview, triages by keyboard, switches collab & pins album, and uses Festival Mode on mobile", async ({
     page,
   }) => {
-    // 1. Import raw text, create festival, edit a row in preview, and save
+    // 1. Import raw text, create festival via Places API + date pickers, verify artists-only preview, toggle schedule, and save
+    await page.route("**/api/places*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          places: [
+            {
+              placeId: "2747373",
+              name: "La Haya",
+              province: "Gemeente Den Haag",
+              region: "Holanda Meridional",
+              country: "Países Bajos",
+              countryCode: "NL",
+              latitude: 52.07667,
+              longitude: 4.29861,
+            },
+          ],
+        }),
+      });
+    });
+
     await page.goto("/import");
 
     await page.getByLabel("Nombre del festival").fill("Rewire");
-    await page.getByLabel("Año del festival").fill("2027");
-    await page.getByLabel("Ubicación del festival").fill("La Haya · 8–11 abril 2027");
+    await page.getByLabel("Ubicación del festival").fill("La Haya");
+    await page.getByRole("option", { name: /La Haya/i }).click();
+    await page.getByLabel("Fecha de inicio").fill("2027-04-08");
+    await page.getByLabel("Fecha de fin").fill("2027-04-11");
+    await expect(page.getByLabel("Año del festival")).toHaveValue("2027");
     await page.getByRole("button", { name: "Crear" }).click();
 
     await expect(page.getByLabel("Festival de destino")).toBeVisible();
@@ -33,17 +57,31 @@ test.describe("KUE E2E flows", () => {
     await page.getByLabel("Texto del cartel en bruto").fill(rawLineup);
     await page.getByRole("button", { name: /Analizar texto/i }).click();
 
-    // Verify parsed preview rows and edit stage on BIG|BRAVE row
+    // Verify preview shows only artists initially (no Día / Escenario columns until toggled)
     await expect(page.locator("tbody tr")).toHaveCount(3);
-    const thirdRowStage = page.locator("tbody tr").nth(2).locator("input").nth(5);
-    await thirdRowStage.fill("PAARD Main");
+    await expect(page.locator("thead th")).toHaveCount(4);
+    await expect(page.getByRole("columnheader", { name: "Escenario" })).toBeHidden();
+
+    // Optionally reveal schedule columns and edit stage on BIG|BRAVE row
+    await page.getByLabel(/Añadir días y escenarios ahora/i).check();
+    await expect(page.getByRole("columnheader", { name: "Escenario" })).toBeVisible();
+    await page.getByLabel("Escenario fila 3").fill("PAARD Main");
 
     await page.getByRole("button", { name: /Importar 3 entradas/i }).click();
     await expect(page.getByText(/Importadas 3 entradas/i)).toBeVisible();
 
-    // Seed two albums for Mabe Fratti so we can deterministically test discography pinning
+    // Verify location metadata and dates were persisted in DB, and seed two albums for Mabe Fratti
     const db = createTestDb();
     try {
+      const festival = await db.festival.findUniqueOrThrow({ where: { slug: "rewire-2027" } });
+      expect(festival.location).toBe("La Haya");
+      expect(festival.locationProvince).toBe("Gemeente Den Haag");
+      expect(festival.locationRegion).toBe("Holanda Meridional");
+      expect(festival.locationCountry).toBe("Países Bajos");
+      expect(festival.locationCountryCode).toBe("NL");
+      expect(festival.startDate?.toISOString().slice(0, 10)).toBe("2027-04-08");
+      expect(festival.endDate?.toISOString().slice(0, 10)).toBe("2027-04-11");
+
       const mabe = await db.artist.findFirstOrThrow({
         where: { normalizedName: "mabe fratti" },
       });

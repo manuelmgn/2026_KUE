@@ -34,6 +34,13 @@ export const createFestivalSchema = z
       .min(1950, "El año debe estar entre 1950 y 2100")
       .max(2100, "El año debe estar entre 1950 y 2100"),
     location: z.string().trim().max(120).optional(),
+    locationProvince: z.string().trim().max(120).nullable().optional(),
+    locationRegion: z.string().trim().max(120).nullable().optional(),
+    locationCountry: z.string().trim().max(120).nullable().optional(),
+    locationCountryCode: z.string().trim().max(10).nullable().optional(),
+    locationLatitude: z.number().min(-90).max(90).nullable().optional(),
+    locationLongitude: z.number().min(-180).max(180).nullable().optional(),
+    locationPlaceId: z.string().trim().max(64).nullable().optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
   })
@@ -191,3 +198,30 @@ export const wikipediaSummaryResponseSchema = z.object({
   type: z.string().optional(),
   extract: z.string().optional(),
 });
+
+export const openMeteoGeocodingItemSchema = z.object({
+  id: z.number(),
+  name: z.string().min(1),
+  latitude: z.number(),
+  longitude: z.number(),
+  country_code: z.string().optional(),
+  country: z.string().optional(),
+  admin1: z.string().optional(),
+  admin2: z.string().optional(),
+});
+
+export const openMeteoGeocodingResponseSchema = z.object({
+  results: z.array(openMeteoGeocodingItemSchema).default([]),
+});
+
+export const placeCandidateSchema = z.object({
+  placeId: z.string().min(1),
+  name: z.string().min(1),
+  province: z.string().nullable(),
+  region: z.string().nullable(),
+  country: z.string().nullable(),
+  countryCode: z.string().nullable(),
+  latitude: z.number(),
+  longitude: z.number(),
+});
+export type PlaceCandidate = z.infer<typeof placeCandidateSchema>;

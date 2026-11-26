@@ -18,6 +18,7 @@ import {
 import { listFestivalEntries, updateEntrySchedule } from "@/server/services/entries";
 import { createFestival } from "@/server/services/festivals";
 import { importFestivalLineup } from "@/server/services/importer";
+import { toFestivalSummary } from "@/server/services/mappers";
 
 let tempDir = "";
 let db: PrismaClient;
@@ -53,6 +54,46 @@ afterAll(async () => {
 });
 
 describe("integration: services against real database", () => {
+  it("persists structured location metadata and dates on Festival without exposing extra fields in summary", async () => {
+    const rewire = await createFestival(
+      {
+        name: "Rewire",
+        year: 2027,
+        location: "La Haya",
+        locationProvince: "Gemeente Den Haag",
+        locationRegion: "Holanda Meridional",
+        locationCountry: "Países Bajos",
+        locationCountryCode: "NL",
+        locationLatitude: 52.07667,
+        locationLongitude: 4.29861,
+        locationPlaceId: "2747373",
+        startDate: new Date("2027-04-08T00:00:00.000Z"),
+        endDate: new Date("2027-04-11T00:00:00.000Z"),
+      },
+      db,
+    );
+
+    expect(rewire.location).toBe("La Haya");
+    expect(rewire.locationProvince).toBe("Gemeente Den Haag");
+    expect(rewire.locationRegion).toBe("Holanda Meridional");
+    expect(rewire.locationCountry).toBe("Países Bajos");
+    expect(rewire.locationCountryCode).toBe("NL");
+    expect(rewire.locationLatitude).toBeCloseTo(52.07667);
+    expect(rewire.locationLongitude).toBeCloseTo(4.29861);
+    expect(rewire.locationPlaceId).toBe("2747373");
+    expect(rewire.startDate?.toISOString().slice(0, 10)).toBe("2027-04-08");
+    expect(rewire.endDate?.toISOString().slice(0, 10)).toBe("2027-04-11");
+
+    const summary = toFestivalSummary(rewire);
+    expect(summary).toEqual({
+      id: rewire.id,
+      slug: "rewire-2027",
+      name: "Rewire",
+      year: 2027,
+      location: "La Haya",
+    });
+  });
+
   it("deduplicates artists across multiple festivals and builds cross-festival history", async () => {
     const rewire = await createFestival({ name: "Rewire", year: 2027, location: "La Haya" }, db);
     const unsound = await createFestival({ name: "Unsound", year: 2026, location: "Cracovia" }, db);
