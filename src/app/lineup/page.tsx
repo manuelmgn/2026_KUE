@@ -36,10 +36,11 @@ export default async function LineupPage({ searchParams }: LineupPageProps) {
   ]);
 
   const festivalSummaries = myEditions.map(toFestivalSummary);
-  let activeFestivalRaw = resolveActiveFestival(myEditions, params.festival);
-  if (!activeFestivalRaw && params.festival) {
-    activeFestivalRaw = await getEditionBySlug(params.festival);
-  }
+  const requestedEdition = params.festival
+    ? (myEditions.find((ed) => ed.slug === params.festival) ??
+      (await getEditionBySlug(params.festival)))
+    : null;
+  const activeFestivalRaw = requestedEdition ?? resolveActiveFestival(myEditions, params.festival);
   const activeFestival = activeFestivalRaw
     ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
     : null;

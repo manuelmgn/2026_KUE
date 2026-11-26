@@ -29,10 +29,11 @@ export default async function FestivalModePage({ searchParams }: FestivalModePag
   ]);
 
   const summaries = editions.map(toFestivalSummary);
-  let activeFestivalRaw = resolveActiveFestival(editions, params.festival);
-  if (!activeFestivalRaw && params.festival) {
-    activeFestivalRaw = await getEditionBySlug(params.festival);
-  }
+  const requestedEdition = params.festival
+    ? (editions.find((ed) => ed.slug === params.festival) ??
+      (await getEditionBySlug(params.festival)))
+    : null;
+  const activeFestivalRaw = requestedEdition ?? resolveActiveFestival(editions, params.festival);
   const activeFestival = activeFestivalRaw
     ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
     : null;

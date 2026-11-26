@@ -36,10 +36,11 @@ export default async function ManagePage({ searchParams }: ManagePageProps) {
   ]);
 
   const summaries = myEditions.map(toFestivalSummary);
-  let activeRaw = resolveActiveFestival(myEditions, params.festival);
-  if (!activeRaw && params.festival) {
-    activeRaw = await getEditionBySlug(params.festival);
-  }
+  const requestedEdition = params.festival
+    ? (myEditions.find((ed) => ed.slug === params.festival) ??
+      (await getEditionBySlug(params.festival)))
+    : null;
+  const activeRaw = requestedEdition ?? resolveActiveFestival(myEditions, params.festival);
 
   let activeEdit: FestivalEditDTO | null = null;
   let entries: ReturnType<typeof toLineupEntryDTO>[] = [];
