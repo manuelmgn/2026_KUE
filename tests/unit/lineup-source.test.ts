@@ -3,6 +3,8 @@ import {
   extractEmbeddedScriptDataText,
   extractLineupFromClashfinderJson,
   extractLineupFromEmbeddedJson,
+  extractLineupFromHtmlStructure,
+  extractLineupFromIcal,
   extractLineupFromJsonLd,
   fetchAndExtractFestivalLineup,
   getClashfinderJsonUrl,
@@ -385,5 +387,126 @@ describe("lineup-source", () => {
     );
     expect(result.method).toBe("embedded-json");
     expect(result.entries).toHaveLength(3);
+  });
+
+  it("extracts iCalendar (.ics) feeds deterministically without AI", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "SUMMARY:Tim Hecker (live AV)",
+      "DTSTART:20270409T213000Z",
+      "LOCATION:Amare",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "SUMMARY:Mabe Fratti &",
+      "  Bill Orcutt",
+      "DTSTART:20270410T200000Z",
+      "LOCATION:Paard",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const parsed = extractLineupFromIcal(ics);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0]).toMatchObject({
+      billingName: "Tim Hecker (live AV)",
+      day: "2027-04-09",
+      setTime: "21:30",
+      stage: "Amare",
+    });
+    expect(parsed[1]).toMatchObject({
+      billingName: "Mabe Fratti & Bill Orcutt",
+      artistNames: ["Mabe Fratti", "Bill Orcutt"],
+      day: "2027-04-10",
+      setTime: "20:00",
+      stage: "Paard",
+    });
+
+    const result = await fetchAndExtractFestivalLineup("https://example.com/schedule.ics", {
+      festivalName: "Rewire",
+      festivalYear: 2027,
+      fetchImpl: async () =>
+        new Response(ics, { status: 200, headers: { "content-type": "text/calendar" } }),
+    });
+    expect(result.method).toBe("ical");
+    expect(result.entries).toHaveLength(2);
+  });
+
+  it("extracts Vue/Nuxt embedded lineups and HTML artist cards deterministically without calling Gemini", async () => {
+    const vueHtml = `
+      <html>
+        <body><nav>Home Artists</nav></body>
+        <script>
+          var vueJsData = {
+            "artist": {
+              "i1": {
+                "items": [
+                  { "title": "*07", "subtitle": "Music" },
+                  { "title": "96 Back", "subtitle": "Music" },
+                  { "title": "ABADIR", "subtitle": "Live AV" },
+                  { "title": "Panel Talk", "subtitle": "Discourse" }
+                ]
+              }
+            }
+          };
+        </script>
+      </html>
+    `;
+    const vueEntries = extractLineupFromEmbeddedJson(vueHtml);
+    expect(vueEntries.map((e) => e.billingName)).toEqual(["*07", "96 Back", "ABADIR"]);
+
+    const nuxtHtml = `
+      <html><body><p>no results</p></body>
+      <script>
+        window.__NUXT__=(function(a,b,c){return {data:[{lineup:[
+          {artist:{uid:"aaron-dilloway",data:{date_tag:a,title:"Aaron Dilloway"}}},
+          {artist:{uid:"film-krakatoa",data:{date_tag:b,title:"Krakatoa"}}},
+          {artist:{uid:"acopia",data:{date_tag:b,title:"Acopia"}}}
+        ]}]}}("Fri 10 April","Sat 11 April","unused"));
+      </script></html>
+    `;
+    const nuxtEntries = extractLineupFromEmbeddedJson(nuxtHtml);
+    expect(nuxtEntries.map((e) => e.billingName)).toEqual(["Aaron Dilloway", "Acopia"]);
+    expect(nuxtEntries[0]?.day).toBe("Fri 10 April");
+
+    const artistCardsHtml = `
+      <html>
+        <body>
+          <nav><a href="/en/2026/artists/nav-link">Nav</a></nav>
+          <main>
+            <a href="/en/2026/artists/k-means"><span>Music</span><p>K Means</p></a>
+            <a href="/en/2026/artists/2k88"><span>Music</span><p>2K88</p></a>
+            <a href="/en/2026/artists/actress"><span>Music</span><p>Actress</p></a>
+            <a href="/en/2026/artists/arca"><span>Music</span><p>Arca</p></a>
+            <a href="/en/2026/artists/beatrice-m"><span>Music</span><p>Beatrice M</p></a>
+            <a href="/en/2026/artists/panel-speaker"><span>Discourse</span><p>Panel Speaker</p></a>
+          </main>
+        </body>
+      </html>
+    `;
+    const htmlEntries = extractLineupFromHtmlStructure(
+      artistCardsHtml,
+      "https://www.unsound.pl/en/2026/artists",
+    );
+    expect(htmlEntries.map((e) => e.billingName)).toEqual([
+      "K Means",
+      "2K88",
+      "Actress",
+      "Arca",
+      "Beatrice M",
+    ]);
+
+    const llmExtractor = vi.fn();
+    const res = await fetchAndExtractFestivalLineup("https://www.unsound.pl/en/2026/artists", {
+      festivalName: "Unsound",
+      festivalYear: 2026,
+      fetchImpl: async () =>
+        new Response(artistCardsHtml, { status: 200, headers: { "content-type": "text/html" } }),
+      llmExtractor,
+    });
+    expect(res.method).toBe("html-structured");
+    expect(res.entries).toHaveLength(5);
+    expect(llmExtractor).not.toHaveBeenCalled();
   });
 });

@@ -30,7 +30,14 @@ export interface LineupDiffMissingEntry {
 export interface PendingLineupDiff {
   checkedAt: string;
   sourceUrl: string;
-  method: "clashfinder" | "json-ld" | "embedded-json" | "plain-text" | "gemini";
+  method:
+    | "clashfinder"
+    | "ical"
+    | "json-ld"
+    | "embedded-json"
+    | "html-structured"
+    | "plain-text"
+    | "gemini";
   added: ParsedLineupEntry[];
   updated: LineupDiffUpdatedEntry[];
   missing: LineupDiffMissingEntry[];

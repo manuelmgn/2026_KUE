@@ -15,8 +15,10 @@ const LINEUP_FETCH_USER_AGENT =
 
 export type LineupExtractionMethod =
   | "clashfinder"
+  | "ical"
   | "json-ld"
   | "embedded-json"
+  | "html-structured"
   | "plain-text"
   | "gemini";
 
@@ -731,10 +733,108 @@ function splitBlockDayAndStage(label: string | null): { day: string | null; stag
   return { day: label, stage: null };
 }
 
+const NON_MUSIC_CATEGORY_REGEX =
+  /^(?:discourse|talk|talks|film|films|cinema|workshop|workshops|exhibition|exhibitions|lecture|lectures|panel|panels|conversa|conversas|masterclass|masterclasses|instala[cç][aã]o|installation|installations|audio\s*walk|listening\s*session|screening|conference|symposium|keynote|debate|podcast|reading|theatre|theater|dance)$/i;
+
+const GENERIC_MUSIC_LABEL_REGEX = /^(?:music|m[uú]sica|concert|concerto|live|dj|club|show|act)$/i;
+
+const LINEUP_CONTAINER_KEY_REGEX =
+  /^(?:artist|artists|lineup|line_up|line-up|acts|performers|bands|calendar|schedule|events|programme|program|programa|shows|concerts|sets)$/i;
+
+const NON_LINEUP_CONTAINER_KEY_REGEX =
+  /^(?:menu|menus|navigation|nav|footer|header|partner|partners|sponsor|sponsors|cookie|cookies|consent|linklist|links|social|socials|press|faq|tickets|news|articles|blog|posts|media|images|gallery|venues|locations|places|filters|categories|tags|breadcrumbs|seo|meta|i18n|translations)$/i;
+
+function isNonMusicCategory(raw: string | null | undefined): boolean {
+  if (!raw) {
+    return false;
+  }
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  if (!trimmed) {
+    return false;
+  }
+  return NON_MUSIC_CATEGORY_REGEX.test(trimmed);
+}
+
+function extractVenueName(raw: unknown): string | null {
+  if (typeof raw === "string") {
+    return raw.replace(/\s+/g, " ").trim() || null;
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const rec = raw as Record<string, unknown>;
+    return (
+      pickLocalizedLabel(rec.company ?? rec.name ?? rec.title ?? rec.venueName ?? rec.label) ?? null
+    );
+  }
+  return null;
+}
+
+function extractNuxt2ArtistEntries(script: string): ParsedLineupEntry[] {
+  if (!script.includes("window.__NUXT__")) {
+    return [];
+  }
+  const paramMap = parseNuxtIifeParamMap(script);
+  const collected: ParsedLineupEntry[] = [];
+
+  // Match Prismic/Nuxt artist objects like `{artist:{...data:{...,date_tag:Q,title:"Aaron Dilloway"}}}`
+  const artistBlockRegex = /\bartist\s*:\s*\{[\s\S]{0,1800}?\btitle\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  for (const match of script.matchAll(artistBlockRegex)) {
+    const block = match[0];
+    const rawTitle = match[1];
+    if (!rawTitle) {
+      continue;
+    }
+    const title = decodeJsStringLiteral(rawTitle);
+    if (!title || title.length < 2 || title.length > 140) {
+      continue;
+    }
+    if (/^(?:line-?up|program(?:me|a)?|artists?|schedule)\b/i.test(title)) {
+      continue;
+    }
+
+    // Check slug/uid prefixes for non-music items (film-, talk-, workshop-, installation-, etc.)
+    const slugMatch = block.match(
+      /\b(?:uid|slug)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][A-Za-z0-9_$]{0,3})\b)/,
+    );
+    const slugVal = slugMatch?.[1]
+      ? decodeJsStringLiteral(slugMatch[1])
+      : slugMatch?.[2]
+        ? (paramMap.get(slugMatch[2]) ?? null)
+        : null;
+    if (
+      slugVal &&
+      /^(?:film|talk|workshop|installation|audio-walk|listening-session|discourse|exhibition)-/i.test(
+        slugVal,
+      )
+    ) {
+      continue;
+    }
+
+    // Resolve optional date_tag / day
+    const dateMatch = block.match(
+      /\b(?:date_tag|day|date)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][A-Za-z0-9_$]{0,3})\b)/,
+    );
+    const dayVal = dateMatch?.[1]
+      ? decodeJsStringLiteral(dateMatch[1])
+      : dateMatch?.[2]
+        ? (paramMap.get(dateMatch[2]) ?? null)
+        : null;
+
+    const normalized = normalizeExtractedEntry({
+      billingName: title,
+      day: dayVal && !/^https?:\/\//i.test(dayVal) ? dayVal : null,
+    });
+    if (normalized) {
+      collected.push(normalized);
+    }
+  }
+
+  return deduplicateEntries(collected);
+}
+
 /**
  * Deterministically extracts structured festival lineups from embedded page hydration JSON
- * (e.g. Primavera Sound `window.__INITIAL_DATA__` `LineupList` blocks / `artistSets`)
- * without executing JavaScript or calling an LLM.
+ * (e.g. Primavera Sound `LineupList` blocks, CTM `vueJsData`, Next.js `__NEXT_DATA__`,
+ * Nuxt 2 `window.__NUXT__` artist objects) without executing JavaScript or calling an LLM.
  */
 export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[] {
   const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
@@ -776,13 +876,80 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
     }
   };
 
-  const visit = (node: unknown, depth = 0) => {
+  const collectGenericItemArray = (items: unknown[]) => {
+    if (items.length < 3) {
+      return;
+    }
+    const candidates: ParsedLineupEntry[] = [];
+    for (const item of items) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+      const rec = item as Record<string, unknown>;
+      const category = pickLocalizedLabel(rec.category ?? rec.type ?? rec.discipline);
+      if (isNonMusicCategory(category)) {
+        continue;
+      }
+
+      const rawTitle = pickLocalizedLabel(
+        rec.billingName ??
+          rec.artistName ??
+          rec.artist_name ??
+          rec.performer ??
+          rec.artist ??
+          rec.title ??
+          rec.header ??
+          rec.name,
+      );
+      if (!rawTitle || rawTitle.length < 2 || rawTitle.length > 160) {
+        continue;
+      }
+
+      const rawSubtitle = pickLocalizedLabel(rec.subtitle ?? rec.header_sub ?? rec.subTitle);
+      if (isNonMusicCategory(rawSubtitle)) {
+        continue;
+      }
+      const subtitle =
+        rawSubtitle && !GENERIC_MUSIC_LABEL_REGEX.test(rawSubtitle) ? rawSubtitle : null;
+
+      const isoInfo = extractIsoDayAndTime(rec.startDate ?? rec.start ?? rec.dateTime);
+      const day =
+        pickLocalizedLabel(rec.startDateOnly ?? rec.day ?? rec.date) ?? isoInfo.day ?? null;
+      const setTime =
+        (typeof rec.time === "string" && /^\d{1,2}:\d{2}/.test(rec.time.trim())
+          ? rec.time.trim().slice(0, 5)
+          : null) ??
+        isoInfo.setTime ??
+        null;
+      const stage = extractVenueName(rec.stage ?? rec.venue ?? rec.location);
+
+      const normalized = normalizeExtractedEntry({
+        billingName: rawTitle,
+        subtitle,
+        day,
+        stage,
+        setTime,
+      });
+      if (normalized) {
+        candidates.push(normalized);
+      }
+    }
+
+    if (candidates.length >= 3) {
+      collected.push(...candidates);
+    }
+  };
+
+  const visit = (node: unknown, depth = 0, inLineupBranch = false) => {
     if (depth > 16 || !node || typeof node !== "object") {
       return;
     }
     if (Array.isArray(node)) {
+      if (inLineupBranch) {
+        collectGenericItemArray(node);
+      }
       for (const item of node) {
-        visit(item, depth + 1);
+        visit(item, depth + 1, inLineupBranch);
       }
       return;
     }
@@ -805,10 +972,20 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
       }
     }
 
-    for (const val of Object.values(rec)) {
-      if (val && typeof val === "object") {
-        visit(val, depth + 1);
+    // Direct `items` array inside a lineup/artist/calendar container (e.g. CTM `vueJsData`)
+    if (inLineupBranch && Array.isArray(rec.items)) {
+      collectGenericItemArray(rec.items);
+    }
+
+    for (const [key, val] of Object.entries(rec)) {
+      if (!val || typeof val !== "object") {
+        continue;
       }
+      if (NON_LINEUP_CONTAINER_KEY_REGEX.test(key)) {
+        continue;
+      }
+      const nextInLineupBranch = inLineupBranch || LINEUP_CONTAINER_KEY_REGEX.test(key);
+      visit(val, depth + 1, nextInLineupBranch);
     }
   };
 
@@ -819,6 +996,14 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
       continue;
     }
     if (/type\s*=\s*["']application\/ld\+json["']/i.test(attrs)) {
+      continue;
+    }
+
+    if (content.includes("window.__NUXT__")) {
+      const nuxtEntries = extractNuxt2ArtistEntries(content);
+      if (nuxtEntries.length > 0) {
+        collected.push(...nuxtEntries);
+      }
       continue;
     }
 
@@ -833,10 +1018,7 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
       } catch {
         parsed = null;
       }
-    } else if (
-      /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*[{[]/.test(content) &&
-      !content.includes("window.__NUXT__")
-    ) {
+    } else if (/(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*[{[]/.test(content)) {
       const assignMatch = content.match(
         /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*([{[])/,
       );
@@ -854,11 +1036,280 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
     }
 
     if (parsed) {
-      visit(parsed);
+      visit(parsed, 0, false);
     }
   }
 
   return deduplicateEntries(collected);
+}
+
+/**
+ * Deterministically extracts festival schedule entries from standard RFC 5545 iCalendar (`.ics`) feeds.
+ */
+export function extractLineupFromIcal(icsText: string): ParsedLineupEntry[] {
+  const unfolded = icsText.replace(/\r?\n[ \t]/g, "");
+  const eventBlocks = unfolded.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/gi) ?? [];
+  const collected: ParsedLineupEntry[] = [];
+
+  for (const block of eventBlocks) {
+    const summaryMatch = block.match(/^SUMMARY(?:;[^:]*)?:(.+)$/im);
+    const dtStartMatch = block.match(
+      /^DTSTART(?:;[^:]*)?:(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/im,
+    );
+    const locationMatch = block.match(/^LOCATION(?:;[^:]*)?:(.+)$/im);
+
+    const rawSummary = summaryMatch?.[1]
+      ?.replace(/\\,/g, ",")
+      .replace(/\\;/g, ";")
+      .replace(/\\n/gi, " ")
+      .trim();
+    if (!rawSummary) {
+      continue;
+    }
+
+    const day =
+      dtStartMatch?.[1] && dtStartMatch[2] && dtStartMatch[3]
+        ? `${dtStartMatch[1]}-${dtStartMatch[2]}-${dtStartMatch[3]}`
+        : null;
+    const setTime =
+      dtStartMatch?.[4] && dtStartMatch[5] ? `${dtStartMatch[4]}:${dtStartMatch[5]}` : null;
+    const stage =
+      locationMatch?.[1]?.replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ").trim() ||
+      null;
+
+    const normalized = normalizeExtractedEntry({
+      billingName: rawSummary,
+      day,
+      stage,
+      setTime,
+    });
+    if (normalized) {
+      collected.push(normalized);
+    }
+  }
+
+  return deduplicateEntries(collected);
+}
+
+const ARTIST_PATH_SEGMENT_REGEX =
+  /\/(?:artists?|artistas?|bands?|acts?|line-?up|performers?|musicians?|musica|music)\//i;
+
+const UI_NOISE_LABEL_REGEX =
+  /^(?:scroll|music|m[uú]sica|live|new|more|read\s*more|ver\s*m[aá]s|info|tickets?|buy|share|en|es|pt|gl|pl|de|fr|back|all|filter|search|menu|home|about|contact|bandcamp|spotify|instagram|facebook|youtube|soundcloud)$/i;
+
+function stripHtmlTagsClean(fragment: string): string {
+  return decodeHtmlEntities(fragment.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractTitleFromAnchorInnerHtml(innerHtml: string): {
+  title: string | null;
+  nonMusic: boolean;
+} {
+  // Collect small badge/tag texts to detect non-music cards (e.g. "Discourse", "Film", "Workshop")
+  const tagTexts = [
+    ...innerHtml.matchAll(/<(?:span|div|small|p)\b[^>]*>([^<]{1,40})<\/(?:span|div|small|p)>/gi),
+  ]
+    .map((m) =>
+      decodeHtmlEntities(m[1] ?? "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  const hasExplicitMusic = tagTexts.some((t) => GENERIC_MUSIC_LABEL_REGEX.test(t));
+  const hasExplicitNonMusic = tagTexts.some((t) => NON_MUSIC_CATEGORY_REGEX.test(t));
+  if (hasExplicitNonMusic && !hasExplicitMusic) {
+    return { title: null, nonMusic: true };
+  }
+
+  // 1. Prefer heading tags or explicit title-classed elements
+  const preferredMatches = [
+    ...innerHtml.matchAll(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi),
+    ...innerHtml.matchAll(
+      /<(?:span|p|div)\b[^>]*class=["'][^"']*(?:title|name|artist|heading)[^"']*["'][^>]*>([\s\S]*?)<\/(?:span|p|div)>/gi,
+    ),
+    ...innerHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi),
+  ];
+
+  for (const match of preferredMatches) {
+    const candidate = stripHtmlTagsClean(match[1] ?? "");
+    if (
+      candidate.length >= 2 &&
+      candidate.length <= 140 &&
+      !UI_NOISE_LABEL_REGEX.test(candidate) &&
+      !NON_MUSIC_CATEGORY_REGEX.test(candidate)
+    ) {
+      return { title: candidate, nonMusic: false };
+    }
+  }
+
+  // 2. Fallback to cleaned full anchor text
+  const fallback = stripHtmlTagsClean(innerHtml);
+  if (
+    fallback.length >= 2 &&
+    fallback.length <= 120 &&
+    !UI_NOISE_LABEL_REGEX.test(fallback) &&
+    !NON_MUSIC_CATEGORY_REGEX.test(fallback)
+  ) {
+    return { title: fallback, nonMusic: false };
+  }
+
+  return { title: null, nonMusic: false };
+}
+
+/**
+ * Deterministically extracts festival lineups from repeated semantic HTML structures:
+ * 1. Repeated `<a href=".../artists/<slug>">` or `<a href=".../band/<slug>">` link cards (e.g. Unsound, Amplifest).
+ * 2. Repeated semantic event/artist title blocks (e.g. `<p class="event-title">`, `itemprop="performer"`).
+ */
+export function extractLineupFromHtmlStructure(html: string, pageUrl: string): ParsedLineupEntry[] {
+  // Remove non-content regions so nav/footer links are never mistaken for artists
+  const contentHtml = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<header\b[^>]*>[\s\S]*?<\/header>/gi, " ")
+    .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, " ");
+
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+
+  // Strategy A: Repeated artist/band URL prefix groups
+  const groups = new Map<string, ParsedLineupEntry[]>();
+  const anchorRegex = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of contentHtml.matchAll(anchorRegex)) {
+    const rawHref = match[1]?.trim();
+    const innerHtml = match[2] ?? "";
+    if (!rawHref) {
+      continue;
+    }
+
+    let resolved: URL;
+    try {
+      resolved = new URL(rawHref, baseUrl);
+    } catch {
+      continue;
+    }
+
+    if (resolved.hostname !== baseUrl.hostname) {
+      continue;
+    }
+
+    const pathname = resolved.pathname.replace(/\/+$/, "");
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments.length < 2) {
+      continue;
+    }
+    const parentPrefix = `/${segments.slice(0, -1).join("/")}/`;
+    if (!ARTIST_PATH_SEGMENT_REGEX.test(parentPrefix)) {
+      continue;
+    }
+
+    const { title, nonMusic } = extractTitleFromAnchorInnerHtml(innerHtml);
+    if (nonMusic || !title) {
+      continue;
+    }
+
+    const normalized = normalizeExtractedEntry({ billingName: title });
+    if (!normalized) {
+      continue;
+    }
+
+    const list = groups.get(parentPrefix) ?? [];
+    list.push(normalized);
+    groups.set(parentPrefix, list);
+  }
+
+  let bestGroup: ParsedLineupEntry[] = [];
+  for (const entries of groups.values()) {
+    const deduped = deduplicateEntries(entries);
+    if (deduped.length > bestGroup.length) {
+      bestGroup = deduped;
+    }
+  }
+  if (bestGroup.length >= 5) {
+    return bestGroup;
+  }
+
+  // Strategy B: Microdata `itemprop="performer"`
+  const microdataEntries: ParsedLineupEntry[] = [];
+  const performerMicrodataRegex =
+    /<[^>]*\bitemprop=["']performer["'][^>]*>([\s\S]{1,300}?)<\/[a-z0-9]+>/gi;
+  for (const match of contentHtml.matchAll(performerMicrodataRegex)) {
+    const text = stripHtmlTagsClean(match[1] ?? "");
+    if (text.length >= 2 && text.length <= 120) {
+      const normalized = normalizeExtractedEntry({ billingName: text });
+      if (normalized) {
+        microdataEntries.push(normalized);
+      }
+    }
+  }
+  const dedupedMicrodata = deduplicateEntries(microdataEntries);
+  if (dedupedMicrodata.length >= 3) {
+    return dedupedMicrodata;
+  }
+
+  // Strategy C: Repeated semantic artist/event title elements (e.g. `event-title`, `artist-name`)
+  const semanticEntries: ParsedLineupEntry[] = [];
+  const semanticClassRegex =
+    /<(?:p|div|h[2-5]|span)\b[^>]*class=["'][^"']*(?:artist[-_]?name|artist[-_]?title|lineup[-_]?artist|event[-_]?title)[^"']*["'][^>]*>([\s\S]{1,300}?)<\/(?:p|div|h[2-5]|span)>/gi;
+
+  for (const match of contentHtml.matchAll(semanticClassRegex)) {
+    const matchIndex = match.index ?? 0;
+    const precedingContext = contentHtml.slice(Math.max(0, matchIndex - 220), matchIndex);
+    const precedingLabels = [...precedingContext.matchAll(/<p\b[^>]*>([^<]{1,40})<\/p>/gi)]
+      .map((m) => decodeHtmlEntities(m[1] ?? "").trim())
+      .filter(Boolean);
+    const lastLabel = precedingLabels.at(-1);
+    if (lastLabel && isNonMusicCategory(lastLabel)) {
+      continue;
+    }
+
+    const inner = match[1] ?? "";
+    const subParts = [...inner.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+      .map((m) => stripHtmlTagsClean(m[1] ?? ""))
+      .filter(Boolean);
+
+    const billingName = subParts[0] ?? stripHtmlTagsClean(inner);
+    const subtitle = subParts.length > 1 ? subParts.slice(1).join(" · ") : null;
+    if (
+      !billingName ||
+      billingName.length < 2 ||
+      billingName.length > 140 ||
+      UI_NOISE_LABEL_REGEX.test(billingName)
+    ) {
+      continue;
+    }
+
+    const followingContext = contentHtml.slice(matchIndex, matchIndex + 450);
+    const timeMatch = followingContext.match(/\b([0-2]?\d:[0-5]\d)\b/);
+    const setTime = timeMatch?.[1] ?? null;
+
+    const normalized = normalizeExtractedEntry({
+      billingName,
+      subtitle,
+      setTime,
+    });
+    if (normalized) {
+      semanticEntries.push(normalized);
+    }
+  }
+
+  const dedupedSemantic = deduplicateEntries(semanticEntries);
+  if (dedupedSemantic.length >= 5) {
+    return dedupedSemantic;
+  }
+
+  return [];
 }
 
 const clashfinderEventSchema = z.object({
@@ -1213,13 +1664,16 @@ export async function fetchAndExtractFestivalLineup(
 
   // Hash visible + embedded structured content so minor HTML noise or ads don't trigger unnecessary LLM calls
   // while updates inside hydration payloads (Nuxt/Vue/Next.js) are still detected.
+  const isIcal =
+    contentType.includes("text/calendar") ||
+    url.pathname.toLowerCase().endsWith(".ics") ||
+    body.trimStart().startsWith("BEGIN:VCALENDAR");
   const isPlainText =
-    contentType.includes("text/plain") || url.pathname.toLowerCase().endsWith(".txt");
-  const visibleText = isPlainText ? body : htmlToCompactText(body);
-  const embeddedDataText = isPlainText ? "" : extractEmbeddedScriptDataText(body);
-  const normalizedForHash = isPlainText
-    ? body
-    : combineVisibleAndEmbeddedText(visibleText, embeddedDataText);
+    !isIcal && (contentType.includes("text/plain") || url.pathname.toLowerCase().endsWith(".txt"));
+  const visibleText = isPlainText || isIcal ? body : htmlToCompactText(body);
+  const embeddedDataText = isPlainText || isIcal ? "" : extractEmbeddedScriptDataText(body);
+  const normalizedForHash =
+    isPlainText || isIcal ? body : combineVisibleAndEmbeddedText(visibleText, embeddedDataText);
   const contentHash = hashLineupContent(normalizedForHash || body);
 
   if (
@@ -1230,7 +1684,16 @@ export async function fetchAndExtractFestivalLineup(
     return { unchanged: true, contentHash, method: null, entries: [] };
   }
 
-  // Layer 1a: Plain text list -> reuse deterministic lineup parser
+  // Layer 1a: iCalendar (.ics) schedule feed (deterministic & free)
+  if (isIcal) {
+    const entries = extractLineupFromIcal(body);
+    if (entries.length === 0) {
+      throw new DomainError("No se detectaron actuaciones en el archivo iCalendar (.ics)");
+    }
+    return { unchanged: false, contentHash, method: "ical", entries };
+  }
+
+  // Layer 1b: Plain text list -> reuse deterministic lineup parser (free)
   if (isPlainText) {
     const entries = deduplicateEntries(parseRawLineup(body));
     if (entries.length === 0) {
@@ -1239,13 +1702,13 @@ export async function fetchAndExtractFestivalLineup(
     return { unchanged: false, contentHash, method: "plain-text", entries };
   }
 
-  // Layer 1b: Embedded JSON-LD schema.org MusicEvent / MusicFestival performers (free)
+  // Layer 1c: Embedded JSON-LD schema.org MusicEvent / MusicFestival performers (free)
   const jsonLdEntries = extractLineupFromJsonLd(body);
   if (jsonLdEntries.length > 0) {
     return { unchanged: false, contentHash, method: "json-ld", entries: jsonLdEntries };
   }
 
-  // Layer 1c: Structured hydration JSON payloads (e.g. Primavera Sound LineupList blocks) (free)
+  // Layer 1d: Structured hydration JSON / Nuxt / Vue payloads (free, zero AI)
   const embeddedJsonEntries = extractLineupFromEmbeddedJson(body);
   if (embeddedJsonEntries.length > 0) {
     return {
@@ -1256,11 +1719,25 @@ export async function fetchAndExtractFestivalLineup(
     };
   }
 
-  // Layer 2: Universal structured extraction via Gemini API (optional, requires GEMINI_API_KEY)
+  // Layer 1e: Semantic HTML structure (repeated artist links, microdata, event-title cards) (free, zero AI)
+  const htmlStructuredEntries = extractLineupFromHtmlStructure(
+    body,
+    response.url || url.toString(),
+  );
+  if (htmlStructuredEntries.length > 0) {
+    return {
+      unchanged: false,
+      contentHash,
+      method: "html-structured",
+      entries: htmlStructuredEntries,
+    };
+  }
+
+  // Layer 2: Universal structured extraction via Gemini API (last-resort fallback, requires GEMINI_API_KEY)
   const apiKey = options.geminiApiKey?.trim();
   if (!apiKey) {
     throw new DomainError(
-      "Esta web no incluye metadatos estructurados (JSON-LD). Configura GEMINI_API_KEY en el servidor para extraer el cartel automáticamente con IA.",
+      "No se pudo extraer el cartel sin IA (sin Clashfinder, iCal, JSON-LD, datos embebidos ni estructura HTML reconocible). Configura GEMINI_API_KEY como respaldo opcional.",
     );
   }
 
