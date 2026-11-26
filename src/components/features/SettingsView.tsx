@@ -570,114 +570,113 @@ export function SettingsView({
         ) : null}
       </section>
 
-      <section
-        aria-labelledby="settings-language-heading"
-        className="flex flex-col gap-4 border-t border-line pt-8"
-      >
-        <div>
-          <h2
-            id="settings-language-heading"
-            className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
-          >
-            {dict.settings.languageSectionTitle}
-          </h2>
-          <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
-            {dict.settings.languageDescription}
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-8 border-t border-line pt-8 desktop:grid-cols-2">
+        <section aria-labelledby="settings-language-heading" className="flex flex-col gap-4">
+          <div>
+            <h2
+              id="settings-language-heading"
+              className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
+            >
+              {dict.settings.languageSectionTitle}
+            </h2>
+            <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
+              {dict.settings.languageDescription}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {languageOptions.map((option) => {
-            const isActive = locale === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={isActive}
-                disabled={savingLocale}
-                onClick={() => void handleLocaleSelect(option.value)}
-                className={`flex cursor-pointer items-center justify-between gap-4 border p-4 text-left transition-colors disabled:opacity-60 ${
-                  isActive
-                    ? "border-acid bg-acid text-acid-ink"
-                    : "border-line bg-surface text-ink hover:border-ink"
-                }`}
-              >
-                <div>
-                  <div className="font-display text-lg font-extrabold leading-tight">
-                    {option.label}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {languageOptions.map((option) => {
+              const isActive = locale === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={isActive}
+                  disabled={savingLocale}
+                  onClick={() => void handleLocaleSelect(option.value)}
+                  className={`flex cursor-pointer items-center justify-between gap-4 border p-4 text-left transition-colors disabled:opacity-60 ${
+                    isActive
+                      ? "border-acid bg-acid text-acid-ink"
+                      : "border-line bg-surface text-ink hover:border-ink"
+                  }`}
+                >
+                  <div>
+                    <div className="font-display text-lg font-extrabold leading-tight">
+                      {option.label}
+                    </div>
+                    <div
+                      className={`mt-1 font-mono text-[0.7rem] uppercase tracking-[0.06em] ${
+                        isActive ? "text-acid-ink/80" : "text-ink-muted"
+                      }`}
+                    >
+                      {option.meta}
+                    </div>
                   </div>
-                  <div
-                    className={`mt-1 font-mono text-[0.7rem] uppercase tracking-[0.06em] ${
-                      isActive ? "text-acid-ink/80" : "text-ink-muted"
-                    }`}
-                  >
-                    {option.meta}
-                  </div>
-                </div>
-                {isActive ? (
-                  <span className="shrink-0 border border-acid-ink px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.08em]">
-                    {dict.settings.activeBadge}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </section>
+                  {isActive ? (
+                    <span className="shrink-0 border border-acid-ink px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.08em]">
+                      {dict.settings.activeBadge}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-      <section
-        aria-labelledby="settings-theme-heading"
-        className="flex flex-col gap-4 border-t border-line pt-8"
-      >
-        <div>
-          <h2
-            id="settings-theme-heading"
-            className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
-          >
-            {dict.settings.themeSectionTitle}
-          </h2>
-          <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
-            {dict.settings.themeDescription}
-          </p>
-        </div>
+        <section
+          aria-labelledby="settings-theme-heading"
+          className="flex flex-col gap-4 border-t border-line pt-8 desktop:border-t-0 desktop:pt-0"
+        >
+          <div>
+            <h2
+              id="settings-theme-heading"
+              className="font-mono text-[0.76rem] font-semibold uppercase tracking-[0.1em] text-ink"
+            >
+              {dict.settings.themeSectionTitle}
+            </h2>
+            <p className="mt-1 font-serif text-[1.08rem] text-ink-muted">
+              {dict.settings.themeDescription}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {themeOptions.map((option) => {
-            const isActive = theme === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => handleThemeSelect(option.value)}
-                className={`flex cursor-pointer items-center justify-between gap-3 border p-4 text-left transition-colors ${
-                  isActive
-                    ? "border-acid bg-acid text-acid-ink"
-                    : "border-line bg-surface text-ink hover:border-ink"
-                }`}
-              >
-                <div>
-                  <div className="font-display text-lg font-extrabold leading-tight">
-                    {option.label}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {themeOptions.map((option) => {
+              const isActive = theme === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => handleThemeSelect(option.value)}
+                  className={`flex cursor-pointer items-center justify-between gap-3 border p-4 text-left transition-colors ${
+                    isActive
+                      ? "border-acid bg-acid text-acid-ink"
+                      : "border-line bg-surface text-ink hover:border-ink"
+                  }`}
+                >
+                  <div>
+                    <div className="font-display text-lg font-extrabold leading-tight">
+                      {option.label}
+                    </div>
+                    <div
+                      className={`mt-1 font-mono text-[0.7rem] uppercase tracking-[0.06em] ${
+                        isActive ? "text-acid-ink/80" : "text-ink-muted"
+                      }`}
+                    >
+                      {option.meta}
+                    </div>
                   </div>
-                  <div
-                    className={`mt-1 font-mono text-[0.7rem] uppercase tracking-[0.06em] ${
-                      isActive ? "text-acid-ink/80" : "text-ink-muted"
-                    }`}
-                  >
-                    {option.meta}
-                  </div>
-                </div>
-                {isActive ? (
-                  <span className="shrink-0 border border-acid-ink px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.08em]">
-                    {dict.settings.activeBadge}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </section>
+                  {isActive ? (
+                    <span className="shrink-0 border border-acid-ink px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.08em]">
+                      {dict.settings.activeBadge}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </div>
 
       {savedNotice ? (
         <p

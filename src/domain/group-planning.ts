@@ -822,7 +822,7 @@ export function organizeJointAgendaEntries(params: {
 
   for (let i = 0; i < enriched.length; i += 1) {
     const left = enriched[i];
-    if (!left || !left.row.day || !left.interval || !left.row.setTime) continue;
+    if (!left?.row.day || !left.interval || !left.row.setTime) continue;
 
     for (let j = i + 1; j < enriched.length; j += 1) {
       const right = enriched[j];
