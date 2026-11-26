@@ -30,6 +30,12 @@ export function normalizeLocale(value: string | null | undefined): Locale {
   return DEFAULT_LOCALE;
 }
 
-export function getPlacesApiLanguage(locale: Locale): "pt" | "es" {
-  return locale === "pt-PT" ? "pt" : "es";
+export function getPlacesApiLanguage(locale: Locale): "gl" | "pt" | "es" {
+  if (locale === "pt-PT") {
+    return "pt";
+  }
+  if (locale === "es-ES") {
+    return "es";
+  }
+  return "gl";
 }

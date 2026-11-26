@@ -32,7 +32,7 @@ describe("i18n", () => {
   });
 
   it("maps locale to Open-Meteo geocoding language codes", () => {
-    expect(getPlacesApiLanguage("gl")).toBe("es");
+    expect(getPlacesApiLanguage("gl")).toBe("gl");
     expect(getPlacesApiLanguage("pt-PT")).toBe("pt");
     expect(getPlacesApiLanguage("es-ES")).toBe("es");
   });

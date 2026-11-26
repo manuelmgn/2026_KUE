@@ -1,5 +1,7 @@
 import type { FestivalSummary, LineupEntryDTO } from "@/components/features/types";
 import type { Festival } from "@/generated/prisma/client";
+import { getPlacesApiLanguage, type Locale } from "@/i18n/config";
+import { getLocalizedPlaceName } from "@/server/clients/places";
 import type { listFestivalEntries } from "@/server/services/entries";
 
 export function toFestivalSummary(festival: Festival): FestivalSummary {
@@ -12,14 +14,29 @@ export function toFestivalSummary(festival: Festival): FestivalSummary {
   };
 }
 
+export async function toLocalizedFestivalSummary(
+  festival: Festival,
+  locale: Locale,
+): Promise<FestivalSummary> {
+  const localizedLocation = await getLocalizedPlaceName(
+    festival.locationPlaceId,
+    getPlacesApiLanguage(locale),
+    festival.location,
+  );
+  return {
+    ...toFestivalSummary(festival),
+    location: localizedLocation,
+  };
+}
+
 /**
  * Picks the requested festival by slug from an already-fetched list, falling back to the
  * first (most recent) festival. Avoids redundant DB roundtrips on every page render.
  */
-export function resolveActiveFestival(
-  festivals: ReadonlyArray<FestivalSummary>,
+export function resolveActiveFestival<T extends { slug: string }>(
+  festivals: ReadonlyArray<T>,
   requestedSlug?: string,
-): FestivalSummary | null {
+): T | null {
   if (requestedSlug) {
     const match = festivals.find((festival) => festival.slug === requestedSlug);
     if (match) {

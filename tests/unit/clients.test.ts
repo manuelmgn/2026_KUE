@@ -9,7 +9,7 @@ import {
   searchMusicBrainzArtists,
   setMusicBrainzMinInterval,
 } from "@/server/clients/musicbrainz";
-import { searchPlaces } from "@/server/clients/places";
+import { clearPlaceNameCache, getLocalizedPlaceName, searchPlaces } from "@/server/clients/places";
 import { fetchWikipediaBio } from "@/server/clients/wikipedia";
 
 const server = setupServer();
@@ -241,5 +241,40 @@ describe("server/clients (MSW)", () => {
       ),
     );
     await expect(searchPlaces("Madrid")).rejects.toBeInstanceOf(ExternalApiError);
+  });
+
+  it("resolves localized place names by placeId with caching and graceful fallback", async () => {
+    clearPlaceNameCache();
+    let requestCount = 0;
+
+    server.use(
+      http.get("https://geocoding-api.open-meteo.com/v1/get", ({ request }) => {
+        requestCount += 1;
+        const url = new URL(request.url);
+        const lang = url.searchParams.get("language");
+        const nameByLang: Record<string, string> = {
+          es: "La Haya",
+          pt: "A Haia",
+          gl: "A Haia",
+        };
+        return HttpResponse.json({
+          id: 2747373,
+          name: nameByLang[lang ?? "es"] ?? "The Hague",
+          latitude: 52.07667,
+          longitude: 4.29861,
+        });
+      }),
+    );
+
+    expect(await getLocalizedPlaceName("2747373", "pt", "La Haya")).toBe("A Haia");
+    expect(await getLocalizedPlaceName("2747373", "pt", "La Haya")).toBe("A Haia");
+    expect(requestCount).toBe(1); // served from cache on second call
+
+    expect(await getLocalizedPlaceName("2747373", "es", "A Haia")).toBe("La Haya");
+    expect(await getLocalizedPlaceName("2747373", "gl", "La Haya")).toBe("A Haia");
+    expect(await getLocalizedPlaceName(null, "pt", "La Haya")).toBe("La Haya");
+
+    server.use(http.get("https://geocoding-api.open-meteo.com/v1/get", () => HttpResponse.error()));
+    expect(await getLocalizedPlaceName("9999999", "pt", "Fallback City")).toBe("Fallback City");
   });
 });

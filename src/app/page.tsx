@@ -11,6 +11,7 @@ import {
   resolveActiveFestival,
   toFestivalSummary,
   toLineupEntryDTO,
+  toLocalizedFestivalSummary,
 } from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,13 @@ interface HomePageProps {
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const [params, { dict }] = await Promise.all([searchParams, getServerDictionary()]);
-  const festivalSummaries = (await listFestivals()).map(toFestivalSummary);
-  const activeFestival = resolveActiveFestival(festivalSummaries, params.festival);
+  const [params, { locale, dict }] = await Promise.all([searchParams, getServerDictionary()]);
+  const festivals = await listFestivals();
+  const festivalSummaries = festivals.map(toFestivalSummary);
+  const activeFestivalRaw = resolveActiveFestival(festivals, params.festival);
+  const activeFestival = activeFestivalRaw
+    ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
+    : null;
 
   const initialQuery = params.q ?? "";
   const parsedStatus = statusFilterSchema.safeParse(params.status);

@@ -10,6 +10,7 @@ import {
   resolveActiveFestival,
   toFestivalSummary,
   toLineupEntryDTO,
+  toLocalizedFestivalSummary,
 } from "@/server/services/mappers";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +20,13 @@ interface FestivalModePageProps {
 }
 
 export default async function FestivalModePage({ searchParams }: FestivalModePageProps) {
-  const [params, { dict }] = await Promise.all([searchParams, getServerDictionary()]);
-  const summaries = (await listFestivals()).map(toFestivalSummary);
-  const activeFestival = resolveActiveFestival(summaries, params.festival);
+  const [params, { locale, dict }] = await Promise.all([searchParams, getServerDictionary()]);
+  const festivals = await listFestivals();
+  const summaries = festivals.map(toFestivalSummary);
+  const activeFestivalRaw = resolveActiveFestival(festivals, params.festival);
+  const activeFestival = activeFestivalRaw
+    ? await toLocalizedFestivalSummary(activeFestivalRaw, locale)
+    : null;
 
   const entries = activeFestival
     ? (await listFestivalEntries(activeFestival.id)).map(toLineupEntryDTO)
