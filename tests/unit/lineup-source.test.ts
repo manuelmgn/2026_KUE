@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  extractEmbeddedScriptDataText,
   extractLineupFromClashfinderJson,
   extractLineupFromJsonLd,
   fetchAndExtractFestivalLineup,
@@ -195,5 +196,119 @@ describe("lineup-source", () => {
           }),
       }),
     ).rejects.toThrow("JSON inválido");
+  });
+
+  it("extracts embedded Vue/Next.js JSON and Nuxt IIFE script payloads without executing JS", async () => {
+    const vueHtml = `
+      <html>
+        <body><nav>Home Artists Schedule</nav></body>
+        <script>
+          var vueJsData = {
+            "artist": {
+              "i1": {
+                "header": "Artists",
+                "items": [
+                  { "title": "Kali Malone", "subtitle": "Music", "media": { "image": "https://cdn.example.com/a.jpg" } },
+                  { "title": "Actress", "subtitle": "Live AV" }
+                ]
+              }
+            },
+            "menu": [{ "title": "Should be ignored" }]
+          };
+        </script>
+      </html>
+    `;
+    const vueExtracted = extractEmbeddedScriptDataText(vueHtml);
+    expect(vueExtracted).toContain("Kali Malone");
+    expect(vueExtracted).toContain("Actress");
+    expect(vueExtracted).not.toContain("Should be ignored");
+    expect(vueExtracted).not.toContain("cdn.example.com");
+
+    const nuxtHtml = `
+      <html>
+        <body><p>no results</p></body>
+        <script>
+          window.__NUXT__=(function(a,b,c){return {data:[{lineup:[
+            {artist:{data:{date_tag:a,title:"Aaron Dilloway"}}},
+            {artist:{data:{date_tag:b,title:"Abdullah Miniawy Trio"}}}
+          ]}]}}("Fri 10 April","Sat 11 April","unused"));
+        </script>
+      </html>
+    `;
+    const nuxtExtracted = extractEmbeddedScriptDataText(nuxtHtml);
+    expect(nuxtExtracted).toContain("title: Aaron Dilloway");
+    expect(nuxtExtracted).toContain("date_tag: Fri 10 April");
+    expect(nuxtExtracted).toContain("title: Abdullah Miniawy Trio");
+    expect(nuxtExtracted).toContain("date_tag: Sat 11 April");
+
+    const nextHtml = `
+      <html>
+        <body><div id="__next"></div></body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"lineup":[{"name":"Mabe Fratti","stage":"Main","day":"Friday"},{"name":"Tim Hecker","stage":"Club","day":"Saturday"}]}}}
+        </script>
+      </html>
+    `;
+    const llmExtractor = vi.fn(async ({ text }) => {
+      expect(text).toContain("Mabe Fratti");
+      expect(text).toContain("Tim Hecker");
+      return [
+        {
+          billingName: "Mabe Fratti",
+          artistNames: ["Mabe Fratti"],
+          subtitle: null,
+          day: "Friday",
+          stage: "Main",
+          setTime: null,
+        },
+      ];
+    });
+    const result = await fetchAndExtractFestivalLineup("https://example.com/next-lineup", {
+      festivalName: "Test Fest",
+      festivalYear: 2027,
+      geminiApiKey: "test-key",
+      fetchImpl: async () =>
+        new Response(nextHtml, { status: 200, headers: { "content-type": "text/html" } }),
+      llmExtractor,
+    });
+    expect(result.entries).toHaveLength(1);
+    expect(llmExtractor).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries once on transient network errors and surfaces the underlying cause on failure", async () => {
+    let attempts = 0;
+    const flakyFetch = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        const err = new TypeError("fetch failed");
+        (err as Error & { cause?: unknown }).cause = { code: "ECONNRESET" };
+        throw err;
+      }
+      return new Response("Autechre\nKali Malone\n", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    });
+
+    const recovered = await fetchAndExtractFestivalLineup("https://example.com/lineup.txt", {
+      festivalName: "Test",
+      festivalYear: 2027,
+      fetchImpl: flakyFetch,
+    });
+    expect(attempts).toBe(2);
+    expect(recovered.entries).toHaveLength(2);
+
+    const brokenFetch = vi.fn(async () => {
+      const err = new TypeError("fetch failed");
+      (err as Error & { cause?: unknown }).cause = { code: "UND_ERR_CONNECT_TIMEOUT" };
+      throw err;
+    });
+    await expect(
+      fetchAndExtractFestivalLineup("https://example.com/down.txt", {
+        festivalName: "Test",
+        festivalYear: 2027,
+        fetchImpl: brokenFetch,
+      }),
+    ).rejects.toThrow("UND_ERR_CONNECT_TIMEOUT");
   });
 });

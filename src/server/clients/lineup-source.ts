@@ -6,9 +6,12 @@ import { DomainError } from "@/domain/errors";
 import { type ParsedLineupEntry, parseRawLineup } from "@/domain/lineup-parser";
 
 const FETCH_TIMEOUT_MS = 20_000;
+const FETCH_RETRY_DELAY_MS = 300;
 const MAX_RESPONSE_BYTES = 3 * 1024 * 1024; // 3 MB
 const MAX_TEXT_FOR_LLM_CHARS = 80_000;
-const LINEUP_FETCH_USER_AGENT = "KUE/1.0 (+https://localhost:5030; festival-lineup-sync)";
+const MAX_EMBEDDED_SCRIPT_CHARS = 60_000;
+const LINEUP_FETCH_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 export type LineupExtractionMethod = "clashfinder" | "json-ld" | "plain-text" | "gemini";
 
@@ -124,6 +127,391 @@ export function htmlToCompactText(html: string): string {
     .filter((line) => line.length > 0);
 
   return lines.join("\n").slice(0, MAX_TEXT_FOR_LLM_CHARS);
+}
+
+const IGNORED_EMBEDDED_KEYS = new Set([
+  "media",
+  "image",
+  "images",
+  "img",
+  "photo",
+  "photos",
+  "thumbnail",
+  "thumbnails",
+  "icon",
+  "icons",
+  "svg",
+  "menu",
+  "menus",
+  "navigation",
+  "nav",
+  "footer",
+  "cookie",
+  "cookies",
+  "consent",
+  "partner",
+  "partners",
+  "sponsor",
+  "sponsors",
+  "linklist",
+  "tracking",
+  "analytics",
+  "seo",
+  "meta",
+  "og",
+  "twitter",
+  "css",
+  "style",
+  "styles",
+  "classes",
+  "classname",
+  "longitude",
+  "latitude",
+  "lat",
+  "lng",
+  "zip",
+  "phone",
+  "email",
+  "linkmap",
+  "small_uri",
+  "large_uri",
+  "uri",
+  "src",
+  "srcset",
+  "width",
+  "height",
+  "dimensions",
+  "alt",
+  "copyright",
+  "edit",
+  "zoom",
+  "background",
+  "space_before",
+  "frame_class",
+  "background_color_class",
+  "header_layout",
+  "header_link",
+  "header_link_target",
+  "header_link_text",
+  "ticket_sold_out",
+  "ticket_free_event",
+  "ticket_no_presale",
+  "ticket_sold_out_label",
+  "ticket_overview_text",
+  "ticket_text",
+  "ticket_link",
+  "ticket_link_text",
+  "ticket_link_target",
+  "alphaid",
+  "uid",
+  "id",
+  "slug",
+  "link",
+  "url",
+  "href",
+  "path",
+  "permalink",
+]);
+
+function pruneEmbeddedJsonValue(value: unknown, depth = 0): unknown {
+  if (depth > 8 || value === null || value === undefined || typeof value === "boolean") {
+    return undefined;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 1900 && value <= 2100 ? value : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.replace(/\s+/g, " ").trim();
+    if (!trimmed || trimmed.length > 240) {
+      return undefined;
+    }
+    if (/^(?:https?:\/\/|\/\/|data:|\/(?:_assets|fileadmin|wp-content|static)\/)/i.test(trimmed)) {
+      return undefined;
+    }
+    return trimmed;
+  }
+  if (Array.isArray(value)) {
+    const items: unknown[] = [];
+    for (const item of value) {
+      const pruned = pruneEmbeddedJsonValue(item, depth + 1);
+      if (pruned !== undefined) {
+        items.push(pruned);
+      }
+      if (items.length >= 600) {
+        break;
+      }
+    }
+    return items.length > 0 ? items : undefined;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    let kept = 0;
+    for (const [key, val] of Object.entries(record)) {
+      if (IGNORED_EMBEDDED_KEYS.has(key.toLowerCase())) {
+        continue;
+      }
+      const pruned = pruneEmbeddedJsonValue(val, depth + 1);
+      if (pruned !== undefined) {
+        out[key] = pruned;
+        kept += 1;
+      }
+    }
+    return kept > 0 ? out : undefined;
+  }
+  return undefined;
+}
+
+function extractBalancedJsonSlice(source: string, openIndex: number): string | null {
+  const openChar = source[openIndex];
+  const closeChar = openChar === "{" ? "}" : openChar === "[" ? "]" : null;
+  if (!closeChar) {
+    return null;
+  }
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = openIndex; i < source.length; i += 1) {
+    const ch = source[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === openChar) {
+      depth += 1;
+    } else if (ch === closeChar) {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(openIndex, i + 1);
+      }
+    }
+  }
+  return null;
+}
+
+function parseNuxtIifeParamMap(script: string): Map<string, string> {
+  const map = new Map<string, string>();
+  const fnMatch = script.match(/window\.__NUXT__\s*=\s*\(\s*function\s*\(([^)]*)\)\s*\{/);
+  if (!fnMatch?.[1]) {
+    return map;
+  }
+  const params = fnMatch[1]
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (params.length === 0) {
+    return map;
+  }
+
+  // Locate the trailing argument list `}(arg1,arg2,...))`
+  const callOpenIdx = script.lastIndexOf("}(");
+  if (callOpenIdx === -1) {
+    return map;
+  }
+  const argsSection = script.slice(callOpenIdx + 2);
+  const args: string[] = [];
+  let i = 0;
+  while (i < argsSection.length && args.length < params.length) {
+    while (i < argsSection.length && /[\s,]/.test(argsSection[i] ?? "")) {
+      i += 1;
+    }
+    const ch = argsSection[i];
+    if (!ch || ch === ")") {
+      break;
+    }
+    if (ch === '"') {
+      let end = i + 1;
+      let esc = false;
+      while (end < argsSection.length) {
+        const c = argsSection[end];
+        if (esc) {
+          esc = false;
+        } else if (c === "\\") {
+          esc = true;
+        } else if (c === '"') {
+          break;
+        }
+        end += 1;
+      }
+      const rawLiteral = argsSection.slice(i, end + 1);
+      try {
+        const decoded = JSON.parse(rawLiteral) as unknown;
+        args.push(typeof decoded === "string" ? decoded : "");
+      } catch {
+        args.push("");
+      }
+      i = end + 1;
+    } else {
+      let end = i;
+      while (end < argsSection.length && argsSection[end] !== "," && argsSection[end] !== ")") {
+        end += 1;
+      }
+      args.push(argsSection.slice(i, end).trim());
+      i = end;
+    }
+  }
+
+  for (let idx = 0; idx < Math.min(params.length, args.length); idx += 1) {
+    const key = params[idx];
+    const val = args[idx];
+    if (key && val && val !== "null" && val !== "void 0" && val !== "true" && val !== "false") {
+      map.set(key, val);
+    }
+  }
+  return map;
+}
+
+function decodeJsStringLiteral(rawContent: string): string | null {
+  try {
+    const parsed = JSON.parse(`"${rawContent}"`) as unknown;
+    return typeof parsed === "string" ? parsed.replace(/\s+/g, " ").trim() : null;
+  } catch {
+    return rawContent.replace(/\s+/g, " ").trim() || null;
+  }
+}
+
+const JS_DATA_FIELD_REGEX =
+  /\b(title|name|artist|artists|performer|subtitle|header|header_sub|day|date|date_tag|startDate|startDateOnly|time|startTime|stage|venue|location|category)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][A-Za-z0-9_$]{0,3})\b)/g;
+
+function extractKeyValuePairsFromJsScript(script: string): string {
+  const paramMap = script.includes("window.__NUXT__")
+    ? parseNuxtIifeParamMap(script)
+    : new Map<string, string>();
+  const lines: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of script.matchAll(JS_DATA_FIELD_REGEX)) {
+    const key = match[1];
+    const rawStr = match[2];
+    const ident = match[3];
+    if (!key) {
+      continue;
+    }
+
+    let value: string | null = null;
+    if (rawStr !== undefined) {
+      value = decodeJsStringLiteral(rawStr);
+    } else if (ident && paramMap.has(ident)) {
+      value = paramMap.get(ident) ?? null;
+    }
+
+    if (!value || value.length > 200) {
+      continue;
+    }
+    if (/^(?:https?:\/\/|\/\/|data:|\/)/i.test(value)) {
+      continue;
+    }
+    const line = `${key}: ${value}`;
+    if (key === "title" || key === "name" || key === "artist" || key === "header") {
+      if (seen.has(line)) {
+        continue;
+      }
+      seen.add(line);
+    }
+    lines.push(line);
+    if (lines.length >= 1200) {
+      break;
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Safely extracts structured lineup data embedded in `<script>` tags (Nuxt, Next.js, Vue, etc.)
+ * without executing any untrusted JavaScript.
+ */
+export function extractEmbeddedScriptDataText(html: string): string {
+  const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  const sections: string[] = [];
+  let totalChars = 0;
+
+  for (const match of html.matchAll(scriptRegex)) {
+    const attrs = match[1] ?? "";
+    const content = match[2]?.trim() ?? "";
+    if (!content || /\bsrc\s*=/i.test(attrs)) {
+      continue;
+    }
+    if (/type\s*=\s*["']application\/ld\+json["']/i.test(attrs)) {
+      continue;
+    }
+
+    let extracted = "";
+    const isJsonScript =
+      /type\s*=\s*["']application\/json["']/i.test(attrs) ||
+      /\bid\s*=\s*["'](?:__NEXT_DATA__|__NUXT_DATA__)["']/i.test(attrs);
+    if (!isJsonScript && content.length < 100) {
+      continue;
+    }
+
+    if (isJsonScript) {
+      try {
+        const parsed = JSON.parse(content) as unknown;
+        const pruned = pruneEmbeddedJsonValue(parsed);
+        if (pruned !== undefined) {
+          extracted = JSON.stringify(pruned);
+        }
+      } catch {
+        // Fall through if malformed
+      }
+    } else if (
+      /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*[{[]/.test(content) &&
+      !content.includes("window.__NUXT__")
+    ) {
+      const assignMatch = content.match(
+        /(?:var|let|const|window\.)\s*[A-Za-z0-9_.$]+\s*=\s*([{[])/,
+      );
+      if (assignMatch && assignMatch.index !== undefined) {
+        const openIdx = content.indexOf(assignMatch[1] ?? "{", assignMatch.index);
+        const jsonSlice = openIdx >= 0 ? extractBalancedJsonSlice(content, openIdx) : null;
+        if (jsonSlice) {
+          try {
+            const parsed = JSON.parse(jsonSlice) as unknown;
+            const pruned = pruneEmbeddedJsonValue(parsed);
+            if (pruned !== undefined) {
+              extracted = JSON.stringify(pruned);
+            }
+          } catch {
+            // Not strict JSON; try JS key-value extraction below
+          }
+        }
+      }
+    }
+
+    if (
+      !extracted &&
+      (content.includes("window.__NUXT__") ||
+        (content.length >= 2_000 && /\b(?:title|artist|performer|lineup)\s*:/i.test(content)))
+    ) {
+      extracted = extractKeyValuePairsFromJsScript(content);
+    }
+
+    if (extracted.length >= 40) {
+      const remaining = MAX_EMBEDDED_SCRIPT_CHARS - totalChars;
+      if (remaining <= 0) {
+        break;
+      }
+      const chunk = extracted.slice(0, remaining);
+      sections.push(chunk);
+      totalChars += chunk.length;
+    }
+  }
+
+  return sections.join("\n");
 }
 
 function extractIsoDayAndTime(rawDate: unknown): { day: string | null; setTime: string | null } {
@@ -431,7 +819,7 @@ export async function extractLineupWithGemini(params: {
     model: params.model,
     store: false,
     system_instruction:
-      "You extract structured music festival lineups from webpage text. Include only musical artists, bands, DJs, ensembles, and live acts on the festival lineup. Exclude navigation links, ticket tiers, sponsors, festival organizers, generic headings, and footer items. Preserve original artist spelling.",
+      "You extract structured music festival lineups from webpage text and/or embedded structured page data (JSON or key-value fields). Include only musical artists, bands, DJs, ensembles, and live acts on the festival lineup. Exclude navigation links, ticket tiers, sponsors, festival organizers, generic headings, films/talks/workshops unless musical performances, and footer items. Preserve original artist spelling.",
     input: [
       `Festival: ${params.festivalName} (${params.festivalYear})`,
       `Source URL: ${params.sourceUrl}`,
@@ -518,6 +906,84 @@ async function readLimitedText(response: Response): Promise<string> {
   return Buffer.concat(chunks, totalBytes).toString("utf8");
 }
 
+function describeFetchError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "error de red desconocido";
+  }
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    const causeRecord = cause as { code?: unknown; message?: unknown };
+    if (typeof causeRecord.code === "string" && causeRecord.code.trim()) {
+      return causeRecord.code.trim();
+    }
+    if (typeof causeRecord.message === "string" && causeRecord.message.trim()) {
+      return causeRecord.message.trim();
+    }
+  }
+  return error.message || "error de red";
+}
+
+function isRetryableFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if (error.name === "AbortError" || error.name === "TimeoutError") {
+    return false;
+  }
+  return true;
+}
+
+async function fetchLineupResponse(
+  fetchFn: typeof fetch,
+  url: string,
+  accept: string,
+): Promise<Response> {
+  const maxAttempts = 2;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fetchFn(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          "User-Agent": LINEUP_FETCH_USER_AGENT,
+          Accept: accept,
+          "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+        },
+      });
+    } catch (error: unknown) {
+      lastError = error;
+      if (attempt < maxAttempts && isRetryableFetchError(error)) {
+        await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAY_MS));
+        continue;
+      }
+      break;
+    }
+  }
+
+  throw new DomainError(
+    `No se pudo conectar con la web del cartel (${describeFetchError(lastError)})`,
+  );
+}
+
+function combineVisibleAndEmbeddedText(visibleText: string, embeddedDataText: string): string {
+  if (!embeddedDataText) {
+    return visibleText.slice(0, MAX_TEXT_FOR_LLM_CHARS);
+  }
+  if (!visibleText) {
+    return embeddedDataText.slice(0, MAX_TEXT_FOR_LLM_CHARS);
+  }
+
+  const separator = "\n\n--- EMBEDDED PAGE DATA ---\n";
+  if (visibleText.length + separator.length + embeddedDataText.length <= MAX_TEXT_FOR_LLM_CHARS) {
+    return `${visibleText}${separator}${embeddedDataText}`;
+  }
+
+  const visibleBudget = Math.min(visibleText.length, Math.floor(MAX_TEXT_FOR_LLM_CHARS * 0.4));
+  const embeddedBudget = MAX_TEXT_FOR_LLM_CHARS - visibleBudget - separator.length;
+  return `${visibleText.slice(0, visibleBudget)}${separator}${embeddedDataText.slice(0, embeddedBudget)}`;
+}
+
 export async function fetchAndExtractFestivalLineup(
   rawUrl: string,
   options: FetchLineupSourceOptions,
@@ -528,10 +994,7 @@ export async function fetchAndExtractFestivalLineup(
   // 1. Clashfinder JSON source (deterministic & free)
   const clashfinderUrl = getClashfinderJsonUrl(url);
   if (clashfinderUrl) {
-    const response = await fetchFn(clashfinderUrl, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { "User-Agent": LINEUP_FETCH_USER_AGENT, Accept: "application/json" },
-    });
+    const response = await fetchLineupResponse(fetchFn, clashfinderUrl, "application/json");
     if (!response.ok) {
       throw new DomainError(`No se pudo descargar Clashfinder (HTTP ${response.status})`);
     }
@@ -558,13 +1021,11 @@ export async function fetchAndExtractFestivalLineup(
   }
 
   // 2. Standard HTTP fetch for official festival webpage or plain-text list
-  const response = await fetchFn(url.toString(), {
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    headers: {
-      "User-Agent": LINEUP_FETCH_USER_AGENT,
-      Accept: "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.8",
-    },
-  });
+  const response = await fetchLineupResponse(
+    fetchFn,
+    url.toString(),
+    "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.8",
+  );
 
   if (!response.ok) {
     throw new DomainError(`No se pudo descargar la web del cartel (HTTP ${response.status})`);
@@ -576,10 +1037,15 @@ export async function fetchAndExtractFestivalLineup(
   const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
   const body = await readLimitedText(response);
 
-  // Hash visible/normalized content so minor HTML noise or ads don't trigger unnecessary LLM calls
+  // Hash visible + embedded structured content so minor HTML noise or ads don't trigger unnecessary LLM calls
+  // while updates inside hydration payloads (Nuxt/Vue/Next.js) are still detected.
   const isPlainText =
     contentType.includes("text/plain") || url.pathname.toLowerCase().endsWith(".txt");
-  const normalizedForHash = isPlainText ? body : htmlToCompactText(body);
+  const visibleText = isPlainText ? body : htmlToCompactText(body);
+  const embeddedDataText = isPlainText ? "" : extractEmbeddedScriptDataText(body);
+  const normalizedForHash = isPlainText
+    ? body
+    : combineVisibleAndEmbeddedText(visibleText, embeddedDataText);
   const contentHash = hashLineupContent(normalizedForHash || body);
 
   if (
