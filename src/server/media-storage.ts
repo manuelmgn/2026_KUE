@@ -158,7 +158,7 @@ export async function readMediaFile(
   }
 
   try {
-    const fileBuffer = await readFile(safePath);
+    const fileBuffer = await readFile(/* turbopackIgnore: true */ safePath);
     return {
       body: fileBuffer,
       contentType,
