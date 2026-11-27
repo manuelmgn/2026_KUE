@@ -38,6 +38,7 @@ import {
   adminSetUserRole,
   authenticateUser,
   changeOwnPassword,
+  ensureBootstrapAdmin,
   getAdminDashboardData,
   registerUser,
 } from "@/server/services/users";
@@ -428,5 +429,51 @@ describe("integration: multi-user auth, admin dashboard, editions, and shared ca
     await removeEditionFromUserFestivals(bob.user.id, rewire2027.id, db);
     expect(await listUserEditions(bob.user.id, db)).toHaveLength(0);
     expect(await listUserEditions(alice.user.id, db)).toHaveLength(2);
+  });
+
+  it("bootstraps admin cleanly (even with quoted env vars), blocks public first-user hijack, and supports login by username or email", async () => {
+    const prevUser = process.env.ADMIN_USERNAME;
+    const prevEmail = process.env.ADMIN_EMAIL;
+    const prevPass = process.env.ADMIN_PASSWORD;
+    const limiter = new SlidingWindowRateLimiter(100, 60_000);
+
+    try {
+      process.env.ADMIN_USERNAME = '"admin"';
+      process.env.ADMIN_EMAIL = '"admin@example.com"';
+      process.env.ADMIN_PASSWORD = '"SuperSecret123"';
+
+      // Even if someone tries to race /register before bootstrap runs, first-user registration is blocked
+      await expect(
+        registerUser(
+          { username: "attacker", email: "attacker@example.com", password: "password1234" },
+          { db, rateLimiter: limiter },
+        ),
+      ).rejects.toBeInstanceOf(DomainError);
+
+      // Login triggers ensureBootstrapAdmin and works with either username or email
+      const byUsername = await authenticateUser(
+        { username: "admin", password: "SuperSecret123" },
+        { db, rateLimiter: limiter },
+      );
+      expect(byUsername.user.role).toBe("ADMIN");
+
+      const byEmail = await authenticateUser(
+        { username: "ADMIN@EXAMPLE.COM", password: "SuperSecret123" },
+        { db, rateLimiter: limiter },
+      );
+      expect(byEmail.user.id).toBe(byUsername.user.id);
+
+      // Subsequent ensureBootstrapAdmin is a no-op
+      expect(await ensureBootstrapAdmin(db)).toBe(false);
+    } finally {
+      if (prevUser === undefined) delete process.env.ADMIN_USERNAME;
+      else process.env.ADMIN_USERNAME = prevUser;
+
+      if (prevEmail === undefined) delete process.env.ADMIN_EMAIL;
+      else process.env.ADMIN_EMAIL = prevEmail;
+
+      if (prevPass === undefined) delete process.env.ADMIN_PASSWORD;
+      else process.env.ADMIN_PASSWORD = prevPass;
+    }
   });
 });

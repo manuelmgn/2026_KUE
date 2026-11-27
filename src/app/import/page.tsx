@@ -12,6 +12,9 @@ interface LegacyImportPageProps {
 
 export default async function LegacyImportRedirectPage({ searchParams }: LegacyImportPageProps) {
   const user = await requirePageUser("/import");
+  if (user.role !== "ADMIN") {
+    redirect("/festivals");
+  }
   const [params, editions] = await Promise.all([searchParams, listUserEditions(user.id)]);
 
   const requested = params.festival

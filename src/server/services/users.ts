@@ -27,7 +27,7 @@ import {
 } from "@/server/auth/rate-limit";
 import { createSessionRecord, invalidateAllUserSessions } from "@/server/auth/session";
 import { getDb } from "@/server/db";
-import { getEnv } from "@/server/env";
+import { isBootstrapAdminConfigured, readBootstrapAdminEnv } from "@/server/env";
 import { deleteMediaFile } from "@/server/media-storage";
 
 const SETTING_LEGACY_CLAIMED = "legacy_claimed_by";
@@ -156,14 +156,15 @@ export async function hasAnyUsers(db: PrismaClient = getDb()): Promise<boolean> 
  * and ADMIN_PASSWORD are provided in the environment and no users exist yet.
  */
 export async function ensureBootstrapAdmin(db: PrismaClient = getDb()): Promise<boolean> {
-  let env: ReturnType<typeof getEnv>;
-  try {
-    env = getEnv();
-  } catch {
+  const adminEnv = readBootstrapAdminEnv();
+  if (adminEnv.partiallyConfigured) {
+    console.warn(
+      "[KUE] Partial ADMIN_* bootstrap variables detected (require ADMIN_USERNAME, ADMIN_EMAIL, and ADMIN_PASSWORD); skipping auto-seed.",
+    );
     return false;
   }
 
-  if (!env.ADMIN_USERNAME || !env.ADMIN_EMAIL || !env.ADMIN_PASSWORD) {
+  if (!adminEnv.username || !adminEnv.email || !adminEnv.password) {
     return false;
   }
 
@@ -173,12 +174,17 @@ export async function ensureBootstrapAdmin(db: PrismaClient = getDb()): Promise<
   }
 
   const parsed = registerSchema.safeParse({
-    username: env.ADMIN_USERNAME,
-    email: env.ADMIN_EMAIL,
-    password: env.ADMIN_PASSWORD,
+    username: adminEnv.username,
+    email: adminEnv.email,
+    password: adminEnv.password,
   });
   if (!parsed.success) {
-    console.warn("[KUE] Invalid ADMIN_* bootstrap environment variables; skipping auto-seed.");
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+    console.warn(
+      `[KUE] Invalid ADMIN_* bootstrap environment variables (${issues}); skipping auto-seed.`,
+    );
     return false;
   }
 
@@ -246,7 +252,13 @@ export async function registerUser(
     let inviteId: string | null = null;
     let inviteMaxUses = 0;
 
-    if (!firstUser) {
+    if (firstUser) {
+      if (isBootstrapAdminConfigured()) {
+        throw new DomainError(
+          "La cuenta de administrador inicial está configurada por entorno; inicia sesión con esas credenciales.",
+        );
+      }
+    } else {
       const token = input.inviteToken?.trim();
       if (!token) {
         throw new DomainError("Necesitas un enlace de invitación válido para registrarte.");
@@ -364,10 +376,22 @@ export async function authenticateUser(
   const db = options.db ?? getDb();
   const limiter = options.rateLimiter ?? getLoginRateLimiter();
 
-  const normalizedUsername = normalizeUsername(input.username);
+  if (isBootstrapAdminConfigured()) {
+    await ensureBootstrapAdmin(db).catch((error: unknown) => {
+      if (process.env.NODE_ENV !== "test") {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[KUE] Bootstrap admin check during login failed: ${message}`);
+      }
+      return false;
+    });
+  }
+
+  const identifier = input.username.trim();
+  const isEmail = identifier.includes("@");
+  const normalizedIdentifier = isEmail ? normalizeEmail(identifier) : normalizeUsername(identifier);
   const ip = options.ipAddress ?? "local";
   const ipKey = `login:ip:${ip}`;
-  const acctKey = `login:acct:${ip}:${normalizedUsername}`;
+  const acctKey = `login:acct:${ip}:${normalizedIdentifier}`;
 
   const ipCheck = limiter.check(ipKey);
   const acctCheck = limiter.check(acctKey);
@@ -378,7 +402,11 @@ export async function authenticateUser(
     );
   }
 
-  const user = await db.user.findUnique({ where: { normalizedUsername } });
+  const user = await db.user.findUnique({
+    where: isEmail
+      ? { normalizedEmail: normalizedIdentifier }
+      : { normalizedUsername: normalizedIdentifier },
+  });
   if (!user) {
     await verifyPasswordTimingDummy(input.password);
     limiter.record(ipKey);

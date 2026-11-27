@@ -46,6 +46,7 @@ interface FestivalGroupPlanningViewProps {
   initialAgendas: JointAgendaSummaryDTO[];
   initialAgendaDetail: JointAgendaDetailDTO | null;
   initialTab?: "comparison" | "agenda";
+  isAdmin?: boolean;
 }
 
 type ConsensusFilter = "ALL" | "UNANIMOUS_MUST_SEE" | "RECOMMENDED" | "DIVISIVE";
@@ -62,6 +63,7 @@ export function FestivalGroupPlanningView({
   initialAgendas,
   initialAgendaDetail,
   initialTab = "comparison",
+  isAdmin = false,
 }: FestivalGroupPlanningViewProps) {
   const { dict } = useI18n();
   const router = useRouter();
@@ -643,6 +645,7 @@ export function FestivalGroupPlanningView({
         year={festival.year}
         location={festival.location}
         activeTab="grupo"
+        isAdmin={isAdmin}
       />
 
       {!inMyFestivals ? (

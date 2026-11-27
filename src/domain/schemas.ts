@@ -74,7 +74,7 @@ export const passwordSchema = z
   .max(128, "La contraseña no puede superar los 128 caracteres");
 
 export const loginSchema = z.object({
-  username: z.string().trim().min(1, "Introduce tu nombre de usuario").max(64),
+  username: z.string().trim().min(1, "Introduce tu nombre de usuario").max(160),
   password: z.string().min(1, "Introduce tu contraseña").max(128),
 });
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { normalizeArtistName } from "@/domain/artist-matching";
@@ -67,6 +69,85 @@ const PRIVATE_HOST_PATTERNS = [
   /^\[?fe80:/i,
 ];
 
+function isPrivateIpv4(ip: string): boolean {
+  const parts = ip.split(".").map((segment) => Number.parseInt(segment, 10));
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
+    return true;
+  }
+  const [a = 0, b = 0] = parts;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 0 && (parts[2] ?? 0) === 0) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+export function isPrivateIpAddress(rawIp: string): boolean {
+  const ip =
+    rawIp
+      .trim()
+      .replace(/^\[|\]$/g, "")
+      .split("%")[0]
+      ?.toLowerCase() ?? "";
+  const version = isIP(ip);
+  if (version === 4) {
+    return isPrivateIpv4(ip);
+  }
+  if (version === 6) {
+    if (ip === "::" || ip === "::1") {
+      return true;
+    }
+    if (ip.startsWith("::ffff:")) {
+      const mapped = ip.slice("::ffff:".length);
+      if (isIP(mapped) === 4) {
+        return isPrivateIpv4(mapped);
+      }
+      const hexParts = mapped.split(":");
+      if (hexParts.length === 2) {
+        const hi = Number.parseInt(hexParts[0] ?? "", 16);
+        const lo = Number.parseInt(hexParts[1] ?? "", 16);
+        if (Number.isFinite(hi) && Number.isFinite(lo)) {
+          const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+          return isPrivateIpv4(ipv4);
+        }
+      }
+      return true;
+    }
+    const firstHextet = Number.parseInt(ip.split(":")[0] || "0", 16);
+    // fc00::/7 (unique local), fe80::/10 (link-local), ff00::/8 (multicast)
+    if ((firstHextet & 0xfe00) === 0xfc00) return true;
+    if ((firstHextet & 0xffc0) === 0xfe80) return true;
+    if ((firstHextet & 0xff00) === 0xff00) return true;
+    return false;
+  }
+  return false;
+}
+
+async function assertPublicHostnameResolvesSafely(hostname: string): Promise<void> {
+  const cleanHost = hostname.trim().replace(/^\[|\]$/g, "");
+  if (isIP(cleanHost) !== 0) {
+    if (isPrivateIpAddress(cleanHost)) {
+      throw new DomainError("La URL del cartel no puede apuntar a direcciones privadas o locales");
+    }
+    return;
+  }
+
+  let records: Array<{ address: string }>;
+  try {
+    records = await lookup(cleanHost, { all: true });
+  } catch {
+    return;
+  }
+
+  if (records.some((record) => isPrivateIpAddress(record.address))) {
+    throw new DomainError("La URL del cartel no puede apuntar a direcciones privadas o locales");
+  }
+}
+
 export function validateLineupSourceUrl(rawUrl: string): URL {
   let parsed: URL;
   try {
@@ -80,7 +161,10 @@ export function validateLineupSourceUrl(rawUrl: string): URL {
   }
 
   const hostname = parsed.hostname.toLowerCase();
-  if (PRIVATE_HOST_PATTERNS.some((pattern) => pattern.test(hostname))) {
+  if (
+    PRIVATE_HOST_PATTERNS.some((pattern) => pattern.test(hostname)) ||
+    isPrivateIpAddress(hostname)
+  ) {
     throw new DomainError("La URL del cartel no puede apuntar a direcciones privadas o locales");
   }
 
@@ -1639,7 +1723,10 @@ function isRetryableFetchError(error: unknown): boolean {
   return true;
 }
 
-async function fetchLineupResponse(
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+async function fetchSingleAttempt(
   fetchFn: typeof fetch,
   url: string,
   accept: string,
@@ -1651,6 +1738,7 @@ async function fetchLineupResponse(
     try {
       return await fetchFn(url, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        redirect: "manual",
         headers: {
           "User-Agent": LINEUP_FETCH_USER_AGENT,
           Accept: accept,
@@ -1670,6 +1758,40 @@ async function fetchLineupResponse(
   throw new DomainError(
     `No se pudo conectar con la web del cartel (${describeFetchError(lastError)})`,
   );
+}
+
+async function fetchLineupResponse(
+  fetchFn: typeof fetch,
+  rawUrl: string,
+  accept: string,
+  isDefaultFetch: boolean,
+): Promise<Response> {
+  let currentUrl = rawUrl;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    const parsed = validateLineupSourceUrl(currentUrl);
+    if (isDefaultFetch) {
+      await assertPublicHostnameResolvesSafely(parsed.hostname);
+    }
+
+    const response = await fetchSingleAttempt(fetchFn, parsed.toString(), accept);
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      return response;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      return response;
+    }
+
+    if (hop === MAX_REDIRECTS) {
+      throw new DomainError("Demasiadas redirecciones al descargar la web del cartel");
+    }
+
+    currentUrl = new URL(location, parsed).toString();
+  }
+
+  throw new DomainError("Demasiadas redirecciones al descargar la web del cartel");
 }
 
 function combineVisibleAndEmbeddedText(visibleText: string, embeddedDataText: string): string {
@@ -1696,11 +1818,17 @@ export async function fetchAndExtractFestivalLineup(
 ): Promise<FetchLineupSourceResult> {
   const url = validateLineupSourceUrl(rawUrl);
   const fetchFn = options.fetchImpl ?? fetch;
+  const isDefaultFetch = !options.fetchImpl;
 
   // 1. Clashfinder JSON source (deterministic & free)
   const clashfinderUrl = getClashfinderJsonUrl(url);
   if (clashfinderUrl) {
-    const response = await fetchLineupResponse(fetchFn, clashfinderUrl, "application/json");
+    const response = await fetchLineupResponse(
+      fetchFn,
+      clashfinderUrl,
+      "application/json",
+      isDefaultFetch,
+    );
     if (!response.ok) {
       throw new DomainError(`No se pudo descargar Clashfinder (HTTP ${response.status})`);
     }
@@ -1731,6 +1859,7 @@ export async function fetchAndExtractFestivalLineup(
     fetchFn,
     url.toString(),
     "text/html,text/plain,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    isDefaultFetch,
   );
 
   if (!response.ok) {

@@ -47,7 +47,14 @@ vi.mock("@/server/services/lineup-sync", () => ({
   updateFestivalSyncConfig: vi.fn(),
 }));
 
-import { createFestivalAction, createFestivalEditionAction } from "@/actions/festival-actions";
+import {
+  applyPendingLineupDiffAction,
+  createFestivalAction,
+  createFestivalEditionAction,
+  dismissPendingLineupDiffAction,
+  updateFestivalAction,
+  updateFestivalSyncConfigAction,
+} from "@/actions/festival-actions";
 
 describe("unit: festival creation server actions permissions", () => {
   beforeEach(() => {
@@ -81,5 +88,28 @@ describe("unit: festival creation server actions permissions", () => {
       ok: false,
       error: "No tienes permisos para realizar esta acción",
     });
+  });
+
+  it("rejects updateFestivalAction, updateFestivalSyncConfigAction, applyPendingLineupDiffAction, and dismissPendingLineupDiffAction for non-ADMIN users", async () => {
+    mockRequireActionAdmin.mockRejectedValue(new ForbiddenError());
+
+    const r1 = await updateFestivalAction({ festivalId: "ed_1", name: "HackFest", year: 2027 });
+    const r2 = await updateFestivalSyncConfigAction({
+      festivalId: "ed_1",
+      lineupSourceUrl: "https://example.com/lineup",
+      autoSyncEnabled: true,
+      autoSyncMode: "AUTO",
+      syncIntervalHours: 12,
+    });
+    const r3 = await applyPendingLineupDiffAction({ festivalId: "ed_1" });
+    const r4 = await dismissPendingLineupDiffAction("ed_1");
+
+    expect(mockRequireActionAdmin).toHaveBeenCalledTimes(4);
+    for (const res of [r1, r2, r3, r4]) {
+      expect(res).toEqual({
+        ok: false,
+        error: "No tienes permisos para realizar esta acción",
+      });
+    }
   });
 });

@@ -23,6 +23,7 @@ interface FestivalHomeViewProps {
   daysUntil: number | null;
   upNextArtists: HomeArtistItemDTO[];
   recentlyRatedArtists: HomeArtistItemDTO[];
+  isAdmin?: boolean;
 }
 
 function formatDateRange(
@@ -66,6 +67,7 @@ export function FestivalHomeView({
   daysUntil,
   upNextArtists,
   recentlyRatedArtists,
+  isAdmin = false,
 }: FestivalHomeViewProps) {
   const { locale, dict } = useI18n();
   const router = useRouter();
@@ -192,6 +194,7 @@ export function FestivalHomeView({
         year={festival.year}
         activeTab="home"
         tabsOnly
+        isAdmin={isAdmin}
       />
 
       {/* Festival-scoped Personal Activity (2-column split on Tablet H / Desktop / Wide) */}

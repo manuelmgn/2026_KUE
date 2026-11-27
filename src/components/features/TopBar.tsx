@@ -227,17 +227,19 @@ export function TopBar({ festivals, activeFestivalSlug, currentUser }: TopBarPro
             {dict.nav.festivalMode}
           </Link>
 
-          <Link
-            href={`/manage${festivalSuffix}`}
-            aria-current={pathname === "/manage" || pathname === "/import" ? "page" : undefined}
-            className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
-              pathname === "/manage" || pathname === "/import"
-                ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
-                : "text-ink hover:bg-surface-elevated"
-            }`}
-          >
-            {dict.nav.manage}
-          </Link>
+          {currentUser?.role === "ADMIN" ? (
+            <Link
+              href={`/manage${festivalSuffix}`}
+              aria-current={pathname === "/manage" || pathname === "/import" ? "page" : undefined}
+              className={`flex items-center justify-center whitespace-nowrap border-l border-line px-[18px] font-mono text-[0.76rem] uppercase tracking-[0.08em] transition-colors ${
+                pathname === "/manage" || pathname === "/import"
+                  ? "border-b-2 border-b-acid bg-ink font-semibold text-bg"
+                  : "text-ink hover:bg-surface-elevated"
+              }`}
+            >
+              {dict.nav.manage}
+            </Link>
+          ) : null}
 
           <Link
             href={`/festivals${festivalSuffix}`}
@@ -284,7 +286,7 @@ export function TopBar({ festivals, activeFestivalSlug, currentUser }: TopBarPro
             >
               {dict.nav.syncStatus(doneCount, syncInfo.total)}
             </div>
-          ) : failedCount > 0 ? (
+          ) : currentUser?.role === "ADMIN" && failedCount > 0 ? (
             <button
               type="button"
               disabled={retrying}

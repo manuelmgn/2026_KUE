@@ -20,7 +20,9 @@ export async function updateEntryScheduleAction(input: UpdateEntryScheduleInput)
   const { dict } = await getServerDictionary();
   return runAction(async () => {
     const user = await requireActionUser();
-    const updated = await updateEntrySchedule(user.id, input);
+    const updated = await updateEntrySchedule(user.id, input, undefined, {
+      allowSharedSchedule: user.role === "ADMIN",
+    });
     revalidatePath("/");
     revalidatePath("/lineup");
     revalidatePath("/festival-mode");

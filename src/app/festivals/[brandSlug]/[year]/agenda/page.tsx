@@ -38,6 +38,7 @@ export default async function FestivalAgendaPage({ params }: FestivalAgendaPageP
       userId={user.id}
       festival={festival}
       entries={rawEntries.map(toLineupEntryDTO)}
+      isAdmin={user.role === "ADMIN"}
     />
   );
 }

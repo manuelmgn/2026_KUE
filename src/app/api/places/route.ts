@@ -16,6 +16,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const query = url.searchParams.get("q")?.trim() ?? "";

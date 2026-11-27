@@ -93,6 +93,7 @@ export default async function FestivalHomePage({ params }: FestivalHomePageProps
       daysUntil={computeDaysUntil(startDate, todayIso)}
       upNextArtists={editionArtists.queue.map(mapArtist)}
       recentlyRatedArtists={editionArtists.recentlyRated.map(mapArtist)}
+      isAdmin={user.role === "ADMIN"}
     />
   );
 }

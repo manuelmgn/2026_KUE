@@ -59,6 +59,7 @@ export default async function FestivalCartelPage({
       <LineupWorkspace
         festival={festival}
         isInMyFestivals={isInMyFestivals}
+        isAdmin={user.role === "ADMIN"}
         initialEntries={rawEntries.map(toLineupEntryDTO)}
         initialQuery={initialQuery}
         initialStatus={initialStatus}

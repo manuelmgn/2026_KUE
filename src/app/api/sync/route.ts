@@ -51,6 +51,9 @@ export async function POST(): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const queue = getSyncQueue();
   const enqueued = await retryFailedArtists(getDb(), queue);

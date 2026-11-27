@@ -9,6 +9,7 @@ function isPublicPath(pathname: string): boolean {
   }
   if (
     pathname === "/api/health" ||
+    pathname === "/robots.txt" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname.startsWith("/icons/")

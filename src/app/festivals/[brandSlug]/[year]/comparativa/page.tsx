@@ -77,6 +77,7 @@ export default async function FestivalComparisonPage({
       initialAgendas={agendas}
       initialAgendaDetail={initialAgendaDetail}
       initialTab={query.tab === "agenda" ? "agenda" : "comparison"}
+      isAdmin={user.role === "ADMIN"}
     />
   );
 }

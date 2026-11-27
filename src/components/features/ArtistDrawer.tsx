@@ -26,6 +26,7 @@ import { useI18n } from "@/i18n/context";
 interface ArtistDrawerProps {
   entry: LineupEntryDTO | null;
   mode?: "drawer" | "inline";
+  isAdmin?: boolean;
   onClose: () => void;
   onRateArtist: (artistId: string, rating: number) => void;
   onStatusArtist: (artistId: string, status: ArtistStatus) => void;
@@ -45,6 +46,7 @@ interface ArtistDrawerProps {
 export function ArtistDrawer({
   entry,
   mode = "drawer",
+  isAdmin = false,
   onClose,
   onRateArtist,
   onStatusArtist,
@@ -252,9 +254,13 @@ export function ArtistDrawer({
     setLiveSaveError(null);
     const res = await updateEntryScheduleAction({
       entryId: entry.id,
-      day: dayDraft.trim() || null,
-      stage: stageDraft.trim() || null,
-      setTime: timeDraft.trim() || null,
+      ...(isAdmin
+        ? {
+            day: dayDraft.trim() || null,
+            stage: stageDraft.trim() || null,
+            setTime: timeDraft.trim() || null,
+          }
+        : {}),
       liveRating: liveRatingDraft,
       liveNotes: liveNotesDraft,
     });
@@ -339,13 +345,15 @@ export function ArtistDrawer({
                   .filter(Boolean)
                   .join(" · ")}
               </span>
-              <button
-                type="button"
-                onClick={() => setDisambigOpen(true)}
-                className="cursor-pointer font-mono text-[0.72rem] text-ink-muted underline underline-offset-4 transition-colors hover:text-acid"
-              >
-                {dict.drawer.notThisArtist}
-              </button>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setDisambigOpen(true)}
+                  className="cursor-pointer font-mono text-[0.72rem] text-ink-muted underline underline-offset-4 transition-colors hover:text-acid"
+                >
+                  {dict.drawer.notThisArtist}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -558,41 +566,43 @@ export function ArtistDrawer({
               {dict.drawer.currentSetTitle}
             </div>
             <div className="flex flex-col gap-3 border border-line bg-surface p-4">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <input
-                  type="text"
-                  value={dayDraft}
-                  onChange={(event) => {
-                    setDayDraft(event.target.value);
-                    setLiveSaveState("idle");
-                  }}
-                  placeholder={dict.drawer.dayPlaceholder}
-                  aria-label={dict.drawer.dayAria}
-                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                />
-                <input
-                  type="text"
-                  value={stageDraft}
-                  onChange={(event) => {
-                    setStageDraft(event.target.value);
-                    setLiveSaveState("idle");
-                  }}
-                  placeholder={dict.drawer.stagePlaceholder}
-                  aria-label={dict.drawer.stageAria}
-                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                />
-                <input
-                  type="text"
-                  value={timeDraft}
-                  onChange={(event) => {
-                    setTimeDraft(event.target.value);
-                    setLiveSaveState("idle");
-                  }}
-                  placeholder={dict.drawer.timePlaceholder}
-                  aria-label={dict.drawer.timeAria}
-                  className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
-                />
-              </div>
+              {isAdmin ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <input
+                    type="text"
+                    value={dayDraft}
+                    onChange={(event) => {
+                      setDayDraft(event.target.value);
+                      setLiveSaveState("idle");
+                    }}
+                    placeholder={dict.drawer.dayPlaceholder}
+                    aria-label={dict.drawer.dayAria}
+                    className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  />
+                  <input
+                    type="text"
+                    value={stageDraft}
+                    onChange={(event) => {
+                      setStageDraft(event.target.value);
+                      setLiveSaveState("idle");
+                    }}
+                    placeholder={dict.drawer.stagePlaceholder}
+                    aria-label={dict.drawer.stageAria}
+                    className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  />
+                  <input
+                    type="text"
+                    value={timeDraft}
+                    onChange={(event) => {
+                      setTimeDraft(event.target.value);
+                      setLiveSaveState("idle");
+                    }}
+                    placeholder={dict.drawer.timePlaceholder}
+                    aria-label={dict.drawer.timeAria}
+                    className="w-full min-w-0 border border-line bg-bg px-2.5 py-2 font-mono text-xs text-ink outline-none focus:border-acid"
+                  />
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-mono text-[0.72rem] uppercase text-ink-muted">
@@ -783,7 +793,7 @@ export function ArtistDrawer({
         </Drawer>
       )}
 
-      {displayArtist ? (
+      {isAdmin && displayArtist ? (
         <DisambiguateModal
           open={disambigOpen}
           onClose={() => setDisambigOpen(false)}

@@ -280,6 +280,7 @@ export function FestivalManageView({
         year={Number(year) || festival.year}
         location={festival.location}
         activeTab="editar"
+        isAdmin={isAdmin}
       />
 
       {/* Section hairline tab bar (3 tabs for regular users, 4 with Auto-sync for admins) */}

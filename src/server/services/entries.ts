@@ -1,4 +1,4 @@
-import { DomainError } from "@/domain/errors";
+import { DomainError, ForbiddenError } from "@/domain/errors";
 import { type EntryFilterCriteria, matchesEntryFilters } from "@/domain/rating";
 import {
   type DeleteEntryInput,
@@ -121,6 +121,7 @@ export async function updateEntrySchedule(
   userId: string,
   rawInput: UpdateEntryScheduleInput,
   db: PrismaClient = getDb(),
+  options: { allowSharedSchedule?: boolean } = {},
 ) {
   const input = updateEntryScheduleSchema.parse(rawInput);
 
@@ -132,20 +133,32 @@ export async function updateEntrySchedule(
     throw new DomainError("Entrada de cartel no encontrada");
   }
 
+  const nextDay = input.day !== undefined ? input.day || null : existing.day;
+  const nextStage = input.stage !== undefined ? input.stage || null : existing.stage;
+  const nextSetTime = input.setTime !== undefined ? input.setTime || null : existing.setTime;
+  const modifiesShared =
+    nextDay !== existing.day || nextStage !== existing.stage || nextSetTime !== existing.setTime;
+
+  if (modifiesShared && options.allowSharedSchedule === false) {
+    throw new ForbiddenError("Solo un administrador puede modificar los horarios del cartel");
+  }
+
   const sharedData: {
     day?: string | null;
     stage?: string | null;
     setTime?: string | null;
   } = {};
 
-  if (input.day !== undefined) {
-    sharedData.day = input.day || null;
-  }
-  if (input.stage !== undefined) {
-    sharedData.stage = input.stage || null;
-  }
-  if (input.setTime !== undefined) {
-    sharedData.setTime = input.setTime || null;
+  if (options.allowSharedSchedule !== false) {
+    if (input.day !== undefined) {
+      sharedData.day = input.day || null;
+    }
+    if (input.stage !== undefined) {
+      sharedData.stage = input.stage || null;
+    }
+    if (input.setTime !== undefined) {
+      sharedData.setTime = input.setTime || null;
+    }
   }
 
   const updatedEntry =

@@ -13,7 +13,7 @@ import type {
   UpdateArtistStatusInput,
 } from "@/domain/schemas";
 import { getServerDictionary } from "@/i18n/server";
-import { requireActionUser } from "@/server/auth/dal";
+import { requireActionAdmin, requireActionUser } from "@/server/auth/dal";
 import {
   disambiguateArtist,
   getArtistDetail,
@@ -116,7 +116,7 @@ export async function disambiguateArtistAction(
 > {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
+    await requireActionAdmin();
     const updated = await disambiguateArtist(input);
     revalidatePath("/");
     revalidatePath("/lineup");

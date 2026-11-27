@@ -21,6 +21,7 @@ import { useI18n } from "@/i18n/context";
 interface LineupWorkspaceProps {
   festival: FestivalSummary;
   isInMyFestivals?: boolean;
+  isAdmin?: boolean;
   initialEntries: LineupEntryDTO[];
   initialQuery: string;
   initialStatus: StatusFilter;
@@ -75,6 +76,7 @@ function applyOptimistic(entries: LineupEntryDTO[], action: OptimisticAction): L
 export function LineupWorkspace({
   festival,
   isInMyFestivals = true,
+  isAdmin = false,
   initialEntries,
   initialQuery,
   initialStatus,
@@ -323,6 +325,7 @@ export function LineupWorkspace({
         year={festival.year}
         location={festival.location}
         activeTab="cartel"
+        isAdmin={isAdmin}
         rightSlot={
           !inMyFestivals ? (
             <HairlineButton
@@ -395,7 +398,7 @@ export function LineupWorkspace({
                   : dict.workspace.noMatchesDescription
               }
               action={
-                baseEntries.length === 0 ? (
+                baseEntries.length === 0 && isAdmin ? (
                   <Link
                     href={festivalEditPath(festival)}
                     className="inline-flex border border-acid bg-acid px-5 py-3 font-mono text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-acid-ink"
@@ -428,6 +431,7 @@ export function LineupWorkspace({
           <ArtistDrawer
             mode="inline"
             entry={openEntry}
+            isAdmin={isAdmin}
             onClose={() => setOpenEntryId(null)}
             onRateArtist={handleRateArtist}
             onStatusArtist={handleStatusArtist}
@@ -441,6 +445,7 @@ export function LineupWorkspace({
         <ArtistDrawer
           mode="drawer"
           entry={openEntry}
+          isAdmin={isAdmin}
           onClose={() => setOpenEntryId(null)}
           onRateArtist={handleRateArtist}
           onStatusArtist={handleStatusArtist}

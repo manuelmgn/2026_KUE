@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/features/AuthForm";
 import { getCurrentUser } from "@/server/auth/dal";
+import { isBootstrapAdminConfigured } from "@/server/env";
 import { validateInvitationToken } from "@/server/services/invitations";
 import { ensureBootstrapAdmin, hasAnyUsers } from "@/server/services/users";
 
@@ -22,13 +23,16 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
     redirect("/");
   }
 
+  const allowFirstUserRegistration = !anyUsers && !isBootstrapAdminConfigured();
   const inviteToken = params.invite?.trim() || null;
-  const inviteState = anyUsers ? await validateInvitationToken(inviteToken) : null;
+  const inviteState = allowFirstUserRegistration
+    ? null
+    : await validateInvitationToken(inviteToken);
 
   return (
     <AuthForm
       mode="register"
-      isFirstUser={!anyUsers}
+      isFirstUser={allowFirstUserRegistration}
       inviteToken={inviteToken}
       inviteState={inviteState}
       nextPath={params.next ?? null}

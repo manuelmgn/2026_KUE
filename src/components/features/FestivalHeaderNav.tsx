@@ -21,6 +21,7 @@ interface FestivalHeaderNavProps {
   activeTab: FestivalSectionTab;
   /** When true, only renders the sticky Level 2 tab bar (used on Festival Home which renders its own Hero above) */
   tabsOnly?: boolean;
+  isAdmin?: boolean;
   rightSlot?: React.ReactNode;
 }
 
@@ -32,6 +33,7 @@ export function FestivalHeaderNav({
   datesLabel,
   activeTab,
   tabsOnly = false,
+  isAdmin = false,
   rightSlot,
 }: FestivalHeaderNavProps) {
   const { dict } = useI18n();
@@ -42,7 +44,9 @@ export function FestivalHeaderNav({
     { id: "cartel", label: dict.nav.lineup, href: festivalCartelPath(target) },
     { id: "agenda", label: dict.nav.festivalMode, href: festivalAgendaPath(target) },
     { id: "grupo", label: dict.nav.groupPlanning, href: festivalComparisonPath(target) },
-    { id: "editar", label: dict.nav.manage, href: festivalEditPath(target) },
+    ...(isAdmin
+      ? [{ id: "editar" as const, label: dict.nav.manage, href: festivalEditPath(target) }]
+      : []),
   ];
 
   return (
@@ -79,7 +83,9 @@ export function FestivalHeaderNav({
         aria-label={dict.nav.festivalSectionsAria}
         className="sticky top-[var(--kue-sticky-top)] z-30 border-y border-line bg-surface"
       >
-        <div className="grid h-11 grid-cols-5 sm:flex sm:items-stretch">
+        <div
+          className={`grid h-11 ${isAdmin ? "grid-cols-5" : "grid-cols-4"} sm:flex sm:items-stretch`}
+        >
           {tabs.map((tab, idx) => {
             const isActive = tab.id === activeTab;
             return (

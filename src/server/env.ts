@@ -1,5 +1,45 @@
 import { z } from "zod";
 
+export function cleanEnvString(raw: string | undefined): string | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  let value = raw.trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value.length > 0 ? value : undefined;
+}
+
+export interface BootstrapAdminEnv {
+  username: string | undefined;
+  email: string | undefined;
+  password: string | undefined;
+  partiallyConfigured: boolean;
+}
+
+export function readBootstrapAdminEnv(): BootstrapAdminEnv {
+  const username = cleanEnvString(process.env.ADMIN_USERNAME);
+  const email = cleanEnvString(process.env.ADMIN_EMAIL);
+  const password = cleanEnvString(process.env.ADMIN_PASSWORD);
+  const count = [username, email, password].filter(Boolean).length;
+  return {
+    username,
+    email,
+    password,
+    partiallyConfigured: count > 0 && count < 3,
+  };
+}
+
+export function isBootstrapAdminConfigured(): boolean {
+  const { username, email, password } = readBootstrapAdminEnv();
+  return Boolean(username && email && password);
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(5030),
@@ -30,20 +70,20 @@ export function getEnv(): Env {
   }
 
   const parsed = envSchema.safeParse({
-    NODE_ENV: process.env.NODE_ENV,
-    PORT: process.env.PORT,
-    DATABASE_URL: process.env.DATABASE_URL,
-    DATABASE_URL_POOLED: process.env.DATABASE_URL_POOLED || undefined,
-    MEDIA_DIR: process.env.MEDIA_DIR,
-    BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN || undefined,
-    BLOB_STORE_ID: process.env.BLOB_STORE_ID || undefined,
-    BLOB_ACCESS: process.env.BLOB_ACCESS || undefined,
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || undefined,
-    GEMINI_MODEL: process.env.GEMINI_MODEL || undefined,
-    ADMIN_USERNAME: process.env.ADMIN_USERNAME || undefined,
-    ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
-    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || undefined,
-    COOKIE_SECURE: process.env.COOKIE_SECURE || undefined,
+    NODE_ENV: cleanEnvString(process.env.NODE_ENV),
+    PORT: cleanEnvString(process.env.PORT),
+    DATABASE_URL: cleanEnvString(process.env.DATABASE_URL),
+    DATABASE_URL_POOLED: cleanEnvString(process.env.DATABASE_URL_POOLED),
+    MEDIA_DIR: cleanEnvString(process.env.MEDIA_DIR),
+    BLOB_READ_WRITE_TOKEN: cleanEnvString(process.env.BLOB_READ_WRITE_TOKEN),
+    BLOB_STORE_ID: cleanEnvString(process.env.BLOB_STORE_ID),
+    BLOB_ACCESS: cleanEnvString(process.env.BLOB_ACCESS)?.toLowerCase(),
+    GEMINI_API_KEY: cleanEnvString(process.env.GEMINI_API_KEY),
+    GEMINI_MODEL: cleanEnvString(process.env.GEMINI_MODEL),
+    ADMIN_USERNAME: cleanEnvString(process.env.ADMIN_USERNAME),
+    ADMIN_EMAIL: cleanEnvString(process.env.ADMIN_EMAIL),
+    ADMIN_PASSWORD: cleanEnvString(process.env.ADMIN_PASSWORD),
+    COOKIE_SECURE: cleanEnvString(process.env.COOKIE_SECURE)?.toLowerCase(),
   });
 
   if (!parsed.success) {

@@ -12,6 +12,9 @@ interface LegacyManagePageProps {
 
 export default async function LegacyManageRedirectPage({ searchParams }: LegacyManagePageProps) {
   const user = await requirePageUser("/manage");
+  if (user.role !== "ADMIN") {
+    redirect("/festivals");
+  }
   const [params, editions] = await Promise.all([searchParams, listUserEditions(user.id)]);
 
   const requested = params.festival

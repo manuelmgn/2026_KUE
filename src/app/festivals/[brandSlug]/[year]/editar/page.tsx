@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FestivalManageView } from "@/components/features/FestivalManageView";
 import type { FestivalEditDTO } from "@/components/features/types";
+import { festivalHomePath } from "@/domain/festival-routes";
 import { getPlacesApiLanguage } from "@/i18n/config";
 import { getServerDictionary } from "@/i18n/server";
 import { requirePageUser } from "@/server/auth/dal";
@@ -22,6 +23,9 @@ export default async function FestivalEditPage({ params }: FestivalEditPageProps
   const user = await requirePageUser(
     `/festivals/${encodeURIComponent(brandSlug)}/${yearParam}/editar`,
   );
+  if (user.role !== "ADMIN") {
+    redirect(festivalHomePath({ brandSlug, year }));
+  }
 
   const [{ locale }, edition] = await Promise.all([
     getServerDictionary(),

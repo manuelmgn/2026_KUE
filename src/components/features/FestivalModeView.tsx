@@ -13,11 +13,17 @@ interface FestivalModeViewProps {
   userId: string;
   festival: FestivalSummary;
   entries: LineupEntryDTO[];
+  isAdmin?: boolean;
 }
 
 const ALL_DAYS_KEY = "__ALL__";
 
-export function FestivalModeView({ userId, festival, entries }: FestivalModeViewProps) {
+export function FestivalModeView({
+  userId,
+  festival,
+  entries,
+  isAdmin = false,
+}: FestivalModeViewProps) {
   const { dict } = useI18n();
   const [selectedDay, setSelectedDay] = useState<string>(ALL_DAYS_KEY);
   const [onlyMustSee, setOnlyMustSee] = useState<boolean>(true);
@@ -137,6 +143,7 @@ export function FestivalModeView({ userId, festival, entries }: FestivalModeView
         year={festival.year}
         location={festival.location}
         activeTab="agenda"
+        isAdmin={isAdmin}
         rightSlot={
           <div className="flex flex-wrap items-center gap-2">
             <Link

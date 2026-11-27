@@ -151,8 +151,8 @@ export async function updateFestivalAction(
 ): Promise<ActionResult<FestivalSummary>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const user = await requireActionUser();
-    const updated = await updateFestival(input, undefined, { actorUserId: user.id });
+    const admin = await requireActionAdmin();
+    const updated = await updateFestival(input, undefined, { actorUserId: admin.id });
     revalidateFestivalViews();
     revalidatePath("/notifications");
     return toFestivalSummary(updated);
@@ -164,7 +164,7 @@ export async function updateFestivalSyncConfigAction(
 ): Promise<ActionResult<{ festivalId: string }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
+    await requireActionAdmin();
     const updated = await updateFestivalSyncConfig(input);
     revalidatePath("/manage");
     return { festivalId: updated.id };
@@ -190,8 +190,8 @@ export async function applyPendingLineupDiffAction(
 ): Promise<ActionResult<ApplyLineupDiffResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const user = await requireActionUser();
-    const result = await applyPendingLineupDiff(input, { actorUserId: user.id });
+    const admin = await requireActionAdmin();
+    const result = await applyPendingLineupDiff(input, { actorUserId: admin.id });
     revalidateFestivalViews();
     revalidatePath("/notifications");
     return result;
@@ -203,7 +203,7 @@ export async function dismissPendingLineupDiffAction(
 ): Promise<ActionResult<{ dismissed: true }>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    await requireActionUser();
+    await requireActionAdmin();
     await dismissPendingLineupDiff(festivalId);
     revalidatePath("/manage");
     return { dismissed: true };

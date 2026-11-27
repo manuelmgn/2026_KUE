@@ -12,6 +12,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { dict } = await getServerDictionary();
   const url = new URL(request.url);
