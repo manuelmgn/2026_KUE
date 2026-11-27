@@ -161,7 +161,10 @@ export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath
           !isFirstUser &&
           inviteState?.status === "valid" &&
           formattedInviteExpires ? (
-            <div className="border-b border-line bg-acid px-6 py-3 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-acid-ink">
+            <div
+              suppressHydrationWarning
+              className="border-b border-line bg-acid px-6 py-3 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-acid-ink"
+            >
               {dict.auth.inviteValidBanner(
                 inviteState.remainingUses,
                 inviteState.maxUses,
