@@ -112,7 +112,9 @@ export default async function HomePage() {
       <main className="w-full min-h-[calc(100dvh-3rem)] sm:min-h-dvh">
         <EmptyState
           title={dict.home.emptyTitle}
-          description={dict.home.emptyDescription}
+          description={
+            user.role === "ADMIN" ? dict.home.emptyDescription : dict.home.emptyDescriptionUser
+          }
           action={
             <Link
               href="/festivals"

@@ -50,8 +50,8 @@ export async function createFestivalAction(
 ): Promise<ActionResult<CreateFestivalActionResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const user = await requireActionUser();
-    const created = await createFestival(input, user.id);
+    const admin = await requireActionAdmin();
+    const created = await createFestival(input, admin.id);
 
     let initialEntriesCount = 0;
     let initialNewArtistsCount = 0;
@@ -62,7 +62,7 @@ export async function createFestivalAction(
         const syncResult = await checkFestivalLineupSync(created.id, {
           force: true,
           applyDirectly: true,
-          actorUserId: user.id,
+          actorUserId: admin.id,
         });
         initialEntriesCount = syncResult.addedCount;
         initialNewArtistsCount = syncResult.newArtistsCount;
@@ -86,8 +86,8 @@ export async function createFestivalEditionAction(
 ): Promise<ActionResult<CreateFestivalActionResult>> {
   const { dict } = await getServerDictionary();
   return runAction(async () => {
-    const user = await requireActionUser();
-    const created = await createFestivalEdition(input, user.id);
+    const admin = await requireActionAdmin();
+    const created = await createFestivalEdition(input, admin.id);
 
     let initialEntriesCount = 0;
     let initialNewArtistsCount = 0;
@@ -98,7 +98,7 @@ export async function createFestivalEditionAction(
         const syncResult = await checkFestivalLineupSync(created.id, {
           force: true,
           applyDirectly: true,
-          actorUserId: user.id,
+          actorUserId: admin.id,
         });
         initialEntriesCount = syncResult.addedCount;
         initialNewArtistsCount = syncResult.newArtistsCount;

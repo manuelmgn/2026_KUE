@@ -3,7 +3,7 @@ import {
   slugifyFestival,
   slugifyFestivalBrand,
 } from "@/domain/artist-matching";
-import { DomainError } from "@/domain/errors";
+import { DomainError, ForbiddenError } from "@/domain/errors";
 import {
   type CreateFestivalEditionInput,
   type CreateFestivalInput,
@@ -220,6 +220,16 @@ async function generateUniqueEditionSlug(
   return slug;
 }
 
+async function assertFestivalCreatorIsAdmin(userId: string, db: PrismaClient): Promise<void> {
+  const actor = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, isActive: true },
+  });
+  if (!actor?.isActive || actor.role !== "ADMIN") {
+    throw new ForbiddenError("Solo los administradores pueden crear festivales o ediciones");
+  }
+}
+
 /**
  * Creates a new Festival (or reuses an existing parent Festival with the same normalizedName)
  * along with its requested annual edition, and automatically adds the edition to the creator's
@@ -230,6 +240,7 @@ export async function createFestival(
   userId: string,
   db: PrismaClient = getDb(),
 ): Promise<EditionWithFestival> {
+  await assertFestivalCreatorIsAdmin(userId, db);
   const input = createFestivalSchema.parse(rawInput);
 
   const cleanedSourceUrl = input.lineupSourceUrl?.trim() || null;
@@ -311,6 +322,7 @@ export async function createFestivalEdition(
   userId: string,
   db: PrismaClient = getDb(),
 ): Promise<EditionWithFestival> {
+  await assertFestivalCreatorIsAdmin(userId, db);
   const input = createFestivalEditionSchema.parse(rawInput);
 
   const brand = await db.festival.findUnique({ where: { id: input.festivalId } });

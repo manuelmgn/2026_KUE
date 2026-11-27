@@ -149,6 +149,7 @@ export function FestivalsView({
   };
 
   const openNewEditionForm = (brand: CatalogFestivalDTO) => {
+    if (!isAdmin) return;
     resetForm();
     setTargetBrand(brand);
     const highestYear = brand.editions[0]?.year;
@@ -171,6 +172,7 @@ export function FestivalsView({
   };
 
   const openNewFestivalForm = () => {
+    if (!isAdmin) return;
     resetForm();
     setTargetBrand(null);
     if (catalogQuery.trim()) {
@@ -255,6 +257,7 @@ export function FestivalsView({
   };
 
   const handleCreateSubmit = async () => {
+    if (!isAdmin) return;
     setError(null);
     setCreateNotice(null);
     if (locationQuery.trim().length > 0 && !selectedPlace) {
@@ -607,12 +610,14 @@ export function FestivalsView({
                   {dict.catalog.catalogTitle}
                 </h2>
                 <p className="mt-1 font-serif text-[1rem] italic text-ink-muted">
-                  {dict.catalog.catalogSubtitle}
+                  {isAdmin ? dict.catalog.catalogSubtitle : dict.catalog.catalogSubtitleUser}
                 </p>
               </div>
-              <HairlineButton variant="acid" size="sm" onClick={openNewFestivalForm}>
-                {dict.catalog.createNewFestivalButton}
-              </HairlineButton>
+              {isAdmin ? (
+                <HairlineButton variant="acid" size="sm" onClick={openNewFestivalForm}>
+                  {dict.catalog.createNewFestivalButton}
+                </HairlineButton>
+              ) : null}
             </div>
 
             <input
@@ -643,13 +648,15 @@ export function FestivalsView({
                         </span>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => openNewEditionForm(brand)}
-                      className="cursor-pointer border border-line bg-bg px-2.5 py-1 font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted transition-colors hover:border-ink hover:text-ink"
-                    >
-                      {dict.catalog.newEditionButton}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => openNewEditionForm(brand)}
+                        className="cursor-pointer border border-line bg-bg px-2.5 py-1 font-mono text-[0.66rem] uppercase tracking-[0.06em] text-ink-muted transition-colors hover:border-ink hover:text-ink"
+                      >
+                        {dict.catalog.newEditionButton}
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className="mt-2.5 flex flex-wrap gap-2">
@@ -686,18 +693,20 @@ export function FestivalsView({
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-6">
               <p className="font-serif text-[1.02rem] italic text-ink-muted">
-                {dict.catalog.notFoundPrompt}
+                {isAdmin ? dict.catalog.notFoundPrompt : dict.catalog.notFoundUserPrompt}
               </p>
-              <HairlineButton variant="acid" size="sm" onClick={openNewFestivalForm}>
-                {dict.catalog.createNewFestivalButton}
-              </HairlineButton>
+              {isAdmin ? (
+                <HairlineButton variant="acid" size="sm" onClick={openNewFestivalForm}>
+                  {dict.catalog.createNewFestivalButton}
+                </HairlineButton>
+              ) : null}
             </div>
           )}
         </section>
       ) : null}
 
       {/* PANEL 2: Create New Festival or New Edition */}
-      {panelMode === "create-festival" || panelMode === "create-edition" ? (
+      {isAdmin && (panelMode === "create-festival" || panelMode === "create-edition") ? (
         <section
           aria-label={dict.importer.createFestivalAria}
           className="border-b border-line-strong bg-surface px-5 py-5 sm:px-6"
@@ -912,7 +921,9 @@ export function FestivalsView({
       {festivals.length === 0 ? (
         <EmptyState
           title={dict.festivals.emptyTitle}
-          description={dict.festivals.emptyDescription}
+          description={
+            isAdmin ? dict.festivals.emptyDescription : dict.festivals.emptyDescriptionUser
+          }
         />
       ) : (
         <div className="grid grid-cols-1 tablet-h:grid-cols-2">

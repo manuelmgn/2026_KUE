@@ -14,6 +14,7 @@ import { useI18n } from "@/i18n/context";
 interface RawImporterProps {
   festivals: FestivalSummary[];
   initialFestivalId: string | null;
+  isAdmin?: boolean;
 }
 
 interface EditableRow {
@@ -27,14 +28,18 @@ interface EditableRow {
   setTime: string;
 }
 
-export function RawImporter({ festivals: initialFestivals, initialFestivalId }: RawImporterProps) {
+export function RawImporter({
+  festivals: initialFestivals,
+  initialFestivalId,
+  isAdmin = false,
+}: RawImporterProps) {
   const { dict } = useI18n();
   const formId = useId();
   const [festivals, setFestivals] = useState<FestivalSummary[]>(initialFestivals);
   const [selectedFestivalId, setSelectedFestivalId] = useState<string>(
     initialFestivalId ?? initialFestivals[0]?.id ?? "",
   );
-  const [showNewFestival, setShowNewFestival] = useState(initialFestivals.length === 0);
+  const [showNewFestival, setShowNewFestival] = useState(isAdmin && initialFestivals.length === 0);
   const [newFestName, setNewFestName] = useState("");
   const [newFestYear, setNewFestYear] = useState(String(new Date().getFullYear()));
   const [newFestLocationQuery, setNewFestLocationQuery] = useState("");
@@ -71,6 +76,7 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
   };
 
   const handleCreateFestival = async () => {
+    if (!isAdmin) return;
     setError(null);
 
     if (newFestLocationQuery.trim().length > 0 && !selectedPlace) {
@@ -239,19 +245,21 @@ export function RawImporter({ festivals: initialFestivals, initialFestivalId }: 
               ))}
             </select>
           ) : null}
-          <HairlineButton
-            type="button"
-            variant={showNewFestival ? "inverted" : "default"}
-            size="md"
-            onClick={() => setShowNewFestival((prev) => !prev)}
-            className="border-0 border-l border-line"
-          >
-            {dict.importer.newFestivalButton}
-          </HairlineButton>
+          {isAdmin ? (
+            <HairlineButton
+              type="button"
+              variant={showNewFestival ? "inverted" : "default"}
+              size="md"
+              onClick={() => setShowNewFestival((prev) => !prev)}
+              className="border-0 border-l border-line"
+            >
+              {dict.importer.newFestivalButton}
+            </HairlineButton>
+          ) : null}
         </div>
       </div>
 
-      {showNewFestival ? (
+      {isAdmin && showNewFestival ? (
         <form
           aria-label={dict.importer.createFestivalAria}
           onSubmit={(event) => {
