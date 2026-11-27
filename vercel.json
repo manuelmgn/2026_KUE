@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
+  "buildCommand": "npm run build:vercel",
+  "functions": {
+    "src/app/api/schedules/lineup-sync/route.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "schedule/v1beta"
+        }
+      ]
+    }
+  },
+  "schedules": {
+    "lineup-sync": {
+      "schedule": "*/30 * * * *",
+      "function": "api/schedules/lineup-sync"
+    }
+  }
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --turbopack -p 5030",
     "build": "next build",
+    "build:vercel": "node scripts/vercel-build.mjs",
     "start": "next start -p 5030",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
@@ -21,6 +22,9 @@
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@vercel/blob": "^2.9.0",
+    "@vercel/functions": "^3.11.4",
+    "@vercel/schedules": "^0.0.3",
     "better-sqlite3": "^12.0.0",
     "next": "^16.4.6",
     "pg": "^8.16.0",

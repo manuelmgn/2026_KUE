@@ -603,6 +603,7 @@ export async function runScheduledLineupSyncs(
 }
 
 const ONE_TIME_EMPTY_RECHECK_MARKER = ".recheck-empty-lineups-v2.done";
+const ONE_TIME_EMPTY_RECHECK_SETTING_KEY = "recheck_empty_lineups_v2_done";
 
 function resolveOneTimeRecheckMarkerPath(overridePath?: string): string {
   if (overridePath) {
@@ -638,16 +639,26 @@ export async function runOneTimeEmptyLineupRecheck(
     geminiModel?: string;
   } = {},
 ): Promise<OneTimeEmptyLineupRecheckResult> {
-  const markerPath = resolveOneTimeRecheckMarkerPath(options.markerPath);
+  const db = options.db ?? getDb();
+  const useDbMarker = !options.markerPath && Boolean(process.env.VERCEL);
+  const markerPath = useDbMarker ? null : resolveOneTimeRecheckMarkerPath(options.markerPath);
 
-  try {
-    await access(markerPath);
-    return { skipped: true, checked: 0, imported: 0, failed: 0 };
-  } catch {
-    // Marker does not exist yet -> run once
+  if (useDbMarker) {
+    const existing = await db.appSetting
+      .findUnique({ where: { key: ONE_TIME_EMPTY_RECHECK_SETTING_KEY } })
+      .catch(() => null);
+    if (existing) {
+      return { skipped: true, checked: 0, imported: 0, failed: 0 };
+    }
+  } else if (markerPath) {
+    try {
+      await access(markerPath);
+      return { skipped: true, checked: 0, imported: 0, failed: 0 };
+    } catch {
+      // Marker does not exist yet -> run once
+    }
   }
 
-  const db = options.db ?? getDb();
   const candidates = await db.festivalEdition.findMany({
     where: {
       lineupSourceUrl: { not: null },
@@ -707,22 +718,35 @@ export async function runOneTimeEmptyLineupRecheck(
     }
   }
 
-  try {
-    await mkdir(path.dirname(markerPath), { recursive: true });
-    await writeFile(
-      markerPath,
-      JSON.stringify({
-        completedAt: new Date().toISOString(),
-        checked,
-        imported,
-        failed,
-      }),
-      "utf8",
-    );
-  } catch (error: unknown) {
-    if (process.env.NODE_ENV !== "test") {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[KUE] Could not write one-time recheck marker (${markerPath}): ${message}`);
+  const markerPayload = JSON.stringify({
+    completedAt: new Date().toISOString(),
+    checked,
+    imported,
+    failed,
+  });
+
+  if (useDbMarker) {
+    try {
+      await db.appSetting.upsert({
+        where: { key: ONE_TIME_EMPTY_RECHECK_SETTING_KEY },
+        create: { key: ONE_TIME_EMPTY_RECHECK_SETTING_KEY, value: markerPayload },
+        update: { value: markerPayload },
+      });
+    } catch (error: unknown) {
+      if (process.env.NODE_ENV !== "test") {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[KUE] Could not save one-time recheck marker in DB: ${message}`);
+      }
+    }
+  } else if (markerPath) {
+    try {
+      await mkdir(path.dirname(markerPath), { recursive: true });
+      await writeFile(markerPath, markerPayload, "utf8");
+    } catch (error: unknown) {
+      if (process.env.NODE_ENV !== "test") {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[KUE] Could not write one-time recheck marker (${markerPath}): ${message}`);
+      }
     }
   }
 

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
   reactCompiler: true,
   serverExternalPackages: ["better-sqlite3", "pg", "sharp"],
   async headers() {

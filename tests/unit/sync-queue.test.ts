@@ -95,6 +95,26 @@ describe("server/sync/queue", () => {
     expect(seen).toEqual(["art-1", "art-2"]);
   });
 
+  it("only resets stale SYNCING artists when staleSyncingMinutes is provided", async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const findMany = vi.fn().mockResolvedValue([{ id: "art-stale" }]);
+    const mockDb = {
+      artist: { updateMany, findMany },
+    } as unknown as PrismaClient;
+
+    const queue = new SyncQueue({ disabled: true });
+    const count = await recoverPendingArtists(mockDb, queue, { staleSyncingMinutes: 5 });
+    expect(count).toBe(0);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        syncStatus: "SYNCING",
+        updatedAt: { lt: new Date("2026-12-31T23:55:00.000Z") },
+      },
+      data: { syncStatus: "PENDING" },
+    });
+  });
+
   it("supports rerunIfActive for mid-sync disambiguation and disabled mode", async () => {
     const runs: string[] = [];
     const queue = new SyncQueue({

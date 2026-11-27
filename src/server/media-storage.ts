@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { DomainError } from "@/domain/errors";
@@ -35,6 +35,22 @@ export function getMediaRootDir(overrideDir?: string): string {
   );
 }
 
+export function isVercelBlobEnabled(overrideMediaDir?: string): boolean {
+  if (overrideMediaDir?.trim()) {
+    return false;
+  }
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim());
+}
+
+export function getVercelBlobAccess(): "private" | "public" {
+  return process.env.BLOB_ACCESS?.trim().toLowerCase() === "public" ? "public" : "private";
+}
+
+function toNormalizedMediaKey(safeAbsolutePath: string, overrideDir?: string): string {
+  const root = getMediaRootDir(overrideDir);
+  return path.relative(root, safeAbsolutePath).split(path.sep).join("/");
+}
+
 /**
  * Resolves a relative media path inside MEDIA_DIR with strict path traversal protection.
  * Returns null if the path escapes the media root or contains invalid characters.
@@ -68,6 +84,95 @@ function sanitizeBaseName(baseName: string): string {
   return baseName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "media";
 }
 
+async function writeMediaBuffer(
+  relativePath: string,
+  buffer: Buffer,
+  contentType: string,
+  mediaDir?: string,
+): Promise<void> {
+  const targetPath = resolveSafeMediaPath(relativePath, mediaDir);
+  if (!targetPath) {
+    throw new DomainError("Ruta de almacenamiento no válida");
+  }
+
+  if (isVercelBlobEnabled(mediaDir)) {
+    const normalizedKey = toNormalizedMediaKey(targetPath, mediaDir);
+    const { put } = await import("@vercel/blob");
+    await put(normalizedKey, buffer, {
+      access: getVercelBlobAccess(),
+      contentType,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+    return;
+  }
+
+  await mkdir(path.dirname(targetPath), { recursive: true });
+  const tmpPath = `${targetPath}.${randomBytes(6).toString("hex")}.tmp`;
+
+  try {
+    await writeFile(tmpPath, buffer);
+    await rename(tmpPath, targetPath);
+  } catch (writeErr) {
+    await rm(tmpPath, { force: true }).catch(() => undefined);
+    throw writeErr;
+  }
+}
+
+export interface ServableMediaResult {
+  body: Buffer | ReadableStream<Uint8Array>;
+  contentType: string;
+  contentLength?: number;
+}
+
+/**
+ * Reads a validated media asset from Vercel Blob (when configured) or local `MEDIA_DIR`.
+ * Returns `null` for unsafe paths, non-image extensions, or missing files.
+ */
+export async function readMediaFile(
+  relativePath: string,
+  mediaDir?: string,
+): Promise<ServableMediaResult | null> {
+  const safePath = resolveSafeMediaPath(relativePath, mediaDir);
+  if (!safePath) {
+    return null;
+  }
+
+  const contentType = getServableMediaType(safePath);
+  if (!contentType) {
+    return null;
+  }
+
+  if (isVercelBlobEnabled(mediaDir)) {
+    const normalizedKey = toNormalizedMediaKey(safePath, mediaDir);
+    const { get } = await import("@vercel/blob");
+    const result = await get(normalizedKey, { access: getVercelBlobAccess() });
+    if (result?.statusCode !== 200 || !result.stream) {
+      return null;
+    }
+    return {
+      body: result.stream,
+      contentType: result.blob.contentType || contentType,
+      ...(typeof result.blob.size === "number" ? { contentLength: result.blob.size } : {}),
+    };
+  }
+
+  try {
+    const fileBuffer = await readFile(safePath);
+    return {
+      body: fileBuffer,
+      contentType,
+      contentLength: fileBuffer.byteLength,
+    };
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    if (code === "ENOENT" || code === "EISDIR") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /** Best-effort removal of a previously cached media file. Never throws. */
 export async function deleteMediaFile(
   relativePath: string | null | undefined,
@@ -78,6 +183,12 @@ export async function deleteMediaFile(
   }
   const target = resolveSafeMediaPath(relativePath, mediaDir);
   if (!target) {
+    return;
+  }
+  if (isVercelBlobEnabled(mediaDir)) {
+    const normalizedKey = toNormalizedMediaKey(target, mediaDir);
+    const { del } = await import("@vercel/blob");
+    await del(normalizedKey).catch(() => undefined);
     return;
   }
   await rm(target, { force: true }).catch(() => undefined);
@@ -139,21 +250,7 @@ export async function downloadAndSaveMedia(options: DownloadMediaOptions): Promi
 
     const contentHash = createHash("sha256").update(buffer).digest("hex").slice(0, 10);
     const relativePath = `${bucket}/${sanitizeBaseName(baseName)}-${contentHash}${ext}`;
-    const targetPath = resolveSafeMediaPath(relativePath, mediaDir);
-    if (!targetPath) {
-      return null;
-    }
-
-    await mkdir(path.dirname(targetPath), { recursive: true });
-    const tmpPath = `${targetPath}.${randomBytes(6).toString("hex")}.tmp`;
-
-    try {
-      await writeFile(tmpPath, buffer);
-      await rename(tmpPath, targetPath);
-    } catch (writeErr) {
-      await rm(tmpPath, { force: true }).catch(() => undefined);
-      throw writeErr;
-    }
+    await writeMediaBuffer(relativePath, buffer, mime, mediaDir);
 
     return relativePath;
   } catch {
@@ -302,21 +399,7 @@ export async function processAndSaveAvatar(options: ProcessAndSaveAvatarOptions)
 
   const contentHash = createHash("sha256").update(cleanWebp).digest("hex").slice(0, 10);
   const relativePath = `avatars/usr_${sanitizeBaseName(userId)}-${contentHash}.webp`;
-  const targetPath = resolveSafeMediaPath(relativePath, mediaDir);
-  if (!targetPath) {
-    throw new DomainError("Ruta de almacenamiento no válida");
-  }
-
-  await mkdir(path.dirname(targetPath), { recursive: true });
-  const tmpPath = `${targetPath}.${randomBytes(6).toString("hex")}.tmp`;
-
-  try {
-    await writeFile(tmpPath, cleanWebp);
-    await rename(tmpPath, targetPath);
-  } catch (writeErr) {
-    await rm(tmpPath, { force: true }).catch(() => undefined);
-    throw writeErr;
-  }
+  await writeMediaBuffer(relativePath, cleanWebp, "image/webp", mediaDir);
 
   if (previousAvatarPath && previousAvatarPath !== relativePath) {
     await deleteMediaFile(previousAvatarPath, mediaDir);

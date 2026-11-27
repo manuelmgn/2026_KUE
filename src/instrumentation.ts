@@ -14,6 +14,12 @@ export async function register(): Promise<void> {
         import("@/server/services/users"),
       ]);
     await ensureBootstrapAdmin();
+
+    if (process.env.VERCEL) {
+      // On Vercel serverless, background artist recovery & lineup sync run via waitUntil + Vercel Schedules
+      return;
+    }
+
     await recoverPendingArtists();
     startLineupSyncScheduler();
   } catch {

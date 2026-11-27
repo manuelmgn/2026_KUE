@@ -1,8 +1,10 @@
+import { getDeadline, waitUntil } from "@vercel/functions";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
 import { syncArtist } from "@/server/sync/sync-artist";
 
 export const DEFAULT_RATE_LIMIT_MS = 1100;
+const VERCEL_DRAIN_SAFETY_MARGIN_MS = 15_000;
 
 export interface SyncQueueStatus {
   running: boolean;
@@ -111,10 +113,22 @@ export class SyncQueue {
       this.currentArtistId = null;
       this.drainPromise = null;
     });
+    if (process.env.VERCEL) {
+      waitUntil(this.drainPromise);
+    }
   }
 
   private async drain(): Promise<void> {
     while (this.queue.length > 0) {
+      if (process.env.VERCEL) {
+        const deadline = getDeadline();
+        if (deadline && deadline.getTime() - Date.now() < VERCEL_DRAIN_SAFETY_MARGIN_MS) {
+          this.queue.length = 0;
+          this.queuedSet.clear();
+          break;
+        }
+      }
+
       const nextId = this.queue.shift();
       if (!nextId) {
         break;
@@ -159,9 +173,18 @@ export function getSyncQueue(): SyncQueue {
 export async function recoverPendingArtists(
   db: PrismaClient = getDb(),
   queue: SyncQueue = getSyncQueue(),
+  options: { staleSyncingMinutes?: number } = {},
 ): Promise<number> {
+  const syncingWhere =
+    options.staleSyncingMinutes && options.staleSyncingMinutes > 0
+      ? {
+          syncStatus: "SYNCING" as const,
+          updatedAt: { lt: new Date(Date.now() - options.staleSyncingMinutes * 60_000) },
+        }
+      : { syncStatus: "SYNCING" as const };
+
   await db.artist.updateMany({
-    where: { syncStatus: "SYNCING" },
+    where: syncingWhere,
     data: { syncStatus: "PENDING" },
   });
 
