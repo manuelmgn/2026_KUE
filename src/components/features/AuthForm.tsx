@@ -11,13 +11,19 @@ import type { InviteValidationResult } from "@/server/services/invitations";
 
 interface AuthFormProps {
   mode: "login" | "register";
-  isFirstUser: boolean;
+  isFirstUser?: boolean;
   inviteToken?: string | null;
   inviteState?: InviteValidationResult | null;
   nextPath?: string | null;
 }
 
-export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  isFirstUser = false,
+  inviteToken,
+  inviteState,
+  nextPath,
+}: AuthFormProps) {
   const { locale, dict } = useI18n();
   const router = useRouter();
   const formId = useId();
@@ -120,14 +126,6 @@ export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath
         <div className="flex h-14 items-stretch justify-between">
           <KueLogo href="/login" />
           <div className="flex items-stretch">
-            {mode === "login" && isFirstUser ? (
-              <Link
-                href="/register"
-                className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
-              >
-                {dict.auth.goToRegister}
-              </Link>
-            ) : null}
             {mode === "register" ? (
               <Link
                 href="/login"
@@ -144,11 +142,17 @@ export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath
         <div className="border border-line bg-surface">
           <div className="border-b border-line px-6 py-6">
             <h1 className="font-display text-[clamp(1.9rem,5vw,2.6rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.03em]">
-              {mode === "login" ? dict.auth.loginTitle : dict.auth.registerTitle}
+              {mode === "login"
+                ? dict.auth.loginTitle
+                : blockedCopy
+                  ? blockedCopy.title
+                  : dict.auth.registerTitle}
             </h1>
-            <p className="mt-2 font-serif text-[1.1rem] italic text-ink-muted">
-              {mode === "login" ? dict.auth.loginSubtitle : dict.auth.registerSubtitle}
-            </p>
+            {!blockedCopy ? (
+              <p className="mt-2 font-serif text-[1.1rem] italic text-ink-muted">
+                {mode === "login" ? dict.auth.loginSubtitle : dict.auth.registerSubtitle}
+              </p>
+            ) : null}
           </div>
 
           {mode === "register" && isFirstUser ? (
@@ -175,9 +179,6 @@ export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath
 
           {blockedCopy ? (
             <div className="flex flex-col gap-4 px-6 py-6">
-              <p className="font-mono text-xs font-semibold uppercase tracking-[0.08em] text-ink">
-                {blockedCopy.title}
-              </p>
               <p className="font-serif text-[1.08rem] text-ink-muted">{blockedCopy.description}</p>
               <Link
                 href="/login"
@@ -308,19 +309,7 @@ export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath
           {!registrationBlocked ? (
             <div className="flex items-center justify-between border-t border-line bg-bg px-6 py-3.5 font-mono text-[0.72rem] text-ink-muted">
               {mode === "login" ? (
-                isFirstUser ? (
-                  <>
-                    <span>{dict.auth.noAccountPrompt}</span>
-                    <Link
-                      href="/register"
-                      className="uppercase text-ink underline underline-offset-4"
-                    >
-                      {dict.auth.goToRegister}
-                    </Link>
-                  </>
-                ) : (
-                  <span>{dict.auth.inviteOnlyNotice}</span>
-                )
+                <span>{dict.auth.inviteOnlyNotice}</span>
               ) : (
                 <>
                   <span>{dict.auth.haveAccountPrompt}</span>

@@ -15,10 +15,14 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
     page,
     browser,
   }) => {
-    // 0. Unauthenticated user is redirected to /login
+    // 0. Unauthenticated user is redirected to /login (no "Crear conta" link shown)
     await page.goto("/import");
     await expect(page).toHaveURL(/\/login/);
     await expect(page.locator("html")).toHaveAttribute("lang", "gl");
+    await expect(page.getByRole("link", { name: /Crear conta/i })).toBeHidden();
+    await expect(
+      page.getByText("Rexistro exclusivo mediante ligazón de invitación."),
+    ).toBeVisible();
 
     // Register first user -> automatically ADMIN
     await page.goto("/register");
@@ -192,6 +196,7 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
 
     await secondPage.goto("/register");
     await expect(secondPage.getByText("Rexistro por invitación")).toBeVisible();
+    await expect(secondPage.getByRole("heading", { name: /Crear conta/i })).toBeHidden();
     await expect(secondPage.getByRole("button", { name: "Crear conta" })).toBeHidden();
 
     // Admin generates an invitation link in /admin
