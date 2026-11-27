@@ -25,6 +25,12 @@ import {
 } from "@/server/services/festivals";
 import { importFestivalLineup } from "@/server/services/importer";
 import {
+  createInvitationLink,
+  listInvitationLinks,
+  revokeInvitationLink,
+  validateInvitationToken,
+} from "@/server/services/invitations";
+import {
   adminCreateUser,
   adminDeleteUser,
   adminResetUserPassword,
@@ -34,7 +40,6 @@ import {
   changeOwnPassword,
   getAdminDashboardData,
   registerUser,
-  setRegistrationOpen,
 } from "@/server/services/users";
 
 let tempDir = "";
@@ -70,6 +75,7 @@ beforeEach(async () => {
   await db.legacyPersonalItem.deleteMany();
   await db.appSetting.deleteMany();
   await db.user.deleteMany();
+  await db.invitationLink.deleteMany();
 });
 
 afterAll(async () => {
@@ -116,14 +122,132 @@ describe("integration: multi-user auth, admin dashboard, editions, and shared ca
     expect(detail?.rating).toBe(5);
     expect(detail?.notes).toBe("Legacy note");
 
-    // Close public registration: self-register must fail, adminCreateUser must succeed
-    await setRegistrationOpen(false, db);
+    // Registration without a valid invite link must fail once an admin exists
     await expect(
       registerUser(
         { username: "bob", email: "bob@example.com", password: "password1234" },
         { db, rateLimiter: limiter },
       ),
     ).rejects.toBeInstanceOf(DomainError);
+
+    await expect(
+      registerUser(
+        {
+          username: "bob",
+          email: "bob@example.com",
+          password: "password1234",
+          inviteToken: "non-existent-token",
+        },
+        { db, rateLimiter: limiter },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    expect((await validateInvitationToken(null, db)).status).toBe("missing");
+    expect((await validateInvitationToken("non-existent-token", db)).status).toBe("invalid");
+
+    // Default invitation link allows 2 uses and expires in ~7 days
+    const defaultInvite = await createInvitationLink(first.user.id, {}, db);
+    expect(defaultInvite.maxUses).toBe(2);
+    expect(defaultInvite.usedCount).toBe(0);
+    expect(defaultInvite.remainingUses).toBe(2);
+    expect(defaultInvite.status).toBe("ACTIVE");
+    const deltaMs =
+      new Date(defaultInvite.expiresAt).getTime() - new Date(defaultInvite.createdAt).getTime();
+    expect(deltaMs).toBe(7 * 24 * 60 * 60 * 1000);
+
+    // Register 2 users via defaultInvite -> 3rd registration is rejected as exhausted
+    const invitedOne = await registerUser(
+      {
+        username: "invited_one",
+        email: "one@example.com",
+        password: "password1234",
+        inviteToken: defaultInvite.token,
+      },
+      { db, rateLimiter: limiter },
+    );
+    expect(invitedOne.isFirstAdmin).toBe(false);
+    expect(invitedOne.user.role).toBe("USER");
+
+    const invitedTwo = await registerUser(
+      {
+        username: "invited_two",
+        email: "two@example.com",
+        password: "password1234",
+        inviteToken: defaultInvite.token,
+      },
+      { db, rateLimiter: limiter },
+    );
+    expect(invitedTwo.user.role).toBe("USER");
+
+    expect((await validateInvitationToken(defaultInvite.token, db)).status).toBe("exhausted");
+    await expect(
+      registerUser(
+        {
+          username: "invited_three",
+          email: "three@example.com",
+          password: "password1234",
+          inviteToken: defaultInvite.token,
+        },
+        { db, rateLimiter: limiter },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    // Revoking an active invitation blocks further registration immediately
+    const revocableInvite = await createInvitationLink(
+      first.user.id,
+      { maxUses: 5, duration: "5h" },
+      db,
+    );
+    expect((await validateInvitationToken(revocableInvite.token, db)).status).toBe("valid");
+    const revokedInvite = await revokeInvitationLink({ invitationId: revocableInvite.id }, db);
+    expect(revokedInvite.status).toBe("REVOKED");
+    expect((await validateInvitationToken(revocableInvite.token, db)).status).toBe("revoked");
+    await expect(
+      registerUser(
+        {
+          username: "blocked_revoked",
+          email: "revoked@example.com",
+          password: "password1234",
+          inviteToken: revocableInvite.token,
+        },
+        { db, rateLimiter: limiter },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    // Expired invitation link is rejected
+    const expiredInvite = await createInvitationLink(
+      first.user.id,
+      { maxUses: 1, duration: "30d" },
+      db,
+    );
+    await db.invitationLink.update({
+      where: { id: expiredInvite.id },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    expect((await validateInvitationToken(expiredInvite.token, db)).status).toBe("expired");
+    await expect(
+      registerUser(
+        {
+          username: "blocked_expired",
+          email: "expired@example.com",
+          password: "password1234",
+          inviteToken: expiredInvite.token,
+        },
+        { db, rateLimiter: limiter },
+      ),
+    ).rejects.toBeInstanceOf(DomainError);
+
+    // Keep one active invite to verify activeInvitations stat
+    const activeInvite = await createInvitationLink(
+      first.user.id,
+      { maxUses: 3, duration: "72h" },
+      db,
+    );
+    const listedInvites = await listInvitationLinks(db);
+    expect(listedInvites.find((i) => i.id === defaultInvite.id)?.registeredUsernames).toEqual([
+      "invited_one",
+      "invited_two",
+    ]);
 
     const bob = await adminCreateUser(
       { username: "bob", email: "bob@example.com", password: "password1234", role: "USER" },
@@ -184,8 +308,9 @@ describe("integration: multi-user auth, admin dashboard, editions, and shared ca
 
     // Dashboard stats reflect live state
     const dashboard = await getAdminDashboardData(db);
-    expect(dashboard.stats.totalUsers).toBe(2);
-    expect(dashboard.stats.registrationOpen).toBe(false);
+    expect(dashboard.stats.totalUsers).toBe(4);
+    expect(dashboard.stats.activeInvitations).toBe(1);
+    expect(activeInvite.status).toBe("ACTIVE");
   });
 
   it("shares festivals and annual editions globally while isolating Mis Festivales and personal ratings per user", async () => {
@@ -194,8 +319,18 @@ describe("integration: multi-user auth, admin dashboard, editions, and shared ca
       { username: "alice", email: "alice@example.com", password: "password1234" },
       { db, rateLimiter: limiter },
     );
+    const bobInvite = await createInvitationLink(
+      alice.user.id,
+      { maxUses: 1, duration: "24h" },
+      db,
+    );
     const bob = await registerUser(
-      { username: "bob", email: "bob@example.com", password: "password1234" },
+      {
+        username: "bob",
+        email: "bob@example.com",
+        password: "password1234",
+        inviteToken: bobInvite.token,
+      },
       { db, rateLimiter: limiter },
     );
 

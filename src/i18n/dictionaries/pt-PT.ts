@@ -60,6 +60,8 @@ export const ptPT: Dictionary = {
     emptyPast: "Ainda não há festivais passados.",
     emptyTitle: "Sem festivais ainda",
     emptyDescription: "Cria o teu primeiro festival para começar a organizar o cartaz.",
+    emptyDescriptionUser:
+      "Adiciona um festival do catálogo partilhado para começar a organizar o teu cartaz.",
     createSubmit: "Criar festival",
   },
   manage: {
@@ -139,6 +141,8 @@ export const ptPT: Dictionary = {
     emptyTitle: "Começa o teu arquivo",
     emptyDescription:
       "Cria o teu primeiro festival e cola o cartaz em bruto para começar a ouvir e avaliar.",
+    emptyDescriptionUser:
+      "Adiciona um festival a partir do catálogo partilhado para começar a ouvir e avaliar.",
     emptyAction: "Ir para Festivais →",
     nextFestivalLabel: "Próximo festival",
     latestFestivalLabel: "Festival ativo",
@@ -388,9 +392,23 @@ export const ptPT: Dictionary = {
     registerSubtitle: "Junta-te ao catálogo partilhado e gere o teu arquivo pessoal.",
     firstAdminNotice:
       "Primeiro utilizador: esta conta receberá o papel ADMIN e herdará o arquivo existente.",
-    registrationClosedTitle: "Registo público encerrado",
-    registrationClosedDescription:
-      "O administrador desativou o registo livre. Pede uma conta ou inicia sessão.",
+    inviteOnlyNotice: "Registo exclusivo por ligação de convite.",
+    inviteValidBanner: (remaining: number, max: number, expiresAt: string) =>
+      `Convite válido · ${remaining} de ${max} ${remaining === 1 ? "utilização disponível" : "utilizações disponíveis"} · Expira em ${expiresAt}`,
+    inviteMissingTitle: "Registo por convite",
+    inviteMissingDescription:
+      "Apenas são permitidas novas contas através de uma ligação de convite gerada pelo administrador.",
+    inviteInvalidTitle: "Ligação de convite inválida",
+    inviteInvalidDescription:
+      "Esta ligação não existe ou está incompleta. Pede uma nova ligação ao administrador.",
+    inviteExpiredTitle: "Convite expirado",
+    inviteExpiredDescription:
+      "O prazo de validade desta ligação terminou. Pede um novo convite ao administrador.",
+    inviteExhaustedTitle: "Convite esgotado",
+    inviteExhaustedDescription:
+      "Esta ligação já atingiu o número máximo de registos permitidos. Pede um novo convite ao administrador.",
+    inviteRevokedTitle: "Convite revogado",
+    inviteRevokedDescription: "O administrador desativou esta ligação de convite.",
     usernameLabel: "Utilizador",
     usernamePlaceholder: "o_teu_utilizador",
     emailLabel: "E-mail",
@@ -574,6 +592,8 @@ export const ptPT: Dictionary = {
     catalogTitle: "Catálogo de festivais",
     catalogSubtitle:
       "Adiciona edições já criadas aos teus festivais ou cria uma nova edição ou festival se não existir.",
+    catalogSubtitleUser:
+      "Explora o catálogo partilhado e adiciona edições existentes aos teus festivais.",
     addEditionAction: "+ Adicionar",
     addedBadge: "ADICIONADO ✓",
     removeFromMine: "Remover",
@@ -582,6 +602,8 @@ export const ptPT: Dictionary = {
     createEditionTitle: (name: string) => `Nova edição de ${name}`,
     createEditionSubmit: "Criar edição",
     notFoundPrompt: "Não encontras o festival que procuras?",
+    notFoundUserPrompt:
+      "Não foram encontrados festivais no catálogo. Apenas um administrador pode criar novos festivais ou edições.",
     createNewFestivalButton: "+ Criar novo festival",
     backToCatalog: "← Voltar ao catálogo",
     editionCount: (count: number) => (count === 1 ? "1 EDIÇÃO" : `${count} EDIÇÕES`),
@@ -592,15 +614,40 @@ export const ptPT: Dictionary = {
     title: "Administração",
     subtitle: "Gestão de utilizadores, segurança de acesso e catálogo global.",
     tabUsers: (count: number) => `Utilizadores (${count})`,
+    tabInvitations: (count: number) => `Convites (${count})`,
     tabCatalog: (count: number) => `Catálogo (${count})`,
     statUsers: "Utilizadores",
     statActiveSessions: "Sessões ativas",
     statFestivals: "Festivais",
     statEditions: "Edições",
-    registrationLabel: "Registo público",
-    registrationOpen: "ABERTO",
-    registrationClosed: "FECHADO",
-    toggleRegistration: "Alterar",
+    newInvitationButton: "+ Novo convite",
+    invitationsTitle: "Ligações de convite",
+    invitationsDescription:
+      "Apenas os administradores podem gerar ligações de registo. Define quantas contas permite cada ligação e durante quanto tempo estará ativa.",
+    invitationMaxUsesLabel: "Utilizações permitidas",
+    invitationUseOption: (count: number) => (count === 1 ? "1 utilização" : `${count} utilizações`),
+    invitationDurationLabel: "Duração ativa",
+    invitationDuration5h: "5 horas",
+    invitationDuration24h: "24 horas",
+    invitationDuration72h: "72 horas",
+    invitationDuration7d: "1 semana",
+    invitationDuration30d: "1 mês",
+    createInvitationSubmit: "Gerar ligação",
+    creatingInvitation: "A gerar...",
+    invitationCreated: "Ligação de convite gerada com sucesso.",
+    invitationRevoked: "Ligação de convite revogada.",
+    copyInviteLink: "Copiar ligação",
+    copiedInviteLink: "Ligação copiada",
+    revokeInvitation: "Revogar",
+    invitationStatusActive: "ATIVO",
+    invitationStatusExhausted: "ESGOTADO",
+    invitationStatusExpired: "EXPIRADO",
+    invitationStatusRevoked: "REVOGADO",
+    invitationUsesStat: (used: number, max: number) => `${used}/${max} USOS`,
+    invitationExpiresLabel: "Expira",
+    invitationCreatedLabel: "Criado",
+    invitationUsedByLabel: "Contas criadas",
+    invitationsEmpty: "Ainda não existem ligações de convite geradas.",
     newUserButton: "+ Novo utilizador",
     createUserTitle: "Criar conta de utilizador",
     roleLabel: "Papel",

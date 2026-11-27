@@ -8,9 +8,16 @@ import type {
   AdminResetPasswordInput,
   AdminUpdateUserActiveInput,
   AdminUpdateUserRoleInput,
+  CreateInvitationInput,
+  RevokeInvitationInput,
 } from "@/domain/schemas";
 import { requireActionAdmin } from "@/server/auth/dal";
 import { deleteFestivalBrand, deleteFestivalEdition } from "@/server/services/festivals";
+import {
+  createInvitationLink,
+  type InvitationLinkDTO,
+  revokeInvitationLink,
+} from "@/server/services/invitations";
 import {
   adminCreateUser,
   adminDeleteUser,
@@ -18,19 +25,27 @@ import {
   adminSetUserActive,
   adminSetUserRole,
   type PublicUserDTO,
-  setRegistrationOpen,
 } from "@/server/services/users";
 
-export async function toggleRegistrationOpenAction(
-  open: boolean,
-): Promise<ActionResult<{ registrationOpen: boolean }>> {
+export async function adminCreateInvitationAction(
+  input: CreateInvitationInput,
+): Promise<ActionResult<InvitationLinkDTO>> {
+  return runAction(async () => {
+    const admin = await requireActionAdmin();
+    const invitation = await createInvitationLink(admin.id, input);
+    revalidatePath("/admin");
+    return invitation;
+  });
+}
+
+export async function adminRevokeInvitationAction(
+  input: RevokeInvitationInput,
+): Promise<ActionResult<InvitationLinkDTO>> {
   return runAction(async () => {
     await requireActionAdmin();
-    const registrationOpen = await setRegistrationOpen(Boolean(open));
+    const invitation = await revokeInvitationLink(input);
     revalidatePath("/admin");
-    revalidatePath("/register");
-    revalidatePath("/login");
-    return { registrationOpen };
+    return invitation;
   });
 }
 

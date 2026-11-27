@@ -7,16 +7,18 @@ import { loginAction, registerAction } from "@/actions/auth-actions";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { KueLogo } from "@/components/ui/KueLogo";
 import { useI18n } from "@/i18n/context";
+import type { InviteValidationResult } from "@/server/services/invitations";
 
 interface AuthFormProps {
   mode: "login" | "register";
-  registrationOpen: boolean;
   isFirstUser: boolean;
+  inviteToken?: string | null;
+  inviteState?: InviteValidationResult | null;
   nextPath?: string | null;
 }
 
-export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: AuthFormProps) {
-  const { dict } = useI18n();
+export function AuthForm({ mode, isFirstUser, inviteToken, inviteState, nextPath }: AuthFormProps) {
+  const { locale, dict } = useI18n();
   const router = useRouter();
   const formId = useId();
 
@@ -49,7 +51,12 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
         router.push(safeNext);
         router.refresh();
       } else {
-        const res = await registerAction({ username, email, password });
+        const res = await registerAction({
+          username,
+          email,
+          password,
+          inviteToken: inviteToken ?? undefined,
+        });
         if (!res.ok) {
           setError(res.error);
           return;
@@ -62,7 +69,50 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
     }
   };
 
-  const registrationBlocked = mode === "register" && !registrationOpen && !isFirstUser;
+  const registrationBlocked =
+    mode === "register" && !isFirstUser && inviteState?.status !== "valid";
+
+  const getBlockedCopy = () => {
+    switch (inviteState?.status) {
+      case "invalid":
+        return {
+          title: dict.auth.inviteInvalidTitle,
+          description: dict.auth.inviteInvalidDescription,
+        };
+      case "expired":
+        return {
+          title: dict.auth.inviteExpiredTitle,
+          description: dict.auth.inviteExpiredDescription,
+        };
+      case "exhausted":
+        return {
+          title: dict.auth.inviteExhaustedTitle,
+          description: dict.auth.inviteExhaustedDescription,
+        };
+      case "revoked":
+        return {
+          title: dict.auth.inviteRevokedTitle,
+          description: dict.auth.inviteRevokedDescription,
+        };
+      default:
+        return {
+          title: dict.auth.inviteMissingTitle,
+          description: dict.auth.inviteMissingDescription,
+        };
+    }
+  };
+
+  const blockedCopy = registrationBlocked ? getBlockedCopy() : null;
+  const formattedInviteExpires =
+    inviteState?.status === "valid"
+      ? new Intl.DateTimeFormat(locale, {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date(inviteState.expiresAt))
+      : null;
 
   return (
     <div className="flex min-h-dvh w-full flex-col overflow-x-clip bg-bg text-ink">
@@ -70,7 +120,7 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
         <div className="flex h-14 items-stretch justify-between">
           <KueLogo href="/login" />
           <div className="flex items-stretch">
-            {mode === "login" && (registrationOpen || isFirstUser) ? (
+            {mode === "login" && isFirstUser ? (
               <Link
                 href="/register"
                 className="flex items-center border-l border-line px-4 font-mono text-[0.74rem] uppercase tracking-[0.08em] text-ink transition-colors hover:bg-surface-elevated"
@@ -107,14 +157,25 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
             </div>
           ) : null}
 
-          {registrationBlocked ? (
+          {mode === "register" &&
+          !isFirstUser &&
+          inviteState?.status === "valid" &&
+          formattedInviteExpires ? (
+            <div className="border-b border-line bg-acid px-6 py-3 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-acid-ink">
+              {dict.auth.inviteValidBanner(
+                inviteState.remainingUses,
+                inviteState.maxUses,
+                formattedInviteExpires,
+              )}
+            </div>
+          ) : null}
+
+          {blockedCopy ? (
             <div className="flex flex-col gap-4 px-6 py-6">
               <p className="font-mono text-xs font-semibold uppercase tracking-[0.08em] text-ink">
-                {dict.auth.registrationClosedTitle}
+                {blockedCopy.title}
               </p>
-              <p className="font-serif text-[1.08rem] text-ink-muted">
-                {dict.auth.registrationClosedDescription}
-              </p>
+              <p className="font-serif text-[1.08rem] text-ink-muted">{blockedCopy.description}</p>
               <Link
                 href="/login"
                 className="inline-flex justify-center border border-acid bg-acid px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-[0.08em] text-acid-ink"
@@ -244,7 +305,7 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
           {!registrationBlocked ? (
             <div className="flex items-center justify-between border-t border-line bg-bg px-6 py-3.5 font-mono text-[0.72rem] text-ink-muted">
               {mode === "login" ? (
-                registrationOpen || isFirstUser ? (
+                isFirstUser ? (
                   <>
                     <span>{dict.auth.noAccountPrompt}</span>
                     <Link
@@ -255,7 +316,7 @@ export function AuthForm({ mode, registrationOpen, isFirstUser, nextPath }: Auth
                     </Link>
                   </>
                 ) : (
-                  <span>{dict.auth.registrationClosedTitle}</span>
+                  <span>{dict.auth.inviteOnlyNotice}</span>
                 )
               ) : (
                 <>

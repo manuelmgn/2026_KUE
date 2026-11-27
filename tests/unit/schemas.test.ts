@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   createFestivalSchema,
+  createInvitationSchema,
   disambiguateArtistSchema,
+  INVITATION_DEFAULT_DURATION,
+  INVITATION_DEFAULT_MAX_USES,
+  INVITATION_DURATION_MS,
   importLineupSchema,
   musicBrainzArtistSearchResponseSchema,
   nullableRatingSchema,
@@ -152,5 +156,34 @@ describe("domain/schemas", () => {
       disambiguation: "Canadian electronic musician",
     });
     expect("tags" in (mb.artists[0] ?? {})).toBe(false);
+  });
+
+  it("validates invitation creation defaults, uses 1..5, and supported durations", () => {
+    const defaults = createInvitationSchema.parse({});
+    expect(defaults.maxUses).toBe(INVITATION_DEFAULT_MAX_USES);
+    expect(defaults.maxUses).toBe(2);
+    expect(defaults.duration).toBe(INVITATION_DEFAULT_DURATION);
+    expect(defaults.duration).toBe("7d");
+
+    for (const uses of [1, 2, 3, 4, 5]) {
+      expect(createInvitationSchema.safeParse({ maxUses: uses, duration: "24h" }).success).toBe(
+        true,
+      );
+    }
+    expect(createInvitationSchema.safeParse({ maxUses: 0 }).success).toBe(false);
+    expect(createInvitationSchema.safeParse({ maxUses: 6 }).success).toBe(false);
+    expect(createInvitationSchema.safeParse({ maxUses: 2.5 }).success).toBe(false);
+
+    for (const duration of ["5h", "24h", "72h", "7d", "30d"] as const) {
+      expect(createInvitationSchema.safeParse({ duration }).success).toBe(true);
+    }
+    expect(createInvitationSchema.safeParse({ duration: "1h" }).success).toBe(false);
+    expect(createInvitationSchema.safeParse({ duration: "365d" }).success).toBe(false);
+
+    expect(INVITATION_DURATION_MS["5h"]).toBe(5 * 60 * 60 * 1000);
+    expect(INVITATION_DURATION_MS["24h"]).toBe(24 * 60 * 60 * 1000);
+    expect(INVITATION_DURATION_MS["72h"]).toBe(72 * 60 * 60 * 1000);
+    expect(INVITATION_DURATION_MS["7d"]).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(INVITATION_DURATION_MS["30d"]).toBe(30 * 24 * 60 * 60 * 1000);
   });
 });

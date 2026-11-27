@@ -37,7 +37,7 @@ import {
 } from "@/server/services/group-planning";
 import { importFestivalLineup } from "@/server/services/importer";
 import { updateOwnPrivacy } from "@/server/services/profile";
-import { registerUser } from "@/server/services/users";
+import { adminCreateUser, registerUser } from "@/server/services/users";
 
 let tempDir = "";
 let db: PrismaClient;
@@ -79,6 +79,7 @@ beforeEach(async () => {
   await db.legacyPersonalItem.deleteMany();
   await db.appSetting.deleteMany();
   await db.user.deleteMany();
+  await db.invitationLink.deleteMany();
 });
 
 afterAll(async () => {
@@ -89,16 +90,28 @@ afterAll(async () => {
 });
 
 async function seedUser(username: string) {
-  const limiter = new SlidingWindowRateLimiter(100, 60_000);
-  const res = await registerUser(
+  if ((await db.user.count()) === 0) {
+    const limiter = new SlidingWindowRateLimiter(100, 60_000);
+    const res = await registerUser(
+      {
+        username,
+        email: `${username}@example.com`,
+        password: "Password123!",
+      },
+      { db, rateLimiter: limiter },
+    );
+    return res.user;
+  }
+
+  return adminCreateUser(
     {
       username,
       email: `${username}@example.com`,
       password: "Password123!",
+      role: "USER",
     },
-    { db, rateLimiter: limiter },
+    db,
   );
-  return res.user;
 }
 
 async function makeFriends(userIdA: string, userIdB: string) {

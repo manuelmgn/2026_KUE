@@ -30,7 +30,6 @@ import { getDb } from "@/server/db";
 import { getEnv } from "@/server/env";
 import { deleteMediaFile } from "@/server/media-storage";
 
-const SETTING_REGISTRATION_OPEN = "registration_open";
 const SETTING_LEGACY_CLAIMED = "legacy_claimed_by";
 
 export interface PublicUserDTO {
@@ -57,7 +56,7 @@ export interface AdminDashboardStatsDTO {
   totalFestivals: number;
   totalEditions: number;
   totalArtists: number;
-  registrationOpen: boolean;
+  activeInvitations: number;
 }
 
 async function claimLegacyDataForAdmin(
@@ -148,29 +147,8 @@ async function claimLegacyDataForAdmin(
   });
 }
 
-export async function isRegistrationOpen(db: PrismaClient = getDb()): Promise<boolean> {
-  const userCount = await db.user.count();
-  if (userCount === 0) {
-    return true;
-  }
-  const setting = await db.appSetting.findUnique({ where: { key: SETTING_REGISTRATION_OPEN } });
-  return setting ? setting.value === "true" : true;
-}
-
 export async function hasAnyUsers(db: PrismaClient = getDb()): Promise<boolean> {
   return (await db.user.count()) > 0;
-}
-
-export async function setRegistrationOpen(
-  open: boolean,
-  db: PrismaClient = getDb(),
-): Promise<boolean> {
-  await db.appSetting.upsert({
-    where: { key: SETTING_REGISTRATION_OPEN },
-    create: { key: SETTING_REGISTRATION_OPEN, value: open ? "true" : "false" },
-    update: { value: open ? "true" : "false" },
-  });
-  return open;
 }
 
 /**
@@ -263,16 +241,43 @@ export async function registerUser(
   const { created, isFirstAdmin } = await db.$transaction(async (tx) => {
     const userCount = await tx.user.count();
     const firstUser = userCount === 0;
+    const now = new Date();
+
+    let inviteId: string | null = null;
+    let inviteMaxUses = 0;
 
     if (!firstUser) {
-      const setting = await tx.appSetting.findUnique({
-        where: { key: SETTING_REGISTRATION_OPEN },
-      });
-      if (setting && setting.value !== "true") {
-        throw new DomainError(
-          "El registro público está desactivado. Contacta con el administrador.",
-        );
+      const token = input.inviteToken?.trim();
+      if (!token) {
+        throw new DomainError("Necesitas un enlace de invitación válido para registrarte.");
       }
+
+      const invite = await tx.invitationLink.findUnique({
+        where: { token },
+        select: {
+          id: true,
+          maxUses: true,
+          usedCount: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      });
+
+      if (!invite) {
+        throw new DomainError("El enlace de invitación no es válido.");
+      }
+      if (invite.revokedAt !== null) {
+        throw new DomainError("Este enlace de invitación ha sido revocado.");
+      }
+      if (invite.expiresAt.getTime() <= now.getTime()) {
+        throw new DomainError("Este enlace de invitación ha caducado.");
+      }
+      if (invite.usedCount >= invite.maxUses) {
+        throw new DomainError("Este enlace de invitación ya ha alcanzado el límite de usos.");
+      }
+
+      inviteId = invite.id;
+      inviteMaxUses = invite.maxUses;
     }
 
     const [dupUser, dupEmail] = await Promise.all([
@@ -287,6 +292,21 @@ export async function registerUser(
       throw new DomainError("Ese correo electrónico ya está registrado");
     }
 
+    if (!firstUser && inviteId) {
+      const claimed = await tx.invitationLink.updateMany({
+        where: {
+          id: inviteId,
+          revokedAt: null,
+          expiresAt: { gt: now },
+          usedCount: { lt: inviteMaxUses },
+        },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (claimed.count !== 1) {
+        throw new DomainError("Este enlace de invitación ya no está disponible.");
+      }
+    }
+
     const user = await tx.user.create({
       data: {
         username: input.username,
@@ -296,7 +316,8 @@ export async function registerUser(
         passwordHash,
         role: firstUser ? "ADMIN" : "USER",
         isActive: true,
-        lastLoginAt: new Date(),
+        invitedByLinkId: inviteId,
+        lastLoginAt: now,
       },
     });
 
@@ -437,33 +458,46 @@ export async function getAdminDashboardData(db: PrismaClient = getDb()): Promise
   users: AdminUserRowDTO[];
 }> {
   const now = new Date();
-  const [usersRaw, activeSessions, totalFestivals, totalEditions, totalArtists, registrationOpen] =
-    await Promise.all([
-      db.user.findMany({
-        orderBy: [{ role: "desc" }, { createdAt: "asc" }],
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          role: true,
-          isActive: true,
-          lastLoginAt: true,
-          createdAt: true,
-          _count: {
-            select: {
-              editions: true,
-              artistStates: { where: { rating: { not: null } } },
-              sessions: { where: { expiresAt: { gt: now } } },
-            },
+  const [
+    usersRaw,
+    activeSessions,
+    totalFestivals,
+    totalEditions,
+    totalArtists,
+    activeInviteCandidates,
+  ] = await Promise.all([
+    db.user.findMany({
+      orderBy: [{ role: "desc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        _count: {
+          select: {
+            editions: true,
+            artistStates: { where: { rating: { not: null } } },
+            sessions: { where: { expiresAt: { gt: now } } },
           },
         },
-      }),
-      db.session.count({ where: { expiresAt: { gt: now } } }),
-      db.festival.count(),
-      db.festivalEdition.count(),
-      db.artist.count(),
-      isRegistrationOpen(db),
-    ]);
+      },
+    }),
+    db.session.count({ where: { expiresAt: { gt: now } } }),
+    db.festival.count(),
+    db.festivalEdition.count(),
+    db.artist.count(),
+    db.invitationLink.findMany({
+      where: { revokedAt: null, expiresAt: { gt: now } },
+      select: { usedCount: true, maxUses: true },
+    }),
+  ]);
+
+  const activeInvitations = activeInviteCandidates.filter(
+    (inv) => inv.usedCount < inv.maxUses,
+  ).length;
 
   const users: AdminUserRowDTO[] = usersRaw.map((u) => ({
     id: u.id,
@@ -487,7 +521,7 @@ export async function getAdminDashboardData(db: PrismaClient = getDb()): Promise
       totalFestivals,
       totalEditions,
       totalArtists,
-      registrationOpen,
+      activeInvitations,
     },
     users,
   };

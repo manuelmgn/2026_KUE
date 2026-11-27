@@ -74,11 +74,14 @@ model User {
   notesVisibility     VisibilityScope @default(FRIENDS)
   role                UserRole        @default(USER)
   isActive            Boolean         @default(true)
+  invitedByLinkId     String?
   lastLoginAt         DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
   sessions            Session[]
+  createdInvitations  InvitationLink[]           @relation("InvitationCreator")
+  invitedByLink       InvitationLink?            @relation("InvitationUsedBy", fields: [invitedByLinkId], references: [id], onDelete: SetNull)
   editions            UserFestivalEdition[]
   artistStates        UserArtistState[]
   albumStates         UserAlbumState[]
@@ -97,6 +100,25 @@ model User {
 
   @@index([role])
   @@index([isActive])
+  @@index([invitedByLinkId])
+}
+
+model InvitationLink {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  createdById String?
+  maxUses     Int       @default(2)
+  usedCount   Int       @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  createdBy       User?  @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  registeredUsers User[] @relation("InvitationUsedBy")
+
+  @@index([createdById])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
 
 model Session {

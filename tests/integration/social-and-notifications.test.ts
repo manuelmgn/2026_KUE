@@ -12,6 +12,7 @@ import { updateEntrySchedule } from "@/server/services/entries";
 import {
   addEditionToUserFestivals,
   createFestival,
+  removeEditionFromUserFestivals,
   updateFestival,
 } from "@/server/services/festivals";
 import {
@@ -35,7 +36,7 @@ import {
   updateOwnProfile,
   uploadOwnAvatar,
 } from "@/server/services/profile";
-import { adminSetUserActive, registerUser } from "@/server/services/users";
+import { adminCreateUser, adminSetUserActive, registerUser } from "@/server/services/users";
 
 let tempDir = "";
 let mediaDir = "";
@@ -74,6 +75,7 @@ beforeEach(async () => {
   await db.legacyPersonalItem.deleteMany();
   await db.appSetting.deleteMany();
   await db.user.deleteMany();
+  await db.invitationLink.deleteMany();
 });
 
 afterAll(async () => {
@@ -84,16 +86,28 @@ afterAll(async () => {
 });
 
 async function seedUser(username: string) {
-  const limiter = new SlidingWindowRateLimiter(100, 60_000);
-  const res = await registerUser(
+  if ((await db.user.count()) === 0) {
+    const limiter = new SlidingWindowRateLimiter(100, 60_000);
+    const res = await registerUser(
+      {
+        username,
+        email: `${username}@example.com`,
+        password: "Password123!",
+      },
+      { db, rateLimiter: limiter },
+    );
+    return res.user;
+  }
+
+  return adminCreateUser(
     {
       username,
       email: `${username}@example.com`,
       password: "Password123!",
+      role: "USER",
     },
-    { db, rateLimiter: limiter },
+    db,
   );
-  return res.user;
 }
 
 describe("integration: user profiles, friendships, privacy matrix, and notifications", () => {
@@ -139,7 +153,9 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     expect(foundSuspended).toHaveLength(0);
 
     // Non-friend cannot see Marta's festivals or activity
-    const rewire = await createFestival({ name: "Rewire", year: 2027 }, marta.id, db);
+    const rewire = await createFestival({ name: "Rewire", year: 2027 }, admin.id, db);
+    await removeEditionFromUserFestivals(admin.id, rewire.id, db);
+    await addEditionToUserFestivals(marta.id, rewire.id, db);
     const strangerView = await getUserProfileByUsername(admin.id, "marta_gz", db);
     expect(strangerView?.relationship).toBe("NONE");
     expect(strangerView?.canViewFestivals).toBe(false);
@@ -203,13 +219,15 @@ describe("integration: user profiles, friendships, privacy matrix, and notificat
     );
     await addEditionToUserFestivals(bob.id, edition.id, db);
 
-    // Unrelated festival created by a third user that also books Kali Malone (Alice does NOT follow it)
+    // Unrelated festival that also books Kali Malone (Alice does NOT follow it)
     const stranger = await seedUser("stranger_org");
     const otherEdition = await createFestival(
       { name: "Unfollowed Fest", year: 2029, location: "Berlin" },
-      stranger.id,
+      alice.id,
       db,
     );
+    await removeEditionFromUserFestivals(alice.id, otherEdition.id, db);
+    await addEditionToUserFestivals(stranger.id, otherEdition.id, db);
     await importFestivalLineup(
       {
         festivalId: otherEdition.id,

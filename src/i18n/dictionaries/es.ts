@@ -60,6 +60,8 @@ export const es: Dictionary = {
     emptyPast: "Todavía no hay festivales pasados.",
     emptyTitle: "Sin festivales todavía",
     emptyDescription: "Crea tu primer festival para empezar a organizar tu cartel.",
+    emptyDescriptionUser:
+      "Añade un festival del catálogo compartido para empezar a organizar tu cartel.",
     createSubmit: "Crear festival",
   },
   manage: {
@@ -139,6 +141,8 @@ export const es: Dictionary = {
     emptyTitle: "Empieza tu archivo",
     emptyDescription:
       "Crea tu primer festival y pega el cartel en bruto para empezar a escuchar y valorar.",
+    emptyDescriptionUser:
+      "Añade un festival desde el catálogo compartido para empezar a escuchar y valorar.",
     emptyAction: "Ir a Festivales →",
     nextFestivalLabel: "Próximo festival",
     latestFestivalLabel: "Festival activo",
@@ -388,9 +392,23 @@ export const es: Dictionary = {
     registerSubtitle: "Únete al catálogo compartido y lleva tu archivo personal.",
     firstAdminNotice:
       "Primer usuario: esta cuenta recibirá rol ADMIN y heredará el archivo existente.",
-    registrationClosedTitle: "Registro público cerrado",
-    registrationClosedDescription:
-      "El administrador ha desactivado el registro libre. Solicita una cuenta o inicia sesión.",
+    inviteOnlyNotice: "Registro exclusivo mediante enlace de invitación.",
+    inviteValidBanner: (remaining: number, max: number, expiresAt: string) =>
+      `Invitación válida · ${remaining} de ${max} ${remaining === 1 ? "uso disponible" : "usos disponibles"} · Caduca el ${expiresAt}`,
+    inviteMissingTitle: "Registro por invitación",
+    inviteMissingDescription:
+      "Solo se permiten nuevas cuentas mediante un enlace de invitación generado por el administrador.",
+    inviteInvalidTitle: "Enlace de invitación no válido",
+    inviteInvalidDescription:
+      "Este enlace no existe o está incompleto. Solicita un nuevo enlace al administrador.",
+    inviteExpiredTitle: "Invitación caducada",
+    inviteExpiredDescription:
+      "El tiempo de validez de este enlace ha expirado. Solicita una nueva invitación al administrador.",
+    inviteExhaustedTitle: "Invitación agotada",
+    inviteExhaustedDescription:
+      "Este enlace ya alcanzó el número máximo de registros permitidos. Solicita uno nuevo al administrador.",
+    inviteRevokedTitle: "Invitación revocada",
+    inviteRevokedDescription: "El administrador ha desactivado este enlace de invitación.",
     usernameLabel: "Usuario",
     usernamePlaceholder: "tu_usuario",
     emailLabel: "Correo electrónico",
@@ -574,6 +592,8 @@ export const es: Dictionary = {
     catalogTitle: "Catálogo de festivales",
     catalogSubtitle:
       "Añade ediciones ya creadas a tus festivales o crea una nueva edición o festival si no existe.",
+    catalogSubtitleUser:
+      "Explora el catálogo compartido y añade ediciones existentes a tus festivales.",
     addEditionAction: "+ Añadir",
     addedBadge: "AÑADIDO ✓",
     removeFromMine: "Quitar",
@@ -582,6 +602,8 @@ export const es: Dictionary = {
     createEditionTitle: (name: string) => `Nueva edición de ${name}`,
     createEditionSubmit: "Crear edición",
     notFoundPrompt: "¿No encuentras el festival que buscas?",
+    notFoundUserPrompt:
+      "No se encontraron festivales en el catálogo. Solo un administrador puede crear nuevos festivales o ediciones.",
     createNewFestivalButton: "+ Crear nuevo festival",
     backToCatalog: "← Volver al catálogo",
     editionCount: (count: number) => (count === 1 ? "1 EDICIÓN" : `${count} EDICIONES`),
@@ -592,15 +614,40 @@ export const es: Dictionary = {
     title: "Administración",
     subtitle: "Gestión de usuarios, seguridad de acceso y catálogo global.",
     tabUsers: (count: number) => `Usuarios (${count})`,
+    tabInvitations: (count: number) => `Invitaciones (${count})`,
     tabCatalog: (count: number) => `Catálogo (${count})`,
     statUsers: "Usuarios",
     statActiveSessions: "Sesiones activas",
     statFestivals: "Festivales",
     statEditions: "Ediciones",
-    registrationLabel: "Registro público",
-    registrationOpen: "ABIERTO",
-    registrationClosed: "CERRADO",
-    toggleRegistration: "Cambiar",
+    newInvitationButton: "+ Nueva invitación",
+    invitationsTitle: "Enlaces de invitación",
+    invitationsDescription:
+      "Solo los administradores pueden generar enlaces de registro. Define cuántas cuentas permite cada enlace y cuánto tiempo estará activo.",
+    invitationMaxUsesLabel: "Usos permitidos",
+    invitationUseOption: (count: number) => (count === 1 ? "1 uso" : `${count} usos`),
+    invitationDurationLabel: "Duración activa",
+    invitationDuration5h: "5 horas",
+    invitationDuration24h: "24 horas",
+    invitationDuration72h: "72 horas",
+    invitationDuration7d: "1 semana",
+    invitationDuration30d: "1 mes",
+    createInvitationSubmit: "Generar enlace",
+    creatingInvitation: "Generando...",
+    invitationCreated: "Enlace de invitación generado correctamente.",
+    invitationRevoked: "Enlace de invitación revocado.",
+    copyInviteLink: "Copiar enlace",
+    copiedInviteLink: "Enlace copiado",
+    revokeInvitation: "Revocar",
+    invitationStatusActive: "ACTIVO",
+    invitationStatusExhausted: "AGOTADO",
+    invitationStatusExpired: "CADUCADO",
+    invitationStatusRevoked: "REVOCADO",
+    invitationUsesStat: (used: number, max: number) => `${used}/${max} USOS`,
+    invitationExpiresLabel: "Caduca",
+    invitationCreatedLabel: "Creado",
+    invitationUsedByLabel: "Cuentas creadas",
+    invitationsEmpty: "Todavía no hay enlaces de invitación generados.",
     newUserButton: "+ Nuevo usuario",
     createUserTitle: "Crear cuenta de usuario",
     roleLabel: "Rol",

@@ -83,8 +83,42 @@ export const registerSchema = z.object({
   username: usernameSchema,
   email: emailSchema,
   password: passwordSchema,
+  inviteToken: z.string().trim().min(1).max(128).optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const INVITATION_DURATIONS = ["5h", "24h", "72h", "7d", "30d"] as const;
+export const invitationDurationSchema = z.enum(INVITATION_DURATIONS);
+export type InvitationDuration = z.infer<typeof invitationDurationSchema>;
+export const INVITATION_DEFAULT_DURATION: InvitationDuration = "7d";
+
+export const INVITATION_MIN_USES = 1;
+export const INVITATION_MAX_USES = 5;
+export const INVITATION_DEFAULT_MAX_USES = 2;
+
+export const INVITATION_DURATION_MS: Record<InvitationDuration, number> = {
+  "5h": 5 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "72h": 72 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+};
+
+export const createInvitationSchema = z.object({
+  maxUses: z.coerce
+    .number({ error: "El número de usos debe ser un entero" })
+    .int("El número de usos debe ser un entero")
+    .min(INVITATION_MIN_USES, "El mínimo es 1 uso")
+    .max(INVITATION_MAX_USES, "El máximo son 5 usos")
+    .default(INVITATION_DEFAULT_MAX_USES),
+  duration: invitationDurationSchema.default(INVITATION_DEFAULT_DURATION),
+});
+export type CreateInvitationInput = z.input<typeof createInvitationSchema>;
+
+export const revokeInvitationSchema = z.object({
+  invitationId: z.string().trim().min(1),
+});
+export type RevokeInvitationInput = z.infer<typeof revokeInvitationSchema>;
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Introduce tu contraseña actual").max(128),

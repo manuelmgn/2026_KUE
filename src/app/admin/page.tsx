@@ -2,14 +2,16 @@ import { AdminDashboardView } from "@/components/features/AdminDashboardView";
 import type { CatalogFestivalDTO } from "@/components/features/types";
 import { requirePageAdmin } from "@/server/auth/dal";
 import { listAllCatalogFestivals } from "@/server/services/festivals";
+import { listInvitationLinks } from "@/server/services/invitations";
 import { getAdminDashboardData } from "@/server/services/users";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const admin = await requirePageAdmin();
-  const [dashboard, rawCatalog] = await Promise.all([
+  const [dashboard, invitations, rawCatalog] = await Promise.all([
     getAdminDashboardData(),
+    listInvitationLinks(),
     listAllCatalogFestivals(admin.id),
   ]);
 
@@ -44,6 +46,7 @@ export default async function AdminPage() {
       currentUserId={admin.id}
       initialStats={dashboard.stats}
       initialUsers={dashboard.users}
+      initialInvitations={invitations}
       initialCatalog={catalog}
     />
   );

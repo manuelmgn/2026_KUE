@@ -51,7 +51,11 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
       });
     });
 
-    await page.goto("/import");
+    await page.goto("/festivals");
+    await page
+      .getByRole("button", { name: /\+ Crear novo festival/i })
+      .first()
+      .click();
 
     await page.getByLabel("Nome do festival").fill("Rewire");
     await page.getByLabel("Localización do festival").fill("La Haya");
@@ -59,9 +63,12 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
     await page.getByLabel("Data de inicio").fill("2027-04-08");
     await page.getByLabel("Data de fin").fill("2027-04-11");
     await expect(page.getByLabel("Ano do festival")).toHaveValue("2027");
-    await page.getByRole("button", { name: "Crear" }).click();
+    await page.getByRole("button", { name: "Crear festival" }).click();
 
-    await expect(page.getByLabel("Festival de destino")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Rewire 2027/i })).toBeVisible();
+
+    await page.goto("/festivals/rewire/2027/editar");
+    await page.getByRole("tab", { name: "Importar" }).click();
 
     const rawLineup = [
       "Mabe Fratti & Bill Orcutt | Sábado 10 | Korzo | 19:30",
@@ -171,11 +178,40 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
     await page.getByRole("button", { name: /Imprescindibles/i }).click();
     await expect(listItems).toHaveCount(2);
 
-    // 5. Second user registers in an isolated browser context, adds Rewire 2027 from shared catalog,
+    // 5. Second user cannot register without an invite; admin generates a 1-use/24h invite link,
+    //    second user registers with it, adds Rewire 2027 from shared catalog,
     //    and creates Rewire 2026 edition without recreating Rewire
     const secondContext = await browser.newContext();
     const secondPage = await secondContext.newPage();
+
+    await secondPage.goto("/login");
+    await expect(
+      secondPage.getByText("Rexistro exclusivo mediante ligazón de invitación."),
+    ).toBeVisible();
+    await expect(secondPage.getByRole("link", { name: /Crear conta/i })).toBeHidden();
+
     await secondPage.goto("/register");
+    await expect(secondPage.getByText("Rexistro por invitación")).toBeVisible();
+    await expect(secondPage.getByRole("button", { name: "Crear conta" })).toBeHidden();
+
+    // Admin generates an invitation link in /admin
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/admin");
+    await page.getByRole("tab", { name: /Invitacións/i }).click();
+    await expect(page.getByLabel("Usos permitidos")).toHaveValue("2");
+    await expect(page.getByLabel("Duración activa")).toHaveValue("7d");
+    await page.getByLabel("Usos permitidos").selectOption("1");
+    await page.getByLabel("Duración activa").selectOption("24h");
+    await page.getByRole("button", { name: "Xerar ligazón" }).click();
+
+    const inviteInput = page.locator("[data-latest-invite-box] input");
+    await expect(inviteInput).toBeVisible();
+    const inviteUrl = await inviteInput.inputValue();
+    expect(inviteUrl).toContain("/register?invite=");
+
+    // Second user registers via the invite link
+    await secondPage.goto(inviteUrl);
+    await expect(secondPage.getByText(/Invitación válida · 1 de 1 uso dispoñible/i)).toBeVisible();
     await secondPage.getByLabel("Usuario").fill("listener_two");
     await secondPage.getByLabel("Correo electrónico").fill("two@kue.test");
     await secondPage.getByLabel("Contrasinal", { exact: true }).fill("ListenerPass123!");
@@ -183,17 +219,31 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
     await secondPage.getByRole("button", { name: "Crear conta" }).click();
     await expect(secondPage).toHaveURL(/\/$/);
 
-    // Go to Festivales -> Catalog shows Rewire 2027 ready to add with 1 click
+    // Opening the exhausted 1-use invite link again is rejected
+    const exhaustedContext = await browser.newContext();
+    const exhaustedPage = await exhaustedContext.newPage();
+    await exhaustedPage.goto(inviteUrl);
+    await expect(exhaustedPage.getByText("Invitación esgotada")).toBeVisible();
+    await expect(exhaustedPage.getByRole("button", { name: "Crear conta" })).toBeHidden();
+    await exhaustedContext.close();
+
+    // Go to Festivales -> Catalog shows Rewire 2027 ready to add with 1 click (non-admin cannot create festivals or editions)
     await secondPage.goto("/festivals");
     await expect(secondPage.getByText("Rewire")).toBeVisible();
+    await expect(secondPage.getByRole("button", { name: /\+ Crear novo festival/i })).toBeHidden();
+    await expect(secondPage.getByRole("button", { name: /\+ Nova edición/i })).toBeHidden();
     await secondPage.getByRole("button", { name: /2027.*Engadir/i }).click();
     await expect(secondPage.getByText(/ENGADIDO/i)).toBeVisible();
 
-    // Create a second edition (2026) under Rewire
-    await secondPage.getByRole("button", { name: /\+ Nova edición/i }).click();
-    await secondPage.getByLabel("Ano do festival").fill("2026");
-    await secondPage.getByRole("button", { name: "Crear edición" }).click();
-    await expect(secondPage.getByRole("link", { name: /2026.*0 ART/i })).toBeVisible();
+    // Admin can see creation controls and add a second edition (2026) under Rewire
+    await page.goto("/festivals");
+    await page.getByRole("button", { name: /\+ Engadir festival/i }).click();
+    await expect(page.getByRole("button", { name: /\+ Crear novo festival/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /\+ Nova edición/i })).toBeVisible();
+    await page.getByRole("button", { name: /\+ Nova edición/i }).click();
+    await page.getByLabel("Ano do festival").fill("2026");
+    await page.getByRole("button", { name: "Crear edición" }).click();
+    await expect(page.getByRole("link", { name: /2026.*0 ART/i })).toBeVisible();
 
     // Non-admin visiting /admin is redirected to /
     await secondPage.goto("/admin");
@@ -215,13 +265,9 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
       await dbSync.$disconnect();
     }
 
-    // Non-admin cannot see last sync timestamp or trigger/force sync (UI + API)
-    await secondPage.goto("/manage?festival=rewire-2027");
-    await secondPage.getByRole("tab", { name: /Auto-sync/i }).click();
-    await expect(secondPage.getByRole("button", { name: "Gardar configuración" })).toBeVisible();
-    await expect(secondPage.getByText(/Última comprobación:/i)).toBeHidden();
-    await expect(secondPage.getByRole("button", { name: "Comprobar agora" })).toBeHidden();
-    await expect(secondPage.getByRole("button", { name: "Forzar análise" })).toBeHidden();
+    // Non-admin cannot see Auto-sync tab or trigger/force sync (UI + API)
+    await secondPage.goto("/festivals/rewire/2027/editar");
+    await expect(secondPage.getByRole("tab", { name: /Auto-sync/i })).toBeHidden();
 
     const nonAdminSyncRes = await secondPage.request.post(
       `/api/festivals/${rewireEditionId}/sync-lineup`,
@@ -232,7 +278,7 @@ test.describe("KUE E2E multi-user, editions, and core flows", () => {
 
     // Admin can see last sync timestamp and sync trigger buttons
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/manage?festival=rewire-2027");
+    await page.goto("/festivals/rewire/2027/editar");
     await page.getByRole("tab", { name: /Auto-sync/i }).click();
     await expect(page.getByText(/Última comprobación:/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "Comprobar agora" })).toBeVisible();

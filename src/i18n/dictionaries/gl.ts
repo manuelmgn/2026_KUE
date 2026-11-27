@@ -60,6 +60,8 @@ export const gl: Dictionary = {
     emptyPast: "Aínda non hai festivais pasados.",
     emptyTitle: "Sen festivais aínda",
     emptyDescription: "Crea o teu primeiro festival para comezar a organizar o cartaz.",
+    emptyDescriptionUser:
+      "Engade un festival do catálogo compartido para comezar a organizar o teu cartaz.",
     createSubmit: "Crear festival",
   },
   manage: {
@@ -138,6 +140,8 @@ export const gl: Dictionary = {
     emptyTitle: "Comeza o teu arquivo",
     emptyDescription:
       "Crea o teu primeiro festival e pega o cartaz en bruto para comezar a escoitar e valorar.",
+    emptyDescriptionUser:
+      "Engade un festival desde o catálogo compartido para comezar a escoitar e valorar.",
     emptyAction: "Ir a Festivais →",
     nextFestivalLabel: "Próximo festival",
     latestFestivalLabel: "Festival activo",
@@ -387,9 +391,23 @@ export const gl: Dictionary = {
     registerSubtitle: "Únete ao catálogo compartido e leva o teu arquivo persoal.",
     firstAdminNotice:
       "Primeiro usuario: esta conta recibirá rol ADMIN e herdará o arquivo existente.",
-    registrationClosedTitle: "Rexistro público pechado",
-    registrationClosedDescription:
-      "O administrador desactivou o rexistro libre. Solicita unha conta ou inicia sesión.",
+    inviteOnlyNotice: "Rexistro exclusivo mediante ligazón de invitación.",
+    inviteValidBanner: (remaining: number, max: number, expiresAt: string) =>
+      `Invitación válida · ${remaining} de ${max} ${remaining === 1 ? "uso dispoñible" : "usos dispoñibles"} · Caduca o ${expiresAt}`,
+    inviteMissingTitle: "Rexistro por invitación",
+    inviteMissingDescription:
+      "Só se permiten novas contas mediante unha ligazón de invitación xerada polo administrador.",
+    inviteInvalidTitle: "Ligazón de invitación non válida",
+    inviteInvalidDescription:
+      "Esta ligazón non existe ou está incompleta. Solicita unha nova ligazón ao administrador.",
+    inviteExpiredTitle: "Invitación caducada",
+    inviteExpiredDescription:
+      "O tempo de validez desta ligazón expirou. Solicita unha nova invitación ao administrador.",
+    inviteExhaustedTitle: "Invitación esgotada",
+    inviteExhaustedDescription:
+      "Esta ligazón xa acadou o número máximo de rexistros permitidos. Solicita unha nova ao administrador.",
+    inviteRevokedTitle: "Invitación revogada",
+    inviteRevokedDescription: "O administrador desactivou esta ligazón de invitación.",
     usernameLabel: "Usuario",
     usernamePlaceholder: "teu_usuario",
     emailLabel: "Correo electrónico",
@@ -573,6 +591,8 @@ export const gl: Dictionary = {
     catalogTitle: "Catálogo de festivais",
     catalogSubtitle:
       "Engade edicións xa creadas aos teus festivais ou crea unha nova edición ou festival se non existe.",
+    catalogSubtitleUser:
+      "Explora o catálogo compartido e engade edicións existentes aos teus festivais.",
     addEditionAction: "+ Engadir",
     addedBadge: "ENGADIDO ✓",
     removeFromMine: "Quitar",
@@ -581,6 +601,8 @@ export const gl: Dictionary = {
     createEditionTitle: (name: string) => `Nova edición de ${name}`,
     createEditionSubmit: "Crear edición",
     notFoundPrompt: "Non atopas o festival que buscas?",
+    notFoundUserPrompt:
+      "Non se atoparon festivais no catálogo. Só un administrador pode crear novos festivais ou edicións.",
     createNewFestivalButton: "+ Crear novo festival",
     backToCatalog: "← Volver ao catálogo",
     editionCount: (count: number) => (count === 1 ? "1 EDICIÓN" : `${count} EDICIÓNS`),
@@ -591,15 +613,40 @@ export const gl: Dictionary = {
     title: "Administración",
     subtitle: "Xestión de usuarios, seguridade de acceso e catálogo global.",
     tabUsers: (count: number) => `Usuarios (${count})`,
+    tabInvitations: (count: number) => `Invitacións (${count})`,
     tabCatalog: (count: number) => `Catálogo (${count})`,
     statUsers: "Usuarios",
     statActiveSessions: "Sesións activas",
     statFestivals: "Festivais",
     statEditions: "Edicións",
-    registrationLabel: "Rexistro público",
-    registrationOpen: "ABERTO",
-    registrationClosed: "PECHADO",
-    toggleRegistration: "Cambiar",
+    newInvitationButton: "+ Nova invitación",
+    invitationsTitle: "Ligazóns de invitación",
+    invitationsDescription:
+      "Só os administradores poden xerar ligazóns de rexistro. Define cantas contas permite cada ligazón e canto tempo estará activa.",
+    invitationMaxUsesLabel: "Usos permitidos",
+    invitationUseOption: (count: number) => (count === 1 ? "1 uso" : `${count} usos`),
+    invitationDurationLabel: "Duración activa",
+    invitationDuration5h: "5 horas",
+    invitationDuration24h: "24 horas",
+    invitationDuration72h: "72 horas",
+    invitationDuration7d: "1 semana",
+    invitationDuration30d: "1 mes",
+    createInvitationSubmit: "Xerar ligazón",
+    creatingInvitation: "Xerando...",
+    invitationCreated: "Ligazón de invitación xerada correctamente.",
+    invitationRevoked: "Ligazón de invitación revogada.",
+    copyInviteLink: "Copiar ligazón",
+    copiedInviteLink: "Ligazón copiada",
+    revokeInvitation: "Revogar",
+    invitationStatusActive: "ACTIVO",
+    invitationStatusExhausted: "ESGOTADO",
+    invitationStatusExpired: "CADUCADO",
+    invitationStatusRevoked: "REVOGADO",
+    invitationUsesStat: (used: number, max: number) => `${used}/${max} USOS`,
+    invitationExpiresLabel: "Caduca",
+    invitationCreatedLabel: "Creada",
+    invitationUsedByLabel: "Contas creadas",
+    invitationsEmpty: "Aínda non hai ligazóns de invitación xeradas.",
     newUserButton: "+ Novo usuario",
     createUserTitle: "Crear conta de usuario",
     roleLabel: "Rol",
