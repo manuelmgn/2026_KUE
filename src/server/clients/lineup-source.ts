@@ -761,9 +761,14 @@ function extractVenueName(raw: unknown): string | null {
   }
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const rec = raw as Record<string, unknown>;
-    return (
-      pickLocalizedLabel(rec.company ?? rec.name ?? rec.title ?? rec.venueName ?? rec.label) ?? null
+    const primary = pickLocalizedLabel(
+      rec.company ?? rec.name ?? rec.title ?? rec.venueName ?? rec.label,
     );
+    const building = pickLocalizedLabel(rec.building ?? rec.room ?? rec.hall);
+    if (primary && building && building.toLowerCase() !== primary.toLowerCase()) {
+      return `${primary} · ${building}`;
+    }
+    return primary ?? building ?? null;
   }
   return null;
 }
@@ -787,7 +792,12 @@ function extractNuxt2ArtistEntries(script: string): ParsedLineupEntry[] {
     if (!title || title.length < 2 || title.length > 140) {
       continue;
     }
-    if (/^(?:line-?up|program(?:me|a)?|artists?|schedule)\b/i.test(title)) {
+    if (
+      /^(?:line-?up|program(?:me|a)?|artists?|schedule)\b/i.test(title) ||
+      /^(?:sound\s*walk|audio\s*walk|workshop|talk|film|listening\s*session|screening|panel|lecture)\s*:/i.test(
+        title,
+      )
+    ) {
       continue;
     }
 
@@ -876,11 +886,20 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
     }
   };
 
-  const collectGenericItemArray = (items: unknown[]) => {
-    if (items.length < 3) {
-      return;
+  const collectGenericItemArray = (
+    items: unknown[],
+    inherited: { day: string | null; stage: string | null; setTime: string | null } = {
+      day: null,
+      stage: null,
+      setTime: null,
+    },
+    minItems = 3,
+  ): number => {
+    if (items.length === 0) {
+      return 0;
     }
     const candidates: ParsedLineupEntry[] = [];
+    let nestedTotal = 0;
     for (const item of items) {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         continue;
@@ -889,6 +908,43 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
       const category = pickLocalizedLabel(rec.category ?? rec.type ?? rec.discipline);
       if (isNonMusicCategory(category)) {
         continue;
+      }
+
+      const rawSubtitle = pickLocalizedLabel(rec.subtitle ?? rec.header_sub ?? rec.subTitle);
+      if (isNonMusicCategory(rawSubtitle)) {
+        continue;
+      }
+
+      const isoInfo = extractIsoDayAndTime(rec.startDate ?? rec.start ?? rec.dateTime);
+      const day =
+        pickLocalizedLabel(rec.startDateOnly ?? rec.day ?? rec.date) ??
+        isoInfo.day ??
+        inherited.day;
+      const setTime =
+        (typeof rec.time === "string" && /^\d{1,2}:\d{2}/.test(rec.time.trim())
+          ? rec.time.trim().slice(0, 5)
+          : null) ??
+        isoInfo.setTime ??
+        inherited.setTime;
+      const stage = extractVenueName(rec.stage ?? rec.venue ?? rec.location) ?? inherited.stage;
+
+      // If this schedule event embeds a nested artist lineup (`lineUp`, `artists`, `performers`),
+      // prefer those concrete artists with inherited day/stage/setTime over the umbrella event title.
+      const nestedArray = Array.isArray(rec.lineUp)
+        ? rec.lineUp
+        : Array.isArray(rec.lineup)
+          ? rec.lineup
+          : Array.isArray(rec.artists)
+            ? rec.artists
+            : Array.isArray(rec.performers)
+              ? rec.performers
+              : null;
+      if (nestedArray && nestedArray.length > 0) {
+        const addedNested = collectGenericItemArray(nestedArray, { day, stage, setTime }, 1);
+        if (addedNested > 0) {
+          nestedTotal += addedNested;
+          continue;
+        }
       }
 
       const rawTitle = pickLocalizedLabel(
@@ -905,23 +961,8 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
         continue;
       }
 
-      const rawSubtitle = pickLocalizedLabel(rec.subtitle ?? rec.header_sub ?? rec.subTitle);
-      if (isNonMusicCategory(rawSubtitle)) {
-        continue;
-      }
       const subtitle =
         rawSubtitle && !GENERIC_MUSIC_LABEL_REGEX.test(rawSubtitle) ? rawSubtitle : null;
-
-      const isoInfo = extractIsoDayAndTime(rec.startDate ?? rec.start ?? rec.dateTime);
-      const day =
-        pickLocalizedLabel(rec.startDateOnly ?? rec.day ?? rec.date) ?? isoInfo.day ?? null;
-      const setTime =
-        (typeof rec.time === "string" && /^\d{1,2}:\d{2}/.test(rec.time.trim())
-          ? rec.time.trim().slice(0, 5)
-          : null) ??
-        isoInfo.setTime ??
-        null;
-      const stage = extractVenueName(rec.stage ?? rec.venue ?? rec.location);
 
       const normalized = normalizeExtractedEntry({
         billingName: rawTitle,
@@ -935,9 +976,11 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
       }
     }
 
-    if (candidates.length >= 3) {
+    if (candidates.length + nestedTotal >= minItems) {
       collected.push(...candidates);
+      return candidates.length + nestedTotal;
     }
+    return 0;
   };
 
   const visit = (node: unknown, depth = 0, inLineupBranch = false) => {
@@ -946,7 +989,10 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
     }
     if (Array.isArray(node)) {
       if (inLineupBranch) {
-        collectGenericItemArray(node);
+        const added = collectGenericItemArray(node);
+        if (added > 0) {
+          return;
+        }
       }
       for (const item of node) {
         visit(item, depth + 1, inLineupBranch);
@@ -974,7 +1020,10 @@ export function extractLineupFromEmbeddedJson(html: string): ParsedLineupEntry[]
 
     // Direct `items` array inside a lineup/artist/calendar container (e.g. CTM `vueJsData`)
     if (inLineupBranch && Array.isArray(rec.items)) {
-      collectGenericItemArray(rec.items);
+      const added = collectGenericItemArray(rec.items);
+      if (added > 0) {
+        return;
+      }
     }
 
     for (const [key, val] of Object.entries(rec)) {
@@ -1095,7 +1144,7 @@ const ARTIST_PATH_SEGMENT_REGEX =
   /\/(?:artists?|artistas?|bands?|acts?|line-?up|performers?|musicians?|musica|music)\//i;
 
 const UI_NOISE_LABEL_REGEX =
-  /^(?:scroll|music|m[uú]sica|live|new|more|read\s*more|ver\s*m[aá]s|info|tickets?|buy|share|en|es|pt|gl|pl|de|fr|back|all|filter|search|menu|home|about|contact|bandcamp|spotify|instagram|facebook|youtube|soundcloud)$/i;
+  /^(?:scroll|music|m[uú]sica|live|new|more|read\s*more|ver\s*m[aá]s|info|tickets?|buy|share|en|es|pt|gl|pl|de|fr|back|all|filter|search|menu|home|about|contact|contacto|bandcamp|spotify|instagram|facebook|youtube|soundcloud|dj\s*sets?|talks?|amplitalks?|social|newsletter|colaboradores|partners?|faq|programa|programme|program|line-?up|schedule|horarios)$/i;
 
 function stripHtmlTagsClean(fragment: string): string {
   return decodeHtmlEntities(fragment.replace(/<[^>]+>/g, " "))
@@ -1258,14 +1307,16 @@ export function extractLineupFromHtmlStructure(html: string, pageUrl: string): P
     return dedupedMicrodata;
   }
 
-  // Strategy C: Repeated semantic artist/event title elements (e.g. `event-title`, `artist-name`)
+  // Strategy C: Repeated semantic artist/event title elements
+  // (e.g. `event-title`, `artist-name`, `uk-accordion-title`, `grid-entry-title`)
+  const compactContentHtml = contentHtml.replace(/\s+/g, " ");
   const semanticEntries: ParsedLineupEntry[] = [];
   const semanticClassRegex =
-    /<(?:p|div|h[2-5]|span)\b[^>]*class=["'][^"']*(?:artist[-_]?name|artist[-_]?title|lineup[-_]?artist|event[-_]?title)[^"']*["'][^>]*>([\s\S]{1,300}?)<\/(?:p|div|h[2-5]|span)>/gi;
+    /<(?:p|div|a|h[2-5]|span)\b[^>]*class=["'][^"']*(?:artist[-_]?name|artist[-_]?title|lineup[-_]?artist|event[-_]?title|accordion[-_]?title|grid-entry-title)[^"']*["'][^>]*>([\s\S]{1,360}?)<\/(?:p|div|a|h[2-5]|span)>/gi;
 
-  for (const match of contentHtml.matchAll(semanticClassRegex)) {
+  for (const match of compactContentHtml.matchAll(semanticClassRegex)) {
     const matchIndex = match.index ?? 0;
-    const precedingContext = contentHtml.slice(Math.max(0, matchIndex - 220), matchIndex);
+    const precedingContext = compactContentHtml.slice(Math.max(0, matchIndex - 320), matchIndex);
     const precedingLabels = [...precedingContext.matchAll(/<p\b[^>]*>([^<]{1,40})<\/p>/gi)]
       .map((m) => decodeHtmlEntities(m[1] ?? "").trim())
       .filter(Boolean);
@@ -1275,29 +1326,59 @@ export function extractLineupFromHtmlStructure(html: string, pageUrl: string): P
     }
 
     const inner = match[1] ?? "";
+    const tdParts = [...inner.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)]
+      .map((m) => stripHtmlTagsClean(m[1] ?? ""))
+      .filter(Boolean);
     const subParts = [...inner.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((m) => stripHtmlTagsClean(m[1] ?? ""))
       .filter(Boolean);
 
-    const billingName = subParts[0] ?? stripHtmlTagsClean(inner);
-    const subtitle = subParts.length > 1 ? subParts.slice(1).join(" · ") : null;
+    let billingName = "";
+    let subtitle: string | null = null;
+    let day: string | null = null;
+
+    if (tdParts.length >= 2 && /^\d{1,2}\s*[/.-]\s*\d{1,2}$/.test(tdParts[0] ?? "")) {
+      day = (tdParts[0] ?? "").replace(/\s+/g, "");
+      billingName = tdParts.slice(1).join(" ").trim();
+    } else if (subParts.length > 0) {
+      billingName = subParts[0] ?? "";
+      subtitle = subParts.length > 1 ? subParts.slice(1).join(" · ") : null;
+    } else {
+      billingName = stripHtmlTagsClean(inner);
+      const leadingDateMatch = billingName.match(/^(\d{1,2}\s*[/.-]\s*\d{1,2})\s+(.+)$/);
+      if (leadingDateMatch?.[1] && leadingDateMatch[2]) {
+        day = leadingDateMatch[1].replace(/\s+/g, "");
+        billingName = leadingDateMatch[2].trim();
+      }
+    }
+
     if (
       !billingName ||
       billingName.length < 2 ||
       billingName.length > 140 ||
-      UI_NOISE_LABEL_REGEX.test(billingName)
+      UI_NOISE_LABEL_REGEX.test(billingName) ||
+      isNonMusicCategory(billingName)
     ) {
       continue;
     }
 
-    const followingContext = contentHtml.slice(matchIndex, matchIndex + 450);
-    const timeMatch = followingContext.match(/\b([0-2]?\d:[0-5]\d)\b/);
-    const setTime = timeMatch?.[1] ?? null;
+    const followingContext = compactContentHtml.slice(matchIndex, matchIndex + 420);
+    const timeAndStageMatch = followingContext.match(
+      /<p\b[^>]*>\s*([0-2]?\d:[0-5]\d)\s*<\/p>\s*<p\b[^>]*>([^<]{2,80})<\/p>/i,
+    );
+    const timeMatch = timeAndStageMatch?.[1]
+      ? timeAndStageMatch[1]
+      : (followingContext.match(/\b([0-2]?\d:[0-5]\d)\b/)?.[1] ?? null);
+    const stageCandidate = timeAndStageMatch?.[2]
+      ? decodeHtmlEntities(timeAndStageMatch[2]).replace(/\s+/g, " ").trim()
+      : null;
 
     const normalized = normalizeExtractedEntry({
       billingName,
       subtitle,
-      setTime,
+      day,
+      stage: stageCandidate && !isNonMusicCategory(stageCandidate) ? stageCandidate : null,
+      setTime: timeMatch,
     });
     if (normalized) {
       semanticEntries.push(normalized);

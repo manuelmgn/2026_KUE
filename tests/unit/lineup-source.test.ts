@@ -509,4 +509,67 @@ describe("lineup-source", () => {
     expect(res.entries).toHaveLength(5);
     expect(llmExtractor).not.toHaveBeenCalled();
   });
+
+  it("inherits event day/stage/time into nested schedule lineUp arrays and parses accordion/event-title HTML", () => {
+    const scheduleHtml = `
+      <html><script>
+        var vueJsData = {
+          "calendar": {
+            "list": {
+              "items": [
+                {
+                  "header": "Kinetisising",
+                  "startDate": "2027-01-29T23:00:00+01:00",
+                  "startDateOnly": "2027-01-29",
+                  "venue": { "company": "Berghain", "building": "Panorama Bar" },
+                  "lineUp": [
+                    { "title": "DJ Strawberry", "time": null },
+                    { "title": "SHERELLE", "time": "01:30" }
+                  ]
+                },
+                {
+                  "header": "Opening Concert",
+                  "startDate": "2027-01-22T20:00:00+01:00",
+                  "startDateOnly": "2027-01-22",
+                  "venue": { "company": "silent green", "building": "Kuppelhalle" },
+                  "lineUp": [{ "title": "Mariana Carrilho", "time": null }]
+                }
+              ]
+            }
+          }
+        };
+      </script></html>
+    `;
+    const scheduleEntries = extractLineupFromEmbeddedJson(scheduleHtml);
+    expect(scheduleEntries).toHaveLength(3);
+    expect(scheduleEntries[0]).toMatchObject({
+      billingName: "DJ Strawberry",
+      day: "2027-01-29",
+      setTime: "23:00",
+      stage: "Berghain · Panorama Bar",
+    });
+    expect(scheduleEntries[1]).toMatchObject({
+      billingName: "SHERELLE",
+      day: "2027-01-29",
+      setTime: "01:30",
+      stage: "Berghain · Panorama Bar",
+    });
+
+    const wosAccordionHtml = `
+      <html><body>
+        <a class="el-title uk-accordion-title"><table><tr><td>13 / 09</td><td>Ana Roxanne</td></tr></table></a>
+        <a class="el-title uk-accordion-title"><table><tr><td>12 / 09</td><td>Ben Vince</td></tr></table></a>
+        <a class="el-title uk-accordion-title"><table><tr><td>12 / 09</td><td>Blood of Aza</td></tr></table></a>
+        <a class="el-title uk-accordion-title"><table><tr><td>12 / 09</td><td>Clara Brea</td></tr></table></a>
+        <a class="el-title uk-accordion-title"><table><tr><td>11 / 09</td><td>Visible Cloaks</td></tr></table></a>
+      </body></html>
+    `;
+    const wosEntries = extractLineupFromHtmlStructure(
+      wosAccordionHtml,
+      "https://wosfestival.es/programa-gl/",
+    );
+    expect(wosEntries).toHaveLength(5);
+    expect(wosEntries[0]).toMatchObject({ billingName: "Ana Roxanne", day: "13/09" });
+    expect(wosEntries[4]).toMatchObject({ billingName: "Visible Cloaks", day: "11/09" });
+  });
 });
